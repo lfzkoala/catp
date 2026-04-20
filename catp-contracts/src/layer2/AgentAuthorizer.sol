@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import "./IAgentAuthorizer.sol";
+import "./ActionData.sol";
 
 /// @title AgentAuthorizer
 /// @notice CATP Layer 2: policy registry and ZK proof verifier.
@@ -13,6 +14,7 @@ contract AgentAuthorizer is IAgentAuthorizer {
     mapping(bytes32 => uint256) private _policyNonces;
 
     function registerPolicy(bytes32 policyCommitment) external override {
+        require(msg.sender != address(0), "AgentAuthorizer: invalid delegator");
         require(policyCommitment != bytes32(0), "AgentAuthorizer: zero commitment");
         require(!_activePolicies[policyCommitment], "AgentAuthorizer: policy already active");
         _policyDelegators[policyCommitment] = msg.sender;
@@ -35,8 +37,9 @@ contract AgentAuthorizer is IAgentAuthorizer {
         require(_activePolicies[policyCommitment], "AgentAuthorizer: policy not active");
         bytes32 actionHash = keccak256(actionData);
         uint256 currentSpend = _cumulativeSpend[policyCommitment];
+        uint256 currentNonce = _policyNonces[policyCommitment];
         require(
-            _verifyProof(policyCommitment, actionHash, block.timestamp, currentSpend, proof),
+            _verifyProof(policyCommitment, actionHash, block.timestamp, currentSpend, currentNonce, proof),
             "AgentAuthorizer: invalid proof"
         );
         uint256 value = _extractValue(actionData);
@@ -54,17 +57,18 @@ contract AgentAuthorizer is IAgentAuthorizer {
     }
 
     /// @dev STUB: accepts any non-empty proof. Replace with Halo2 verifier in Phase 2.
+    ///      The real verifier must bind all public inputs including nonce to prevent replay.
     function _verifyProof(
-        bytes32, bytes32, uint256, uint256,
+        bytes32, bytes32, uint256, uint256, uint256,
         bytes calldata proof
     ) internal pure virtual returns (bool) {
         return proof.length > 0;
     }
 
-    /// @dev ActionData ABI encoding: abi.encode(ActionType, bytes32, bytes32, uint256)
-    ///      ActionType (enum/uint8) is ABI-padded to 32 bytes, so value starts at offset 96.
+    /// @dev Decode value from ABI-encoded ActionData using full abi.decode (type-safe).
     function _extractValue(bytes calldata actionData) internal pure returns (uint256) {
         if (actionData.length < 128) return 0;
-        return abi.decode(actionData[96:128], (uint256));
+        (, , , uint256 value) = abi.decode(actionData, (ActionData.ActionType, bytes32, bytes32, uint256));
+        return value;
     }
 }
