@@ -4,4 +4,22 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# halo2_proofs and halo2_gadgets will be added in Task 1.2
+# Encryption (P5)
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+aes-gcm = "0.10"
+rand = "0.8"
+rand_core = { version = "0.6", features = ["getrandom"] }
+
+# Hashing
+sha2 = "0.10"
+blake2 = "0.10"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+thiserror = "1"
+
+[dev-dependencies]
+hex = "0.4"
