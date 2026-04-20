@@ -10,7 +10,6 @@ members = [
 ]
 
 # Shared dependency versions — edit here to update all crates at once.
-# Halo2 dependencies will be added in Task 1.2.
 [workspace.dependencies]
 
 # Without opt-level >= 3, Halo2 proof generation is too slow to be usable.
@@ -19,3 +18,9 @@ opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 3
+
+# blake2b_simd 1.0.4+ pulls in constant_time_eq 0.4.3 which requires edition2024,
+# not supported by Cargo 1.79. Patch both to versions using edition 2021.
+[patch.crates-io]
+blake2b_simd = { path = "/Users/zhoulinfeng/.cargo/registry/src/index.crates.io-6f17d22bba15001f/blake2b_simd-1.0.2" }
+constant_time_eq = { path = "/Users/zhoulinfeng/.cargo/registry/src/index.crates.io-6f17d22bba15001f/constant_time_eq-0.3.1" }
