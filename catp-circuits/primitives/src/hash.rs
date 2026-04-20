@@ -49,7 +49,8 @@ impl CommitmentScheme {
 
     /// Commit with a random salt for hiding.
     pub fn commit_with_salt(data: &[u8], salt: &[u8; 32]) -> Commitment {
-        Self::commit_fields(&[data, salt])
+        // Domain tag 0x01 distinguishes salted commitments from plain commit_fields output.
+        Self::commit_fields(&[b"\x01", data, salt])
     }
 }
 
