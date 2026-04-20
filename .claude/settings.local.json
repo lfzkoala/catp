@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(cargo test *)",
+      "Bash(cargo tree *)",
+      "Bash(cargo check *)",
+      "Bash(cargo search *)",
+      "Bash(cargo add *)",
+      "Bash(cargo fetch *)",
+      "Bash(true ls *)",
+      "Bash(rustup show *)",
+      "Bash(cargo update *)",
+      "Bash(python3 -c ' *)",
+      "Bash(cargo generate-lockfile *)",
+      "Bash(forge test *)"
+    ]
+  }
+}
