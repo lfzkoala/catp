@@ -1,0 +1,4 @@
+[package]
+name = "catp-node"
+version = "0.1.0"
+edition = "2021"

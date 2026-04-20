@@ -1,0 +1,10 @@
+[workspace]
+resolver = "2"
+members = [
+    "catp-circuits/primitives",
+    "catp-circuits/layer2",
+    "catp-circuits/layer3",
+    "catp-circuits/layer4",
+    "catp-circuits/layer5",
+    "catp-node",
+]
