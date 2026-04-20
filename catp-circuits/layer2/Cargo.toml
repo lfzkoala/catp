@@ -1,0 +1,11 @@
+[package]
+name = "catp-layer2"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+catp-primitives = { path = "../primitives" }
+halo2_proofs = "0.3"
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+thiserror = "1"

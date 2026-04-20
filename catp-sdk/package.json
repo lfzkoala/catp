@@ -1,0 +1,45 @@
+{
+  "name": "@catp/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./layer1": {
+      "import": "./dist/layer1/index.js",
+      "types": "./dist/layer1/index.d.ts"
+    },
+    "./layer2": {
+      "import": "./dist/layer2/index.js",
+      "types": "./dist/layer2/index.d.ts"
+    },
+    "./layer3": {
+      "import": "./dist/layer3/index.js",
+      "types": "./dist/layer3/index.d.ts"
+    },
+    "./layer4": {
+      "import": "./dist/layer4/index.js",
+      "types": "./dist/layer4/index.d.ts"
+    },
+    "./layer5": {
+      "import": "./dist/layer5/index.js",
+      "types": "./dist/layer5/index.d.ts"
+    }
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'No tests yet'"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

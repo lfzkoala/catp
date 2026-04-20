@@ -1,0 +1,5 @@
+{
+  "name": "catp",
+  "private": true,
+  "workspaces": ["catp-sdk"]
+}
