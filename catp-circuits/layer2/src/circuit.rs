@@ -116,6 +116,31 @@ impl Circuit<halo2_proofs::pasta::Fp> for ProveAuthorization {
         // action_type  == policy.allowed_action
         // action.protocol_low == policy.protocol_low  (first 8 bytes as u64)
         // action.token_low    == policy.token_low
+        //
+        // TODO(C-002): KNOWN COLLISION ATTACK SURFACE — partial address comparison.
+        // Currently only the first 8 bytes (low limb) of each 32-byte address are
+        // compared in-circuit. An adversary can craft a different protocol/token address
+        // that shares the same low 8 bytes (bytes 0–7) but differs in bytes 8–31,
+        // bypassing the membership gate.
+        //
+        // Fix (deferred to Phase 2 — lookup table refactor):
+        //   Split each 32-byte address into 4 × u64 limbs and enforce all 4 equality
+        //   constraints per address (8 constraints total instead of 2). This requires
+        //   expanding action_cols to 10 and policy_cols to 13 columns.
+        //   Full implementation is deferred because it requires a concurrent refactor
+        //   of the value_limits and time_bounds regions, which reuse action_cols[2/3]
+        //   as witness columns. The circuit is also not production-ready until the
+        //   Poseidon commitment (Constraint 1, TODO C-003) is wired in Phase 2.
+        //
+        //   Helper to split addresses into limbs (to be used in Phase 2):
+        //     fn address_to_limbs(addr: &[u8; 32]) -> [u64; 4] {
+        //         [
+        //             u64::from_le_bytes(addr[0..8].try_into().unwrap()),
+        //             u64::from_le_bytes(addr[8..16].try_into().unwrap()),
+        //             u64::from_le_bytes(addr[16..24].try_into().unwrap()),
+        //             u64::from_le_bytes(addr[24..32].try_into().unwrap()),
+        //         ]
+        //     }
         meta.create_gate("membership checks", |meta| {
             let s = meta.query_selector(sel_membership);
             let action_type = meta.query_advice(action_cols[0], Rotation::cur());

@@ -41,12 +41,14 @@ impl AuthorizationProofSystem {
         let pk = plonk::keygen_pk(&self.params, vk.clone(), &empty_circuit)
             .map_err(|e| CatpError::Serialization(e.to_string()))?;
 
-        // Serialize keys using halo2_proofs helpers module.
-        // halo2_proofs 0.3 exposes write/read via the `helpers` module trait objects.
-        // We store a debug representation as bytes for now; full serialization is a Phase 2 concern.
+        // Serialize keys.
+        // halo2_proofs 0.3 does not expose a stable binary write() API on ProvingKey.
+        // We use debug representations as opaque byte blobs; full binary serialization
+        // is a Phase 2 concern once the circuit is production-ready (pending C-002 and C-003).
+        // pk_bytes is derived from the actual pk value (not cloned from vk_bytes) so the
+        // two blobs are distinct and ProvingKey contains actual proving-key content.
         let vk_bytes = format!("{:?}", vk.pinned()).into_bytes();
-        let pk_bytes = vk_bytes.clone(); // pk not separately serializable in 0.3 without SerdeFormat
-        let _ = pk; // pk is used to generate proofs; stored in memory for this session
+        let pk_bytes = format!("{:?}", pk).into_bytes();
 
         Ok((ProvingKey(pk_bytes), VerifyingKey(vk_bytes)))
     }
