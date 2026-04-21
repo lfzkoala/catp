@@ -15,7 +15,9 @@
       "Bash(cargo update *)",
       "Bash(python3 -c ' *)",
       "Bash(cargo generate-lockfile *)",
-      "Bash(forge test *)"
+      "Bash(forge test *)",
+      "Bash(git worktree *)",
+      "Bash(git branch *)"
     ]
   }
 }
