@@ -1,8 +1,16 @@
 # CATP Implementation Plan
 
-## Requirements Restatement
+## Product Goal
 
-Build a 5-layer cryptographic trust stack for AI agents operating on-chain:
+AI agents (Claude Code, AutoGen, Hermes, OpenClaw, etc.) today operate with broad permissions and no standard mechanism for proving they acted within authorized scope. CATP solves this with two complementary layers:
+
+**Enforcement Layer** — a plugin/hook that intercepts agent actions in real time, checks them against a user-defined policy, and records a commitment hash. Fast and synchronous; blocks unauthorized actions before they execute.
+
+**CATP Protocol Layer** — generates ZK proofs from commitment hashes in the background and anchors policy commitments on-chain. Allows any third party to verify an agent's compliance after the fact, without trusting the agent developer or seeing the policy details.
+
+## Protocol Requirements
+
+Build a 5-layer cryptographic trust stack backing the CATP protocol:
 - **Layer 1**: Encrypted agent communication (X25519 + AES-256-GCM + Double Ratchet)
 - **Layer 2**: ZK-proven delegated authorization (Halo2 circuits + Solidity verifier)
 - **Layer 3**: Output verification (commit-and-prove + MPA attestors + optimistic slash)

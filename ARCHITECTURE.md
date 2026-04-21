@@ -12,6 +12,92 @@ Identity layer (Layer 0) is ceded to existing players (Kite AI, Lit Protocol, et
 
 ---
 
+## Problem
+
+Open-source agent frameworks (Claude Code, OpenClaw, Hermes, AutoGen, etc.) give AI agents broad permissions on local machines and remote systems — file access, shell execution, API calls, browser control — with no standard mechanism for:
+
+1. **Authorization verification**: Who granted this agent permission to do this specific action?
+2. **Compliance proof**: Can the agent prove it stayed within its authorized scope?
+3. **Tamper-proof audit**: If something goes wrong, can the agent's behavior be verified by a third party after the fact?
+
+Today these are handled by trust-the-agent-developer or by blunt OS-level permission grants. Neither is sufficient as agents take higher-stakes actions.
+
+---
+
+## Product Architecture
+
+CATP is deployed as two complementary layers:
+
+```
+┌───────────────────────────────────────────────────────┐
+│                  Enforcement Layer                    │
+│   (Plugin / Hook — runs locally, synchronous)         │
+│                                                       │
+│   User defines policy → Agent action intercepted →   │
+│   Local policy check → Allow / Deny + Audit log      │
+└────────────────────────┬──────────────────────────────┘
+                         │ action commitment hash (async)
+                         ▼
+┌───────────────────────────────────────────────────────┐
+│                  CATP Protocol Layer                  │
+│   (ZK proof + blockchain — async, trustless)          │
+│                                                       │
+│   ZK proof generated in background →                 │
+│   Policy commitment anchored on-chain →               │
+│   Anyone can verify agent's compliance               │
+│   without seeing the policy details                   │
+└───────────────────────────────────────────────────────┘
+```
+
+**Analogy — HTTPS:**
+
+| HTTPS | CATP |
+|-------|------|
+| 🔒 indicator in browser | Plugin (enforcement surface) |
+| TLS handshake + certificates | CATP protocol (ZK proof + policy commitment) |
+| Certificate Authority | Blockchain (immutable policy anchor) |
+
+Without TLS, the lock icon means nothing. Without CATP protocol, the plugin is just a local access control list that can be bypassed or silently disabled.
+
+### Sync Enforcement + Async Proof
+
+The two layers run at different speeds and serve different purposes:
+
+```
+At action time (milliseconds — blocks the agent)
+  Plugin intercepts tool call
+  → Local policy check (allow / deny)
+  → Record commitment hash of action
+  → Agent proceeds or is blocked
+
+In background (seconds — non-blocking)
+  ZK proof generated from commitment hash
+  → Submitted to CATP protocol layer
+
+If challenged by any party (on demand)
+  Proof retrieved
+  → Verified trustlessly (no honest party required)
+  → Agent's compliance is mathematically guaranteed
+```
+
+This is the same model as ZK rollups: execute optimistically, prove lazily, challenge when needed.
+
+### Enforcement Layer — Integration Points
+
+The plugin integrates with agent frameworks via their native extension hooks:
+
+| Agent Framework | Integration Point |
+|----------------|-------------------|
+| Claude Code | `PreToolUse` / `PostToolUse` hooks |
+| LangChain / LangGraph | Tool middleware / callback handlers |
+| AutoGen | Agent message interceptors |
+| OpenAI Assistants | Function call wrappers |
+| Custom agents | CATP SDK middleware |
+
+Each integration intercepts the agent's action before execution, checks it against the user-defined CATP policy, and records a commitment hash for later proof generation.
+
+---
+
 ## Protocol Portability
 
 ### The Core Principle
