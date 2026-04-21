@@ -3,6 +3,7 @@ pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
 import "../../src/layer2/AgentAuthorizer.sol";
+import "../../src/layer2/StubVerifier.sol";
 import "../../src/layer2/ActionData.sol";
 
 contract AgentAuthorizerTest is Test {
@@ -11,10 +12,13 @@ contract AgentAuthorizerTest is Test {
     address public agent     = address(0xB);
     address public attacker  = address(0xC);
 
-    bytes32 public constant POLICY     = keccak256("test-policy");
+    bytes32 public constant POLICY      = keccak256("test-policy");
     bytes   public constant VALID_PROOF = hex"deadbeef";
 
-    function setUp() public { authorizer = new AgentAuthorizer(); }
+    function setUp() public {
+        StubVerifier stub = new StubVerifier();
+        authorizer = new AgentAuthorizer(address(stub));
+    }
 
     function _ad(uint256 value) internal pure returns (bytes memory) {
         return ActionData.encode(ActionData.Action({
