@@ -2,11 +2,104 @@
 
 ## Vision
 
-A modular, cryptography-native protocol stack that enables trustworthy autonomous operations on-chain — for both AI agents and human actors. Each layer is independently deployable, collectively composable.
+A modular, cryptography-native protocol stack that enables trustworthy autonomous operations — for both AI agents and human actors, on any chain or web2 environment. Each layer is independently deployable, collectively composable.
 
 The protocol treats AI agents and humans as two types of the same abstraction: **principals**. A principal is any entity (human wallet, AI agent, smart contract, DAO multisig) that can be authorized, verified, and reputation-scored. This design ensures CATP is not limited to the AI agent market — it serves any scenario where one entity delegates authority to another with cryptographic trust.
 
+**CATP is a ZK proof protocol, not an Ethereum protocol.** The ZK proof is the universal trust primitive. Any system that can verify a Halo2 proof can participate in CATP — whether it is an EVM chain, a non-EVM blockchain, or a web2 service. The Ethereum implementation is the reference deployment, not the protocol boundary.
+
 Identity layer (Layer 0) is ceded to existing players (Kite AI, Lit Protocol, etc. for agents; ENS, Polygon ID, etc. for humans). CATP owns everything above identity: authorization, verification, reputation, discovery, and communication.
+
+---
+
+## Protocol Portability
+
+### The Core Principle
+
+The ZK proof is self-contained. It encodes all claims about policy compliance, output correctness, and reputation — and can be verified by any system that has the verification key. The chain or environment is just where state is anchored and proofs are submitted. It is an adapter, not the protocol.
+
+```
+┌─────────────────────────────────────────────┐
+│           CATP Protocol Core                │
+│                                             │
+│  ZK circuits (Rust/Halo2)                  │
+│  Proof format (universal)                   │
+│  Policy encoding (chain-agnostic)           │
+│  SDK (TypeScript)                           │
+└──────────────────┬──────────────────────────┘
+                   │  CATProof
+         ┌─────────┼──────────┐
+         ▼         ▼          ▼
+    EVM Adapter  Web2 Adapter  Future
+    (Solidity    (Rust fn,     (Move,
+     IVerifier)   REST API)    CosmWasm…)
+```
+
+### The IVerifier Interface
+
+Every environment exposes one function to the CATP protocol:
+
+```
+verify(publicInputs: bytes32[], proof: bytes) → bool
+```
+
+Implementations:
+- **EVM**: auto-generated Halo2 Solidity verifier contract implementing `IVerifier`
+- **Web2**: Rust `halo2_proofs::verify_proof` called from any server
+- **Non-EVM chains**: native verifier library — same circuit, same verification key, different host
+
+The Solidity `AgentAuthorizer` accepts an `IVerifier` at construction time. Swapping the verifier (e.g., upgrading from stub to real Halo2 verifier, or replacing with a different proof system) requires no changes to policy or authorization logic.
+
+### Proof-Centric State Design
+
+A key architectural principle: **push state into proofs, not contracts.**
+
+| Concern | Naive (state-in-contract) | Proof-centric (target) |
+|---------|--------------------------|------------------------|
+| Policy validity | `mapping(bytes32 => bool) activePolicies` | Delegator signature in proof public inputs |
+| Spend tracking | `mapping(bytes32 => uint256) cumulativeSpend` | Cumulative spend as proof public input, monotonicity enforced in circuit |
+| Reputation | On-chain counters | State commitment in proof, updated off-chain |
+
+The current Phase 1 implementation uses the naive approach for simplicity. The target architecture moves toward proof-centric state, reducing contract surface area to a thin event log + verifier call. A contract with no application state is trivial to port to any chain.
+
+### Deployment Environments
+
+| Environment | Verifier | State anchor | Policy identifier |
+|-------------|----------|--------------|------------------|
+| Ethereum / EVM L2 | `IVerifier` Solidity contract | Smart contract storage | `bytes32` commitment |
+| Web2 server | Rust `verify_proof` fn | Database row | UUID or hash |
+| Cosmos / CosmWasm | Native Rust verifier | CosmWasm contract | Bytes32 |
+| Solana | Native Rust verifier | Account data | Pubkey-derived |
+| Offline / air-gapped | Rust binary | File / HSM | Hash |
+
+The ZK circuit, proof format, and verification key are identical across all rows.
+
+### Architecture Tradeoffs
+
+| Property | ZK proof approach | Alternative (signatures + MPA only) |
+|----------|------------------|--------------------------------------|
+| Policy privacy | Full — verifier sees only commitment | None — policy visible to verifier |
+| Correctness proof | Cryptographic (circuit constraints) | Economic (staking + slashing) |
+| Proving time | Seconds to minutes (mitigated by pre-compute) | Milliseconds |
+| Portability | Any system with verification key | Any system with signature check |
+| Developer complexity | High — circuit expertise required | Low — standard crypto |
+| Trusted parties required | None (trustless) | Honest attestor majority |
+| Auditability of logic | Hard — circuit bugs are subtle | Easy — policy checks are readable |
+| Upgrade cost | New circuit + new verifier per change | Update policy schema |
+
+**Why ZK despite the costs**: The privacy guarantee is load-bearing for CATP's value proposition. An agent's policy parameters (which tokens, which protocols, what limits) reveal trading strategy. A reputation history reveals operational patterns. These are competitively sensitive. Exposing them to on-chain verifiers or attestor nodes undermines the protocol's usefulness in adversarial markets. The signature approach solves correctness but not privacy — and correctness is already handled by MPA + optimistic slash.
+
+**Where MPA + slash is used instead of ZK**: Layer 3 output verification. Model binding and output consistency cannot be proven by ZK alone (ZK proves computation was correct, not that the correct model was used). MPA provides the honest-majority guarantee here; ZK boundary proofs are a supplementary privacy layer, not the primary mechanism.
+
+### Known Gaps in Current Implementation
+
+The following are documented gaps between the current codebase and the target architecture:
+
+1. **`IVerifier` interface** — `AgentAuthorizer` previously used an inline stub. Now accepts `IVerifier` at construction. ✅ Fixed.
+2. **Policy state in contracts** — `activePolicies` and `cumulativeSpend` mappings should migrate to proof public inputs over time. 🔜 Planned.
+3. **EVM address types throughout SDK** — `0x${string}` assumes 20-byte Ethereum addresses. Future: abstract to `PrincipalId` bytes. 🔜 Planned.
+4. **Layer 5 registry assumes on-chain storage** — registry entries use EVM addresses and contract mappings. Future: content-addressed off-chain store with on-chain commitments. 🔜 Planned.
+5. **No web2 verification path** — Rust verifier fn not yet exposed as library. Future: `catp-verify` crate with `no_std` support. 🔜 Planned.
 
 ---
 
@@ -208,39 +301,41 @@ Output: proof π (Halo2)
 
 **On-Chain Verifier**:
 
+`AgentAuthorizer` depends on `IVerifier` — a single-function interface that decouples proof verification from authorization logic. The verifier implementation (stub, real Halo2, or future proof system) is injected at deploy time.
+
 ```solidity
+// Universal verifier interface — same shape on any chain
+interface IVerifier {
+    function verify(
+        bytes32[] calldata publicInputs,
+        bytes calldata proof
+    ) external view returns (bool);
+}
+
 contract AgentAuthorizer {
-    mapping(bytes32 => bool) public activePolicies;     // policy_commitment => active
-    mapping(bytes32 => uint256) public cumulativeSpend;  // policy_commitment => total spent
-    
-    function registerPolicy(bytes32 policyCommitment) external {
-        // User registers a policy commitment on-chain
-        activePolicies[policyCommitment] = true;
-    }
-    
+    IVerifier public immutable verifier;  // injected — swap without redeploying logic
+
+    mapping(bytes32 => bool)    public activePolicies;
+    mapping(bytes32 => uint256) public cumulativeSpend;
+
+    constructor(address verifier_) { verifier = IVerifier(verifier_); }
+
+    function registerPolicy(bytes32 policyCommitment) external { ... }
+
     function executeAuthorized(
         bytes32 policyCommitment,
         bytes calldata actionData,
         bytes calldata proof
     ) external {
         require(activePolicies[policyCommitment], "Policy not active");
-        require(verifyProof(proof, policyCommitment, hash(actionData), 
-                block.timestamp, cumulativeSpend[policyCommitment]), 
-                "Invalid proof");
-        
-        // Execute the action
-        _execute(actionData);
-        
-        // Update cumulative spend
+        bytes32[] memory pub = _buildPublicInputs(policyCommitment, actionData);
+        require(verifier.verify(pub, proof), "Invalid proof");
         cumulativeSpend[policyCommitment] += _extractValue(actionData);
-    }
-    
-    function revokePolicy(bytes32 policyCommitment) external {
-        // Only delegator can revoke
-        activePolicies[policyCommitment] = false;
     }
 }
 ```
+
+**Phase 1 verifier**: stub (`proof.length > 0`). **Phase 2**: auto-generated Halo2 Solidity verifier. **Web2**: same `verify()` signature, implemented in Rust.
 
 **Why ZK here (not just on-chain checks)**:
 - Privacy: the full policy (what tokens, what protocols, what limits) is never revealed on-chain. Competitors can't see your agent's strategy parameters.
