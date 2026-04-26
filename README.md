@@ -24,10 +24,20 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and [IMPLEMENTATION_P
 ### Install
 
 ```bash
+git clone https://github.com/lfzkoala/catp.git
+cd catp
 bash install.sh
 ```
 
 This installs dependencies, compiles the plugin, and symlinks the `catp` binary to `~/.local/bin/`.
+
+If `catp` is not found after install, add `~/.local/bin` to your PATH:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
+# or for bash:
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
+```
 
 ### Wire up Claude Code hooks
 
