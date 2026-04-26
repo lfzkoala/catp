@@ -5,18 +5,21 @@ A 5-layer cryptographic trust stack for AI agents operating on-chain. Agents can
 ## Architecture
 
 ```
-Layer 1  Encrypted agent communication    (X25519 + AES-256-GCM + Double Ratchet)
+Layer 0  Local enforcement plugin          (Claude Code hooks + TOML policy + audit log)
+Layer 1  Encrypted agent communication     (X25519 + AES-256-GCM + Double Ratchet)
 Layer 2  ZK-proven delegated authorization (Halo2 circuits + Solidity verifier)
-Layer 3  Output verification              (commit-and-prove + MPA attestors + optimistic slash)
-Layer 4  Privacy-preserving reputation    (ZK-proven performance attestations)
-Layer 5  Verifiable agent registry        (capability proofs + discovery)
+Layer 3  Output verification               (commit-and-prove + MPA attestors + optimistic slash)
+Layer 4  Privacy-preserving reputation     (ZK-proven performance attestations)
+Layer 5  Verifiable agent registry         (capability proofs + discovery)
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for full design and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the phased roadmap.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the phased roadmap.
 
-## Quick Start — Claude Code Enforcement (Phase 0)
+---
 
-`catp-plugin` is a local enforcement layer that runs as Claude Code hooks. It evaluates every tool call against a TOML policy file and writes a tamper-evident audit log with a SHA-256 commitment chain.
+## Quick Start — Claude Code Enforcement (Layer 0)
+
+`catp-plugin` is a local enforcement layer that runs as Claude Code hooks. It evaluates every tool call against a TOML policy file and writes a tamper-evident audit log with a SHA-256 commitment chain. **No blockchain or ZK required** — this works today with any Claude Code installation.
 
 ### Install
 
@@ -24,7 +27,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for full design and [IMPLEMENTATION_PLAN.
 bash install.sh
 ```
 
-This builds the plugin, installs the `catp` binary to `~/.local/bin/`, and prints the hook config.
+This installs dependencies, compiles the plugin, and symlinks the `catp` binary to `~/.local/bin/`.
 
 ### Wire up Claude Code hooks
 
@@ -53,7 +56,7 @@ catp init          # creates catp-policy.toml
 catp validate      # syntax-checks the policy
 ```
 
-The generated `catp-policy.toml` looks like:
+Example `catp-policy.toml`:
 
 ```toml
 [agent]
@@ -84,10 +87,10 @@ Rules are evaluated top-to-bottom; first match wins. Unmatched tools are **allow
 
 ```bash
 catp log show         # recent tool calls with allow/deny verdicts
-catp log verify       # verify the commitment chain hasn't been tampered with
+catp log verify       # verify the SHA-256 commitment chain is intact
 ```
 
-Logs are written to `~/.catp/audit/<agentId>/<YYYY-MM-DD>/actions.jsonl`. Each entry chains on the previous via SHA-256, forming a tamper-evident sequence that Phase 1 will upgrade to Poseidon hashes verified on-chain.
+Logs are written to `~/.catp/audit/<agentId>/<YYYY-MM-DD>/actions.jsonl`. Each entry chains on the previous commitment hash, forming a tamper-evident sequence. Layer 2 will upgrade this to Poseidon hashes verifiable on-chain.
 
 ---
 
@@ -95,7 +98,7 @@ Logs are written to `~/.catp/audit/<agentId>/<YYYY-MM-DD>/actions.jsonl`. Each e
 
 ```
 catp/
-├── catp-plugin/            # TypeScript — Claude Code enforcement plugin (Phase 0)
+├── catp-plugin/            # TypeScript — Layer 0 enforcement plugin
 │   └── src/
 │       ├── policy/         # TOML loader, rule engine
 │       ├── audit/          # Commitment chain logger and verifier
@@ -105,7 +108,7 @@ catp/
 │   ├── primitives/         # Poseidon hash, SMT, X25519/AES, ProofSystem trait
 │   └── layer2/             # ProveAuthorization circuit
 ├── catp-contracts/         # Solidity — on-chain verifiers + state
-│   ├── src/layer2/         # AgentAuthorizer, ActionData, IAgentAuthorizer
+│   ├── src/layer2/         # AgentAuthorizer, IVerifier, StubVerifier
 │   └── src/layer3/         # CommitRegistry, MPAVerifier, OptimisticChallenge
 ├── catp-sdk/               # TypeScript — developer-facing SDK
 │   └── src/layer2/         # types, PolicyBuilder, AuthorizerClient, ProofClient
@@ -113,14 +116,16 @@ catp/
 └── catp-tests/             # Integration tests (scaffold)
 ```
 
+---
+
 ## Current Status
 
-| Phase | Component | Status |
+| Layer | Component | Status |
 |-------|-----------|--------|
 | 0 | `catp-plugin` — Claude Code enforcement + audit log | ✅ Complete |
 | 2 | `ProveAuthorization` Halo2 circuit | ✅ Complete (9 tests) |
 | 2 | `AgentAuthorizer.sol` + `ActionData.sol` | ✅ Complete (16 tests) |
-| 2 | TypeScript SDK (`PolicyBuilder`, `AuthorizerClient`, `ProofClient`) | ✅ Complete |
+| 2 | TypeScript SDK — types, `PolicyBuilder`, `AuthorizerClient`, `ProofClient` | ⚠️ API complete; ZK prover is a stub |
 | 3 | `CommitRegistry.sol` | ✅ Complete (8 tests) |
 | 3 | `MPAVerifier.sol` | ✅ Complete (9 tests) |
 | 3 | `OptimisticChallenge.sol` | ✅ Complete (10 tests) |
@@ -128,39 +133,65 @@ catp/
 
 **43 tests passing** across Rust (MockProver) and Solidity (Forge).
 
-> The Halo2 on-chain verifier and WASM prover are stubs in the current phase. They will be replaced with the generated Halo2 Solidity verifier and wasm-pack bundle when the real on-chain verifier is ready.
+> **Stub notice:** The Halo2 on-chain verifier (`IVerifier`) and WASM prover (`ProofClient`) are intentional stubs. They will be replaced with the generated Halo2 Solidity verifier and a `wasm-pack` bundle in the next phase. Do not use the Layer 2 SDK in production.
+
+---
 
 ## Prerequisites
 
+**Layer 0 only (catp-plugin):**
+
 | Tool | Version |
 |------|---------|
-| Rust | stable via `rust-toolchain.toml` |
-| Foundry | latest (`curl -L https://foundry.paradigm.xyz | bash`) |
 | Node.js | ≥ 20 |
 | npm | ≥ 10 (bundled with Node.js 20) |
 
+**Full stack (circuits + contracts + SDK):**
+
+| Tool | Version | Used by |
+|------|---------|---------|
+| Node.js | ≥ 20 | catp-plugin, catp-sdk |
+| npm | ≥ 10 | catp-plugin |
+| pnpm | ≥ 9 | catp-sdk |
+| Rust | stable via `rust-toolchain.toml` | catp-circuits, catp-node |
+| Foundry | latest | catp-contracts |
+
+Install Foundry: `curl -L https://foundry.paradigm.xyz | bash`
+
+---
+
 ## Getting Started
 
-### Rust circuits and primitives
+### Layer 0 — enforcement plugin
+
+```bash
+bash install.sh
+```
+
+See the [Quick Start](#quick-start--claude-code-enforcement-layer-0) section above.
+
+### Layer 2 — Halo2 circuits
 
 ```bash
 cargo test --workspace
 ```
 
-### Solidity contracts
+### Layer 2 — Solidity contracts
 
 ```bash
 cd catp-contracts
 forge test
 ```
 
-### TypeScript SDK
+### Layer 2 — TypeScript SDK
 
 ```bash
 cd catp-sdk
 NODE_ENV=development pnpm install
 pnpm tsc --noEmit
 ```
+
+---
 
 ## How Layer 2 Works
 
@@ -174,8 +205,23 @@ pnpm tsc --noEmit
 1. Before inference, the agent submits a `preCommitment` hash to `CommitRegistry`.
 2. After inference, it submits a `postCommitment`; MPA attestors submit `outputCommitments` to `MPAVerifier`.
 3. Once ≥ 2/3 of attestors agree, the round is finalized.
-4. Any party can open a challenge via `OptimisticChallenge` within the challenge window. A successful challenge upheld by re-execution awards the challenger 30% of the slashed attestor stake.
+4. Any party can open a challenge via `OptimisticChallenge` within the challenge window. A successful challenge awards the challenger 30% of the slashed attestor stake.
+
+---
+
+## Contributing
+
+Contributions are welcome. Please open an issue before starting significant work so we can coordinate.
+
+- **Layer 0 (`catp-plugin`)**: TypeScript, Node.js ≥ 20, npm workspaces
+- **Circuits (`catp-circuits`)**: Rust, Halo2 (PSE fork), `cargo test`
+- **Contracts (`catp-contracts`)**: Solidity ^0.8.24, Foundry (`forge test`)
+- **SDK (`catp-sdk`)**: TypeScript, pnpm
+
+All PRs should include tests. The Layer 0 plugin targets 80% coverage; contract PRs require Forge tests.
+
+---
 
 ## License
 
-MIT
+[MIT](LICENSE)
