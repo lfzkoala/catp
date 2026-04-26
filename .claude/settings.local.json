@@ -18,7 +18,32 @@
       "Bash(forge test *)",
       "Bash(git worktree *)",
       "Bash(git branch *)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(node_modules/.bin/tsc)",
+      "Bash(node dist/cli.js --help)",
+      "Read(//private/tmp/catp-test/**)",
+      "Bash(node /Users/zhoulinfeng/catp/catp-plugin/dist/cli.js validate)",
+      "Bash(node /Users/zhoulinfeng/catp/catp-plugin/dist/cli.js hook pre)",
+      "Bash(echo \"exit_code: $?\")",
+      "Bash(node /Users/zhoulinfeng/catp/catp-plugin/dist/cli.js log show)",
+      "Bash(node /Users/zhoulinfeng/catp/catp-plugin/dist/cli.js log verify)",
+      "Bash(echo \"allow exit: $?\")",
+      "Bash(echo \"deny exit: $?\")",
+      "Bash(echo \"verify: $?\")",
+      "Bash(node -e \"require\\('fs'\\).rmSync\\(require\\('path'\\).join\\(require\\('os'\\).homedir\\(\\), '.catp', 'audit', 'my-agent'\\), {recursive: true, force: true}\\); console.log\\('done'\\)\")",
+      "Bash(echo \"verify exit: $?\")",
+      "Bash(node -e \"require\\('fs'\\).rmSync\\(require\\('path'\\).join\\(require\\('os'\\).homedir\\(\\), '.catp', 'audit', 'my-agent'\\), {recursive: true, force: true}\\)\")",
+      "Bash(chmod +x /Users/zhoulinfeng/catp/install.sh)",
+      "Bash(bash /Users/zhoulinfeng/catp/install.sh)",
+      "Bash(bash install.sh)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(catp --version)",
+      "Bash(catp --help)"
     ]
   }
 }

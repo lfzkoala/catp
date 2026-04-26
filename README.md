@@ -14,10 +14,93 @@ Layer 5  Verifiable agent registry        (capability proofs + discovery)
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for full design and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the phased roadmap.
 
+## Quick Start — Claude Code Enforcement (Phase 0)
+
+`catp-plugin` is a local enforcement layer that runs as Claude Code hooks. It evaluates every tool call against a TOML policy file and writes a tamper-evident audit log with a SHA-256 commitment chain.
+
+### Install
+
+```bash
+bash install.sh
+```
+
+This builds the plugin, installs the `catp` binary to `~/.local/bin/`, and prints the hook config.
+
+### Wire up Claude Code hooks
+
+Add to `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": ".*",
+      "command": "catp hook pre"
+    }],
+    "PostToolUse": [{
+      "matcher": ".*",
+      "command": "catp hook post"
+    }]
+  }
+}
+```
+
+### Configure a project policy
+
+```bash
+cd your-project/
+catp init          # creates catp-policy.toml
+catp validate      # syntax-checks the policy
+```
+
+The generated `catp-policy.toml` looks like:
+
+```toml
+[agent]
+id = "my-agent"
+version = 1
+
+[[rules]]
+tool = "Bash"
+allow = false
+pattern = ["rm -rf *", "sudo *", "curl * | bash"]
+reason = "Destructive or remote-execution commands are blocked"
+
+[[rules]]
+tool = "Write"
+allow = true
+path_allowlist = ["src/**", "tests/**"]
+reason = "Writes allowed only inside src/ and tests/"
+
+[[rules]]
+tool = "WebFetch"
+allow = true
+reason = "Web reads are unrestricted"
+```
+
+Rules are evaluated top-to-bottom; first match wins. Unmatched tools are **allowed by default**.
+
+### View the audit log
+
+```bash
+catp log show         # recent tool calls with allow/deny verdicts
+catp log verify       # verify the commitment chain hasn't been tampered with
+```
+
+Logs are written to `~/.catp/audit/<agentId>/<YYYY-MM-DD>/actions.jsonl`. Each entry chains on the previous via SHA-256, forming a tamper-evident sequence that Phase 1 will upgrade to Poseidon hashes verified on-chain.
+
+---
+
 ## Repository Structure
 
 ```
 catp/
+├── catp-plugin/            # TypeScript — Claude Code enforcement plugin (Phase 0)
+│   └── src/
+│       ├── policy/         # TOML loader, rule engine
+│       ├── audit/          # Commitment chain logger and verifier
+│       ├── hook/           # pre.ts / post.ts hook handlers
+│       └── commands/       # init, validate, log CLI commands
 ├── catp-circuits/          # Rust — Halo2 ZK circuits
 │   ├── primitives/         # Poseidon hash, SMT, X25519/AES, ProofSystem trait
 │   └── layer2/             # ProveAuthorization circuit
@@ -32,8 +115,9 @@ catp/
 
 ## Current Status
 
-| Layer | Component | Status |
+| Phase | Component | Status |
 |-------|-----------|--------|
+| 0 | `catp-plugin` — Claude Code enforcement + audit log | ✅ Complete |
 | 2 | `ProveAuthorization` Halo2 circuit | ✅ Complete (9 tests) |
 | 2 | `AgentAuthorizer.sol` + `ActionData.sol` | ✅ Complete (16 tests) |
 | 2 | TypeScript SDK (`PolicyBuilder`, `AuthorizerClient`, `ProofClient`) | ✅ Complete |
@@ -53,7 +137,7 @@ catp/
 | Rust | stable via `rust-toolchain.toml` |
 | Foundry | latest (`curl -L https://foundry.paradigm.xyz | bash`) |
 | Node.js | ≥ 20 |
-| pnpm | ≥ 9 |
+| npm | ≥ 10 (bundled with Node.js 20) |
 
 ## Getting Started
 

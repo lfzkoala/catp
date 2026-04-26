@@ -1,0 +1,57 @@
+#!/usr/bin/env node
+import { Command } from "commander";
+import { runPreHook } from "./hook/pre.js";
+import { runPostHook } from "./hook/post.js";
+import { cmdInit } from "./commands/init.js";
+import { cmdValidate } from "./commands/validate.js";
+import { cmdLogShow, cmdLogVerify } from "./commands/log.js";
+
+const program = new Command();
+
+program
+  .name("catp")
+  .description("CATP enforcement plugin — policy enforcement and audit for AI agents")
+  .version("0.1.0");
+
+program
+  .command("init")
+  .description("Scaffold a catp-policy.toml in the current directory")
+  .action(cmdInit);
+
+program
+  .command("validate")
+  .description("Validate catp-policy.toml syntax")
+  .option("-f, --file <path>", "path to policy file (default: auto-discover)")
+  .action(cmdValidate);
+
+const hook = program.command("hook").description("Hook handlers called by agent frameworks");
+
+hook
+  .command("pre")
+  .description("PreToolUse handler — reads stdin JSON, allows or blocks")
+  .action(() => { runPreHook().catch(() => process.exit(0)); });
+
+hook
+  .command("post")
+  .description("PostToolUse handler — reads stdin JSON, records to audit log")
+  .action(() => { runPostHook().catch(() => process.exit(0)); });
+
+const log = program.command("log").description("Audit log commands");
+
+log
+  .command("show")
+  .description("Display recent audit log entries")
+  .option("-n, --lines <n>", "number of lines to show", "50")
+  .option("--agent <id>", "agent id (default: from policy file)")
+  .action(cmdLogShow);
+
+log
+  .command("verify")
+  .description("Verify commitment chain integrity")
+  .option("--agent <id>", "agent id (default: from policy file)")
+  .action(cmdLogVerify);
+
+program.parseAsync(process.argv).catch((err) => {
+  process.stderr.write(`catp: ${(err as Error).message}\n`);
+  process.exit(1);
+});
