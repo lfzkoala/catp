@@ -188,12 +188,24 @@ Wire Phase 0 audit logs to on-chain:
 - Fuzz witness generator to find edge cases
 - Benchmark prover: target < 30s on developer hardware
 
+### 1.5 — Regulatory Alignment Audit
+
+NIST launched the AI Agent Standards Initiative (CAISI) in February 2026, focusing on agent authentication, authorization interoperability, and auditability. As CAISI publishes draft specifications, verify CATP's interfaces remain compatible:
+
+- Map CATP's policy commitment → NIST's agent authorization model
+- Map CATP's audit log + ZK proof → NIST's auditability requirements
+- Document any gaps; open issues for any required interface changes
+- Track IETF Agent Name Service (ANS) draft for identity interoperability
+
+This is a research + documentation task, not a code change. Output: one-page compatibility matrix added to `ARCHITECTURE.md`.
+
 ### Deliverables
 
 - [ ] Real Halo2 Solidity verifier deployed on testnet
 - [ ] WASM prover bundle integrated into SDK
 - [ ] `catp anchor` command working end-to-end
 - [ ] Circuit review complete
+- [ ] NIST CAISI compatibility matrix documented
 - [ ] Updated README with Phase 1 flow
 
 ---

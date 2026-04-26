@@ -24,6 +24,13 @@ Open-source agent frameworks (Claude Code, AutoGen, Hermes, OpenClaw, etc.) give
 
 Today these are handled by trusting the agent developer, or by blunt OS-level permission grants. Neither is sufficient as agents take higher-stakes actions.
 
+**Market evidence (2026):**
+- 70% of enterprise AI agents have more system access than equivalent human roles (Cisco State of AI Security 2026)
+- Only 3% of organizations have automated, machine-speed controls governing agent behavior (Gravitee)
+- AI agents caused security incidents at two-thirds of surveyed enterprises (Infosecurity Magazine)
+- CVE-2025-53773 (CVSS 9.6): prompt injection in a GitHub Copilot PR description triggered remote code execution
+- US federal government issued a formal RFI on AI agent security in January 2026; NIST launched the AI Agent Standards Initiative in February 2026
+
 ### Product Market Fit
 
 **Who**: AI agent developers and operators who need to constrain, audit, and prove the behavior of the agents they build or deploy.
@@ -59,6 +66,20 @@ Specifically: a Claude Code user installs the CATP plugin, defines a policy (e.g
 1. **Phase 0**: Enforcement plugin for Claude Code. Zero friction — TOML policy file + hook installation. Immediate value: policy enforcement + local audit log.
 2. **Phase 1**: ZK proof layer wired to enforcement plugin. Audit logs become verifiable ZK proofs. On-chain anchoring optional.
 3. **Phase 2+**: Full protocol (output verification, reputation, registry). Required for multi-agent ecosystems and high-stakes integrations.
+
+### Competitive Landscape
+
+Several industry players launched agent trust solutions in early 2026. CATP's differentiation is the ZK privacy guarantee — no competitor provides policy-private compliance proofs.
+
+| Solution | Provider | Launched | Approach | Policy private? | Trustless? |
+|----------|----------|----------|----------|----------------|------------|
+| Agent Governance Toolkit | Microsoft | Apr 2026 | DID + Ed25519 + Inter-Agent Trust Protocol (IATP) | ✗ | ✗ (relies on DID infrastructure) |
+| Verifiable Intent | Mastercard + Google | 2026 | Tamper-resistant authorization record, open standard | ✗ | ✗ (relies on Mastercard trust anchor) |
+| **CATP** | — | — | ZK proof + on-chain policy commitment | **✓** | **✓** |
+
+Microsoft's IATP and Mastercard's Verifiable Intent solve the *record-keeping* problem but not the *privacy* problem: the verifier sees the policy. CATP is the only approach where an agent can prove compliance with a policy without revealing what the policy says.
+
+**Regulatory alignment**: NIST's AI Agent Standards Initiative (CAISI, Feb 2026) focuses on agent authentication, authorization interoperability, and auditability. CATP's design maps directly to these requirements and should be tracked for standards compatibility as CAISI publishes concrete specifications.
 
 ---
 
@@ -123,6 +144,18 @@ The plugin integrates with agent frameworks via their native extension hooks:
 | Custom agents | CATP SDK middleware |
 
 Each integration intercepts the agent's action before execution, checks it against the user-defined CATP policy, and records a commitment hash for later proof generation.
+
+### Attack Vectors the Enforcement Layer Addresses
+
+| Attack | Mechanism | CATP mitigation |
+|--------|-----------|-----------------|
+| Prompt injection → privilege escalation | Injected instructions expand agent's effective scope | `PreToolUse` hook blocks any action outside policy allowlist regardless of instruction source |
+| Excessive agency | Agent granted write access to prod DB, email, financial APIs by default | Policy file defines an explicit allowlist; everything else is denied |
+| OAuth scope creep | Default OAuth scopes extend agent access to Gmail, Drive, Calendar | Policy rules constrain which external APIs the agent may call |
+| Silent exfiltration | Agent reads sensitive files and calls external endpoints without user awareness | `PostToolUse` hook records every action; anomalies visible in audit log |
+| Undecommissioned agents | Agents persist with live credentials after their task ends | Policy TTL and session limits enforced at the hook layer |
+
+The ZK proof layer adds one further guarantee: even after the session ends, the audit log can be proven tamper-free to any external party without replaying or exposing raw logs.
 
 ### Day 1 Developer Experience (Claude Code)
 
