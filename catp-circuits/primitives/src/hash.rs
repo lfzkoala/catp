@@ -1,5 +1,5 @@
-use sha2::{Digest, Sha256};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 /// 32-byte commitment value.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

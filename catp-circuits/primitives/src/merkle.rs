@@ -102,7 +102,7 @@ impl SparseMerkleTree {
         let byte_idx = depth / 8;
         let bit_idx = 7 - (depth % 8);
         key[byte_idx] ^= 1 << bit_idx; // flip the bit
-        // zero out bits below depth
+                                       // zero out bits below depth
         for i in (byte_idx + 1)..32 {
             key[i] = 0;
         }
@@ -128,7 +128,8 @@ impl SparseMerkleTree {
     /// Generate a Merkle inclusion proof for the given key.
     /// Returns an error if the key has no value in the tree.
     pub fn prove(&self, key: [u8; 32]) -> crate::error::CatpResult<MerkleProof> {
-        let leaf = self.get(&key)
+        let leaf = self
+            .get(&key)
             .cloned()
             .ok_or(crate::error::CatpError::MerkleProofInvalid)?;
 
@@ -140,14 +141,20 @@ impl SparseMerkleTree {
             let bit = (current_key[depth / 8] >> (7 - (depth % 8))) & 1;
             path_bits.push(bit == 1);
             let sibling_key = Self::sibling_key(current_key, depth);
-            let sibling = self.nodes.get(&(depth + 1, sibling_key))
+            let sibling = self
+                .nodes
+                .get(&(depth + 1, sibling_key))
                 .cloned()
                 .unwrap_or_else(Self::zero_commitment);
             siblings.push(sibling);
             current_key = Self::parent_key(current_key, depth);
         }
 
-        Ok(MerkleProof { leaf, siblings, path_bits })
+        Ok(MerkleProof {
+            leaf,
+            siblings,
+            path_bits,
+        })
     }
 }
 

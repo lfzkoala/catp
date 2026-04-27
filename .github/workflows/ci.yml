@@ -33,9 +33,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
-      - run: pnpm install
-      - run: pnpm --filter @catp/sdk typecheck
+      - name: Install dependencies
+        working-directory: catp-sdk
+        run: NODE_ENV=development pnpm install
+      - name: Type check
+        working-directory: catp-sdk
+        run: pnpm tsc --noEmit
 
   catp-plugin:
     name: catp-plugin (type-check + tests)

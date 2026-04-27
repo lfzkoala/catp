@@ -45,7 +45,8 @@ impl std::fmt::Debug for SessionKey {
 fn derive_session_key(dh_output: &[u8; 32], context: &[u8]) -> SessionKey {
     let hk = Hkdf::<Sha256>::new(None, dh_output);
     let mut okm = [0u8; 32];
-    hk.expand(context, &mut okm).expect("32 bytes always fits HKDF output");
+    hk.expand(context, &mut okm)
+        .expect("32 bytes always fits HKDF output");
     SessionKey(okm)
 }
 
@@ -119,7 +120,11 @@ pub fn encrypt(session_key: &SessionKey, plaintext: &[u8]) -> CatpResult<(Vec<u8
 ///
 /// `nonce_bytes` must be exactly 12 bytes (the nonce returned by `encrypt`).
 /// Returns `Err` (never panics) on invalid nonce length, wrong key, or tampered ciphertext.
-pub fn decrypt(session_key: &SessionKey, nonce_bytes: &[u8], ciphertext: &[u8]) -> CatpResult<Vec<u8>> {
+pub fn decrypt(
+    session_key: &SessionKey,
+    nonce_bytes: &[u8],
+    ciphertext: &[u8],
+) -> CatpResult<Vec<u8>> {
     if nonce_bytes.len() != 12 {
         return Err(CatpError::Decryption(format!(
             "invalid nonce length: expected 12, got {}",

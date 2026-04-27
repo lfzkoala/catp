@@ -240,7 +240,11 @@ impl Circuit<halo2_proofs::pasta::Fp> for ProveAuthorization {
                     || "action_type",
                     config.action_cols[0],
                     0,
-                    || action.map(|a| fp(a.action_type.as_u64())).unwrap_or(Value::unknown()),
+                    || {
+                        action
+                            .map(|a| fp(a.action_type.as_u64()))
+                            .unwrap_or(Value::unknown())
+                    },
                 )?;
                 region.assign_advice(
                     || "action_value",
@@ -255,9 +259,7 @@ impl Circuit<halo2_proofs::pasta::Fp> for ProveAuthorization {
                     0,
                     || {
                         action
-                            .map(|a| {
-                                fp(u64::from_le_bytes(a.protocol[..8].try_into().unwrap()))
-                            })
+                            .map(|a| fp(u64::from_le_bytes(a.protocol[..8].try_into().unwrap())))
                             .unwrap_or(Value::unknown())
                     },
                 )?;
@@ -276,19 +278,31 @@ impl Circuit<halo2_proofs::pasta::Fp> for ProveAuthorization {
                     || "policy_allowed_action",
                     config.policy_cols[0],
                     0,
-                    || policy.map(|p| fp(p.allowed_action.as_u64())).unwrap_or(Value::unknown()),
+                    || {
+                        policy
+                            .map(|p| fp(p.allowed_action.as_u64()))
+                            .unwrap_or(Value::unknown())
+                    },
                 )?;
                 region.assign_advice(
                     || "policy_max_per_tx",
                     config.policy_cols[1],
                     0,
-                    || policy.map(|p| fp(p.max_value_per_tx)).unwrap_or(Value::unknown()),
+                    || {
+                        policy
+                            .map(|p| fp(p.max_value_per_tx))
+                            .unwrap_or(Value::unknown())
+                    },
                 )?;
                 region.assign_advice(
                     || "policy_max_total",
                     config.policy_cols[2],
                     0,
-                    || policy.map(|p| fp(p.max_value_total)).unwrap_or(Value::unknown()),
+                    || {
+                        policy
+                            .map(|p| fp(p.max_value_total))
+                            .unwrap_or(Value::unknown())
+                    },
                 )?;
                 region.assign_advice(
                     || "policy_valid_from",
@@ -300,7 +314,11 @@ impl Circuit<halo2_proofs::pasta::Fp> for ProveAuthorization {
                     || "policy_valid_until",
                     config.policy_cols[4],
                     0,
-                    || policy.map(|p| fp(p.valid_until)).unwrap_or(Value::unknown()),
+                    || {
+                        policy
+                            .map(|p| fp(p.valid_until))
+                            .unwrap_or(Value::unknown())
+                    },
                 )?;
                 region.assign_advice(
                     || "policy_protocol_low",
@@ -360,12 +378,7 @@ impl Circuit<halo2_proofs::pasta::Fp> for ProveAuthorization {
                     0,
                     || fp(max_per_tx),
                 )?;
-                region.assign_advice(
-                    || "max_total",
-                    config.policy_cols[2],
-                    0,
-                    || fp(max_total),
-                )?;
+                region.assign_advice(|| "max_total", config.policy_cols[2], 0, || fp(max_total))?;
                 region.assign_advice(
                     || "diff_per_tx",
                     config.policy_cols[3],
