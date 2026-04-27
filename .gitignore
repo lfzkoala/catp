@@ -5,3 +5,4 @@ dist/
 .env
 *.key
 *.pem
+.claude/settings.local.json
