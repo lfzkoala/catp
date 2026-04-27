@@ -1,0 +1,12 @@
+pre-push:
+  commands:
+    rust-fmt:
+      run: cargo fmt --check
+    rust-clippy:
+      run: cargo clippy --workspace -- -D warnings
+    plugin-typecheck:
+      root: catp-plugin/
+      run: npm run typecheck
+    sdk-typecheck:
+      root: catp-sdk/
+      run: pnpm tsc --noEmit
