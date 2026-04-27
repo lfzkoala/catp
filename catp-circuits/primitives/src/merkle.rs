@@ -102,10 +102,7 @@ impl SparseMerkleTree {
         let byte_idx = depth / 8;
         let bit_idx = 7 - (depth % 8);
         key[byte_idx] ^= 1 << bit_idx; // flip the bit
-                                       // zero out bits below depth
-        for i in (byte_idx + 1)..32 {
-            key[i] = 0;
-        }
+        key[(byte_idx + 1)..].fill(0);
         if bit_idx > 0 {
             let mask = !((1u8 << bit_idx) - 1);
             key[byte_idx] &= mask;
@@ -118,10 +115,7 @@ impl SparseMerkleTree {
         let bit_idx = 7 - (depth % 8);
         // zero out the bit at depth
         key[byte_idx] &= !(1 << bit_idx);
-        // zero out bits below depth
-        for i in (byte_idx + 1)..32 {
-            key[i] = 0;
-        }
+        key[(byte_idx + 1)..].fill(0);
         key
     }
 
