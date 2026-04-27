@@ -61,23 +61,15 @@ forge build
 forge test                         # 34 tests across Layer 2 + Layer 3
 ```
 
-## Local Pre-Push Checks
+## Pre-Push Checks
 
-Install [lefthook](https://github.com/evilmartians/lefthook) once, then register the hooks:
-
-```bash
-# macOS
-brew install lefthook
-
-# or cross-platform via npm
-npm install -g @evilmartians/lefthook
-```
+Before pushing or opening a PR, run:
 
 ```bash
-lefthook install
+bash check.sh
 ```
 
-After that, every `git push` automatically runs `cargo fmt --check`, `cargo clippy`, and typechecks for both TypeScript packages before the push goes through.
+This runs `cargo fmt --check`, `cargo clippy`, and typechecks for both TypeScript packages. CI runs the same checks, so catching failures locally saves a round-trip.
 
 ## Pull Requests
 
