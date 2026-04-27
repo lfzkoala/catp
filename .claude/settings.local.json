@@ -43,7 +43,12 @@
       "Bash(bash install.sh)",
       "Bash(echo \"exit: $?\")",
       "Bash(catp --version)",
-      "Bash(catp --help)"
+      "Bash(catp --help)",
+      "Bash(node --experimental-vm-modules node_modules/.bin/jest)",
+      "Bash(node --experimental-vm-modules node_modules/.bin/jest --coverage --ci)",
+      "Bash(npm pack *)",
+      "Bash(npm whoami *)",
+      "Bash(npm view *)"
     ]
   }
 }

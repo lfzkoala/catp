@@ -23,6 +23,14 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and [IMPLEMENTATION_P
 
 ### Install
 
+**Option A — npm:**
+
+```bash
+npm install -g @catp-protocol/cli
+```
+
+**Option B — clone and build (requires the repo to be public):**
+
 ```bash
 git clone https://github.com/lfzkoala/catp.git
 cd catp
@@ -71,7 +79,7 @@ Example `catp-policy.toml`:
 ```toml
 [agent]
 id = "my-agent"
-version = 1
+version = "1"
 
 [[rules]]
 tool = "Bash"
@@ -81,9 +89,9 @@ reason = "Destructive or remote-execution commands are blocked"
 
 [[rules]]
 tool = "Write"
-allow = true
+allow = false
 path_allowlist = ["src/**", "tests/**"]
-reason = "Writes allowed only inside src/ and tests/"
+reason = "Deny writes to paths outside src/ and tests/"
 
 [[rules]]
 tool = "WebFetch"
@@ -132,7 +140,7 @@ catp/
 
 | Layer | Component | Status |
 |-------|-----------|--------|
-| 0 | `catp-plugin` — Claude Code enforcement + audit log | ✅ Complete |
+| 0 | `catp-plugin` — Claude Code enforcement + audit log | ✅ Complete (56 tests) |
 | 2 | `ProveAuthorization` Halo2 circuit | ✅ Complete (9 tests) |
 | 2 | `AgentAuthorizer.sol` + `ActionData.sol` | ✅ Complete (16 tests) |
 | 2 | TypeScript SDK — types, `PolicyBuilder`, `AuthorizerClient`, `ProofClient` | ⚠️ API complete; ZK prover is a stub |
@@ -141,7 +149,7 @@ catp/
 | 3 | `OptimisticChallenge.sol` | ✅ Complete (10 tests) |
 | 1, 4, 5 | All layers | 🔜 Planned |
 
-**43 tests passing** across Rust (MockProver) and Solidity (Forge).
+**99 tests passing** across TypeScript/Jest (56), Rust/MockProver (9), and Solidity/Forge (34).
 
 > **Stub notice:** The Halo2 on-chain verifier (`IVerifier`) and WASM prover (`ProofClient`) are intentional stubs. They will be replaced with the generated Halo2 Solidity verifier and a `wasm-pack` bundle in the next phase. Do not use the Layer 2 SDK in production.
 
@@ -223,12 +231,7 @@ pnpm tsc --noEmit
 
 Contributions are welcome. Please open an issue before starting significant work so we can coordinate.
 
-- **Layer 0 (`catp-plugin`)**: TypeScript, Node.js ≥ 20, npm workspaces
-- **Circuits (`catp-circuits`)**: Rust, Halo2 (PSE fork), `cargo test`
-- **Contracts (`catp-contracts`)**: Solidity ^0.8.24, Foundry (`forge test`)
-- **SDK (`catp-sdk`)**: TypeScript, pnpm
-
-All PRs should include tests. The Layer 0 plugin targets 80% coverage; contract PRs require Forge tests.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for per-component dev setup, coding conventions, and commit message format.
 
 ---
 
