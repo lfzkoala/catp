@@ -43,6 +43,8 @@ function matchesRule(rule: Rule, input: HookInput): boolean {
     if (rule.path_allowlist && rule.path_allowlist.length > 0) {
       return !micromatch.isMatch(filePath, rule.path_allowlist);
     }
+    // path condition present but file didn't match denylist and no allowlist — no match
+    return false;
   }
 
   // No pattern/path conditions — matches any invocation of this tool

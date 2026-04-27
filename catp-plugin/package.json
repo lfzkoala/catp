@@ -1,7 +1,15 @@
 {
-  "name": "@catp/plugin",
+  "name": "@catp-protocol/cli",
   "version": "0.1.0",
-  "private": true,
+  "description": "Cryptographic Agent Trust Protocol — local enforcement plugin for Claude Code with TOML policy and tamper-evident audit log",
+  "keywords": ["claude-code", "ai-agents", "policy", "audit", "hooks", "trust", "zk"],
+  "license": "MIT",
+  "homepage": "https://github.com/lfzkoala/catp#readme",
+  "bugs": "https://github.com/lfzkoala/catp/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lfzkoala/catp.git"
+  },
   "type": "module",
   "bin": {
     "catp": "./dist/cli.js"
@@ -13,7 +21,8 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "test:coverage": "node --experimental-vm-modules node_modules/.bin/jest --coverage --ci"
   },
   "dependencies": {
     "commander": "^12.0.0",
