@@ -154,22 +154,24 @@ After Claude Code:
 
 ## Phase 1: ZK Protocol Layer (Month 3–9)
 
-**Goal**: Audit logs become cryptographically verifiable. On-chain anchoring via `AgentAuthorizer` on EVM testnet. Upgrades the enforcement plugin from "local policy file" to "provable compliance."
+**Goal**: Audit logs become cryptographically verifiable. ZK proofs are generated from the WASM prover and verifiable via a Rust endpoint. On-chain verification is deferred pending stable KZG tooling on crates.io. Upgrades the enforcement plugin from "local policy file" to "provable compliance."
 
-### 1.1 — Real Halo2 On-Chain Verifier
+### 1.1 — Web2 Verification Path
 
-Replace `StubVerifier` in `AgentAuthorizer` with the auto-generated Halo2 Solidity verifier:
+Expose `verify_authorization` as a lightweight verification service — the primary verification path for Phase 1:
 
-- Generate Solidity verifier from `catp-circuits/layer2/` proving key
-- Deploy as `Halo2Verifier` implementing `IVerifier`
-- Update `DeployAgentAuthorizer.s.sol` to inject real verifier
-- End-to-end test: Rust prover → Solidity verifier → `executeAuthorized`
+- Extract a `catp-verify` crate from `catp-circuits/layer2` with lean dependencies
+- Expose a REST endpoint: accepts `(proof_bytes, public_inputs_json)`, returns `{ valid: bool }`
+- Wire `ProofClient` in the TypeScript SDK to call this endpoint for verification
 
-### 1.2 — WASM Prover Bundle
+**Why not on-chain yet**: the IPA/pasta backend used by `halo2_proofs 0.3.x` (crates.io) has no practical Solidity verifier — pasta curves lack EVM precompiles. Switching to KZG requires either a git-pinned dependency (fragile to maintain as APIs drift) or a per-circuit trusted setup (contradicts CATP's trustless principle). On-chain verification is deferred to Phase 2 when the ecosystem matures. The `IVerifier` interface is already in place — swapping to a real verifier requires no changes to `AgentAuthorizer` logic.
 
-Build `catp-circuits/layer2/` to WASM via wasm-pack:
+### 1.2 — WASM Prover Bundle ✅
 
-- Wire `ProofClient` in TypeScript SDK to real WASM bundle
+`catp-circuits/wasm` built and published via wasm-pack. Exports `prove_authorization` and `verify_authorization` as wasm-bindgen functions.
+
+Remaining:
+- Wire `ProofClient` in TypeScript SDK to the WASM bundle (currently returns placeholder)
 - Test in both Node.js and browser environments
 - Measure proving time; document latency expectations for developers
 
@@ -201,12 +203,15 @@ This is a research + documentation task, not a code change. Output: one-page com
 
 ### Deliverables
 
-- [ ] Real Halo2 Solidity verifier deployed on testnet
-- [ ] WASM prover bundle integrated into SDK
+- [x] WASM prover bundle built (`catp-circuits/wasm`)
+- [ ] `catp-verify` crate exposing `verify_authorization` as a Rust library + REST endpoint
+- [ ] WASM bundle wired into `ProofClient` in TypeScript SDK
+- [ ] `ProofClient` verification calls routed to `catp-verify` REST endpoint
 - [ ] `catp anchor` command working end-to-end
 - [ ] Circuit review complete
 - [ ] NIST CAISI compatibility matrix documented
 - [ ] Updated README with Phase 1 flow
+- [ ] On-chain Solidity verifier — deferred to Phase 2 (pending stable KZG crates.io release or Nova/HyperNova tooling)
 
 ---
 
@@ -312,19 +317,20 @@ This is a research + documentation task, not a code change. Output: one-page com
 
 | Component | Status |
 |-----------|--------|
-| `ProveAuthorization` Halo2 circuit (Layer 2) | ✅ Complete (9 tests) |
+| `ProveAuthorization` Halo2 circuit — prove + real verify | ✅ Complete (11 tests) |
+| WASM prover bundle (`catp-circuits/wasm`) | ✅ Complete — `prove_authorization` / `verify_authorization` |
 | `AgentAuthorizer.sol` + `ActionData.sol` | ✅ Complete (16 tests, stub verifier) |
-| TypeScript SDK Layer 2 (`PolicyBuilder`, `AuthorizerClient`, `ProofClient`) | ✅ Complete |
+| TypeScript SDK Layer 2 (`PolicyBuilder`, `AuthorizerClient`, `ProofClient`) | ⚠️ API complete; `ProofClient` not yet wired to WASM bundle |
+| `catp-verify` REST verification endpoint | 🔜 Next — Phase 1 primary verification path |
 | `CommitRegistry.sol` (Layer 3) | ✅ Complete (8 tests) |
 | `MPAVerifier.sol` (Layer 3) | ✅ Complete (9 tests) |
 | `OptimisticChallenge.sol` (Layer 3) | ✅ Complete (10 tests) |
 | Enforcement plugin (`catp-plugin/`) | 🔴 Not started — **Phase 0 priority** |
-| Real Halo2 on-chain verifier | 🔴 Not started — Phase 1 |
-| WASM prover bundle | 🔴 Not started — Phase 1 |
+| Real Halo2 on-chain verifier | 🔜 Deferred to Phase 2 — pending stable KZG tooling |
 | Layers 1, 4, 5 circuits | 🔜 Scaffold only |
 | SDK Layers 1, 3, 4, 5 | 🔜 Scaffold only |
 
-**43 tests passing** across Rust (MockProver) and Solidity (Forge).
+**45 tests passing** across Rust (11) and Solidity/Forge (34).
 
 ---
 

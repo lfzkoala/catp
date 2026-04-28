@@ -1,5 +1,6 @@
 .worktrees/
 target/
+catp-circuits/wasm/pkg/
 node_modules/
 dist/
 .env

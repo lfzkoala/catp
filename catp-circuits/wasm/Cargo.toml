@@ -1,0 +1,18 @@
+[package]
+name = "catp-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+catp-layer2 = { path = "../layer2" }
+catp-primitives = { path = "../primitives" }
+wasm-bindgen = "0.2"
+serde_json = "1"
+js-sys = "0.3"
+
+# getrandom with js feature is required for OsRng to work in WASM (Node.js / browser).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }

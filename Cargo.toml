@@ -6,6 +6,7 @@ members = [
     "catp-circuits/layer3",
     "catp-circuits/layer4",
     "catp-circuits/layer5",
+    "catp-circuits/wasm",
     "catp-node",
 ]
 

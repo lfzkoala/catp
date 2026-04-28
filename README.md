@@ -124,7 +124,8 @@ catp/
 │       └── commands/       # init, validate, log CLI commands
 ├── catp-circuits/          # Rust — Halo2 ZK circuits
 │   ├── primitives/         # Poseidon hash, SMT, X25519/AES, ProofSystem trait
-│   └── layer2/             # ProveAuthorization circuit
+│   ├── layer2/             # ProveAuthorization circuit
+│   └── wasm/               # wasm-pack bindings — prove_authorization / verify_authorization
 ├── catp-contracts/         # Solidity — on-chain verifiers + state
 │   ├── src/layer2/         # AgentAuthorizer, IVerifier, StubVerifier
 │   └── src/layer3/         # CommitRegistry, MPAVerifier, OptimisticChallenge
@@ -141,17 +142,18 @@ catp/
 | Layer | Component | Status |
 |-------|-----------|--------|
 | 0 | `catp-plugin` — Claude Code enforcement + audit log | ✅ Complete (56 tests) |
-| 2 | `ProveAuthorization` Halo2 circuit | ✅ Complete (9 tests) |
+| 2 | `ProveAuthorization` Halo2 circuit — prove + verify | ✅ Complete (11 tests) |
+| 2 | WASM prover bundle (`catp-circuits/wasm`) | ✅ Complete — `prove_authorization` / `verify_authorization` exported |
 | 2 | `AgentAuthorizer.sol` + `ActionData.sol` | ✅ Complete (16 tests) |
-| 2 | TypeScript SDK — types, `PolicyBuilder`, `AuthorizerClient`, `ProofClient` | ⚠️ API complete; ZK prover is a stub |
+| 2 | TypeScript SDK — types, `PolicyBuilder`, `AuthorizerClient`, `ProofClient` | ⚠️ API complete; `ProofClient` not yet wired to WASM bundle |
 | 3 | `CommitRegistry.sol` | ✅ Complete (8 tests) |
 | 3 | `MPAVerifier.sol` | ✅ Complete (9 tests) |
 | 3 | `OptimisticChallenge.sol` | ✅ Complete (10 tests) |
 | 1, 4, 5 | All layers | 🔜 Planned |
 
-**99 tests passing** across TypeScript/Jest (56), Rust/MockProver (9), and Solidity/Forge (34).
+**101 tests passing** across TypeScript/Jest (56), Rust (11), and Solidity/Forge (34).
 
-> **Stub notice:** The Halo2 on-chain verifier (`IVerifier`) and WASM prover (`ProofClient`) are intentional stubs. They will be replaced with the generated Halo2 Solidity verifier and a `wasm-pack` bundle in the next phase. Do not use the Layer 2 SDK in production.
+> **Phase 1 verification path:** ZK proofs are generated via the WASM bundle and verified via the `catp-verify` REST endpoint (web2 path). The on-chain `IVerifier` remains a stub — direct Solidity verification is deferred to Phase 2 pending stable KZG tooling. `ProofClient` wiring to the WASM prover and verification endpoint is in progress. Do not use the Layer 2 SDK in production.
 
 ---
 
