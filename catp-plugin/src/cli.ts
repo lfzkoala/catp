@@ -5,6 +5,7 @@ import { runPostHook } from "./hook/post.js";
 import { cmdInit } from "./commands/init.js";
 import { cmdValidate } from "./commands/validate.js";
 import { cmdLogShow, cmdLogVerify } from "./commands/log.js";
+import { cmdAnchor } from "./commands/anchor.js";
 
 const program = new Command();
 
@@ -50,6 +51,13 @@ log
   .description("Verify commitment chain integrity")
   .option("--agent <id>", "agent id (default: from policy file)")
   .action(cmdLogVerify);
+
+program
+  .command("anchor")
+  .description("Batch audit commitments into a Merkle root and submit on-chain")
+  .option("--agent <id>", "agent id (default: from policy file)")
+  .option("--dry-run", "compute and print the Merkle root without submitting")
+  .action(cmdAnchor);
 
 program.parseAsync(process.argv).catch((err) => {
   process.stderr.write(`catp: ${(err as Error).message}\n`);

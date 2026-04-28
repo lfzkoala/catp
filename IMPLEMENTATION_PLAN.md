@@ -204,10 +204,10 @@ This is a research + documentation task, not a code change. Output: one-page com
 ### Deliverables
 
 - [x] WASM prover bundle built (`catp-circuits/wasm`)
-- [ ] `catp-verify` crate exposing `verify_authorization` as a Rust library + REST endpoint
-- [ ] WASM bundle wired into `ProofClient` in TypeScript SDK
-- [ ] `ProofClient` verification calls routed to `catp-verify` REST endpoint
-- [ ] `catp anchor` command working end-to-end
+- [x] `catp-verify` crate exposing `verify_authorization` as a Rust library + REST endpoint
+- [x] WASM bundle wired into `ProofClient` in TypeScript SDK
+- [x] `ProofClient` verification calls routed to `catp-verify` REST endpoint
+- [x] `catp anchor` command working end-to-end
 - [ ] Circuit review complete
 - [ ] NIST CAISI compatibility matrix documented
 - [ ] Updated README with Phase 1 flow
@@ -320,8 +320,8 @@ This is a research + documentation task, not a code change. Output: one-page com
 | `ProveAuthorization` Halo2 circuit — prove + real verify | ✅ Complete (11 tests) |
 | WASM prover bundle (`catp-circuits/wasm`) | ✅ Complete — `prove_authorization` / `verify_authorization` |
 | `AgentAuthorizer.sol` + `ActionData.sol` | ✅ Complete (16 tests, stub verifier) |
-| TypeScript SDK Layer 2 (`PolicyBuilder`, `AuthorizerClient`, `ProofClient`) | ⚠️ API complete; `ProofClient` not yet wired to WASM bundle |
-| `catp-verify` REST verification endpoint | 🔜 Next — Phase 1 primary verification path |
+| TypeScript SDK Layer 2 (`PolicyBuilder`, `AuthorizerClient`, `ProofClient`) | ✅ Complete — wired to WASM prover + `catp-verify` REST endpoint |
+| `catp-verify` REST verification endpoint | ✅ Complete (3 tests) |
 | `CommitRegistry.sol` (Layer 3) | ✅ Complete (8 tests) |
 | `MPAVerifier.sol` (Layer 3) | ✅ Complete (9 tests) |
 | `OptimisticChallenge.sol` (Layer 3) | ✅ Complete (10 tests) |
@@ -330,7 +330,7 @@ This is a research + documentation task, not a code change. Output: one-page com
 | Layers 1, 4, 5 circuits | 🔜 Scaffold only |
 | SDK Layers 1, 3, 4, 5 | 🔜 Scaffold only |
 
-**45 tests passing** across Rust (11) and Solidity/Forge (34).
+**120 tests passing** across TypeScript/Jest (72), Rust (14), and Solidity/Forge (34).
 
 ---
 

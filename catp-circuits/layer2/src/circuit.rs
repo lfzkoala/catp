@@ -153,47 +153,102 @@ impl Circuit<halo2_proofs::pasta::Fp> for ProveAuthorization {
             |mut region| {
                 config.sel_membership.enable(&mut region, 0)?;
 
-                region.assign_advice(|| "action_type", config.action_cols[0], 0, || {
-                    action.map(|a| fp(a.action_type.as_u64())).unwrap_or_else(unk)
-                })?;
-                region.assign_advice(|| "action_value", config.action_cols[1], 0, || {
-                    action.map(|a| fp(a.value)).unwrap_or_else(unk)
-                })?;
-                region.assign_advice(|| "action_protocol_low", config.action_cols[2], 0, || {
-                    action
-                        .map(|a| fp(u64::from_le_bytes(a.protocol[..8].try_into().unwrap())))
-                        .unwrap_or_else(unk)
-                })?;
-                region.assign_advice(|| "action_token_low", config.action_cols[3], 0, || {
-                    action
-                        .map(|a| fp(u64::from_le_bytes(a.token[..8].try_into().unwrap())))
-                        .unwrap_or_else(unk)
-                })?;
-                region.assign_advice(|| "policy_allowed_action", config.policy_cols[0], 0, || {
-                    policy.map(|p| fp(p.allowed_action.as_u64())).unwrap_or_else(unk)
-                })?;
-                region.assign_advice(|| "policy_max_per_tx", config.policy_cols[1], 0, || {
-                    policy.map(|p| fp(p.max_value_per_tx)).unwrap_or_else(unk)
-                })?;
-                region.assign_advice(|| "policy_max_total", config.policy_cols[2], 0, || {
-                    policy.map(|p| fp(p.max_value_total)).unwrap_or_else(unk)
-                })?;
-                region.assign_advice(|| "policy_valid_from", config.policy_cols[3], 0, || {
-                    policy.map(|p| fp(p.valid_from)).unwrap_or_else(unk)
-                })?;
-                region.assign_advice(|| "policy_valid_until", config.policy_cols[4], 0, || {
-                    policy.map(|p| fp(p.valid_until)).unwrap_or_else(unk)
-                })?;
-                region.assign_advice(|| "policy_protocol_low", config.policy_cols[5], 0, || {
-                    policy
-                        .map(|p| fp(u64::from_le_bytes(p.allowed_protocol[..8].try_into().unwrap())))
-                        .unwrap_or_else(unk)
-                })?;
-                region.assign_advice(|| "policy_token_low", config.policy_cols[6], 0, || {
-                    policy
-                        .map(|p| fp(u64::from_le_bytes(p.allowed_token[..8].try_into().unwrap())))
-                        .unwrap_or_else(unk)
-                })?;
+                region.assign_advice(
+                    || "action_type",
+                    config.action_cols[0],
+                    0,
+                    || {
+                        action
+                            .map(|a| fp(a.action_type.as_u64()))
+                            .unwrap_or_else(unk)
+                    },
+                )?;
+                region.assign_advice(
+                    || "action_value",
+                    config.action_cols[1],
+                    0,
+                    || action.map(|a| fp(a.value)).unwrap_or_else(unk),
+                )?;
+                region.assign_advice(
+                    || "action_protocol_low",
+                    config.action_cols[2],
+                    0,
+                    || {
+                        action
+                            .map(|a| fp(u64::from_le_bytes(a.protocol[..8].try_into().unwrap())))
+                            .unwrap_or_else(unk)
+                    },
+                )?;
+                region.assign_advice(
+                    || "action_token_low",
+                    config.action_cols[3],
+                    0,
+                    || {
+                        action
+                            .map(|a| fp(u64::from_le_bytes(a.token[..8].try_into().unwrap())))
+                            .unwrap_or_else(unk)
+                    },
+                )?;
+                region.assign_advice(
+                    || "policy_allowed_action",
+                    config.policy_cols[0],
+                    0,
+                    || {
+                        policy
+                            .map(|p| fp(p.allowed_action.as_u64()))
+                            .unwrap_or_else(unk)
+                    },
+                )?;
+                region.assign_advice(
+                    || "policy_max_per_tx",
+                    config.policy_cols[1],
+                    0,
+                    || policy.map(|p| fp(p.max_value_per_tx)).unwrap_or_else(unk),
+                )?;
+                region.assign_advice(
+                    || "policy_max_total",
+                    config.policy_cols[2],
+                    0,
+                    || policy.map(|p| fp(p.max_value_total)).unwrap_or_else(unk),
+                )?;
+                region.assign_advice(
+                    || "policy_valid_from",
+                    config.policy_cols[3],
+                    0,
+                    || policy.map(|p| fp(p.valid_from)).unwrap_or_else(unk),
+                )?;
+                region.assign_advice(
+                    || "policy_valid_until",
+                    config.policy_cols[4],
+                    0,
+                    || policy.map(|p| fp(p.valid_until)).unwrap_or_else(unk),
+                )?;
+                region.assign_advice(
+                    || "policy_protocol_low",
+                    config.policy_cols[5],
+                    0,
+                    || {
+                        policy
+                            .map(|p| {
+                                fp(u64::from_le_bytes(
+                                    p.allowed_protocol[..8].try_into().unwrap(),
+                                ))
+                            })
+                            .unwrap_or_else(unk)
+                    },
+                )?;
+                region.assign_advice(
+                    || "policy_token_low",
+                    config.policy_cols[6],
+                    0,
+                    || {
+                        policy
+                            .map(|p| {
+                                fp(u64::from_le_bytes(p.allowed_token[..8].try_into().unwrap()))
+                            })
+                            .unwrap_or_else(unk)
+                    },
+                )?;
                 Ok(())
             },
         )?;
@@ -211,12 +266,37 @@ impl Circuit<halo2_proofs::pasta::Fp> for ProveAuthorization {
                 let diff_per_tx = max_per_tx.saturating_sub(action_val);
                 let diff_total = max_total.saturating_sub(cumulative.saturating_add(action_val));
 
-                region.assign_advice(|| "action_value", config.action_cols[1], 0, || fp(action_val))?;
-                region.assign_advice(|| "max_per_tx", config.policy_cols[1], 0, || fp(max_per_tx))?;
+                region.assign_advice(
+                    || "action_value",
+                    config.action_cols[1],
+                    0,
+                    || fp(action_val),
+                )?;
+                region.assign_advice(
+                    || "max_per_tx",
+                    config.policy_cols[1],
+                    0,
+                    || fp(max_per_tx),
+                )?;
                 region.assign_advice(|| "max_total", config.policy_cols[2], 0, || fp(max_total))?;
-                region.assign_advice(|| "diff_per_tx", config.policy_cols[3], 0, || fp(diff_per_tx))?;
-                region.assign_advice(|| "diff_total", config.policy_cols[4], 0, || fp(diff_total))?;
-                region.assign_advice(|| "cumulative", config.action_cols[2], 0, || fp(cumulative))?;
+                region.assign_advice(
+                    || "diff_per_tx",
+                    config.policy_cols[3],
+                    0,
+                    || fp(diff_per_tx),
+                )?;
+                region.assign_advice(
+                    || "diff_total",
+                    config.policy_cols[4],
+                    0,
+                    || fp(diff_total),
+                )?;
+                region.assign_advice(
+                    || "cumulative",
+                    config.action_cols[2],
+                    0,
+                    || fp(cumulative),
+                )?;
                 region.assign_advice(|| "_", config.action_cols[0], 0, || fp(0))?;
                 region.assign_advice(|| "_", config.action_cols[3], 0, || fp(0))?;
                 region.assign_advice(|| "_", config.policy_cols[0], 0, || fp(0))?;
@@ -240,9 +320,24 @@ impl Circuit<halo2_proofs::pasta::Fp> for ProveAuthorization {
 
                 region.assign_advice(|| "timestamp", config.action_cols[0], 0, || fp(ts))?;
                 region.assign_advice(|| "diff_from", config.action_cols[1], 0, || fp(diff_from))?;
-                region.assign_advice(|| "diff_until", config.action_cols[2], 0, || fp(diff_until))?;
-                region.assign_advice(|| "valid_from", config.policy_cols[3], 0, || fp(valid_from))?;
-                region.assign_advice(|| "valid_until", config.policy_cols[4], 0, || fp(valid_until))?;
+                region.assign_advice(
+                    || "diff_until",
+                    config.action_cols[2],
+                    0,
+                    || fp(diff_until),
+                )?;
+                region.assign_advice(
+                    || "valid_from",
+                    config.policy_cols[3],
+                    0,
+                    || fp(valid_from),
+                )?;
+                region.assign_advice(
+                    || "valid_until",
+                    config.policy_cols[4],
+                    0,
+                    || fp(valid_until),
+                )?;
                 region.assign_advice(|| "_", config.action_cols[3], 0, || fp(0))?;
                 region.assign_advice(|| "_", config.policy_cols[0], 0, || fp(0))?;
                 region.assign_advice(|| "_", config.policy_cols[1], 0, || fp(0))?;
@@ -314,49 +409,73 @@ mod tests {
 
     #[test]
     fn wrong_action_type_fails() {
-        let action = Action { action_type: ActionType::Transfer, ..test_action() };
+        let action = Action {
+            action_type: ActionType::Transfer,
+            ..test_action()
+        };
         assert!(run_circuit(test_policy(), action, test_public_inputs()).is_err());
     }
 
     #[test]
     fn wrong_protocol_fails() {
-        let action = Action { protocol: [9u8; 32], ..test_action() };
+        let action = Action {
+            protocol: [9u8; 32],
+            ..test_action()
+        };
         assert!(run_circuit(test_policy(), action, test_public_inputs()).is_err());
     }
 
     #[test]
     fn wrong_token_fails() {
-        let action = Action { token: [9u8; 32], ..test_action() };
+        let action = Action {
+            token: [9u8; 32],
+            ..test_action()
+        };
         assert!(run_circuit(test_policy(), action, test_public_inputs()).is_err());
     }
 
     #[test]
     fn value_exceeds_per_tx_limit_fails() {
-        let action = Action { value: 1500, ..test_action() };
+        let action = Action {
+            value: 1500,
+            ..test_action()
+        };
         assert!(run_circuit(test_policy(), action, test_public_inputs()).is_err());
     }
 
     #[test]
     fn cumulative_exceeds_total_limit_fails() {
-        let public_inputs = AuthorizationPublicInputs { cumulative_spend: 9800, ..test_public_inputs() };
+        let public_inputs = AuthorizationPublicInputs {
+            cumulative_spend: 9800,
+            ..test_public_inputs()
+        };
         assert!(run_circuit(test_policy(), test_action(), public_inputs).is_err());
     }
 
     #[test]
     fn timestamp_before_valid_from_fails() {
-        let public_inputs = AuthorizationPublicInputs { current_timestamp: 500, ..test_public_inputs() };
+        let public_inputs = AuthorizationPublicInputs {
+            current_timestamp: 500,
+            ..test_public_inputs()
+        };
         assert!(run_circuit(test_policy(), test_action(), public_inputs).is_err());
     }
 
     #[test]
     fn timestamp_after_valid_until_fails() {
-        let public_inputs = AuthorizationPublicInputs { current_timestamp: 9500, ..test_public_inputs() };
+        let public_inputs = AuthorizationPublicInputs {
+            current_timestamp: 9500,
+            ..test_public_inputs()
+        };
         assert!(run_circuit(test_policy(), test_action(), public_inputs).is_err());
     }
 
     #[test]
     fn exact_boundary_values_pass() {
-        let action = Action { value: 1000, ..test_action() };
+        let action = Action {
+            value: 1000,
+            ..test_action()
+        };
         let public_inputs = AuthorizationPublicInputs {
             current_timestamp: 1000,
             cumulative_spend: 9000,

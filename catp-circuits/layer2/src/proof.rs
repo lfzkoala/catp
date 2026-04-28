@@ -78,15 +78,9 @@ impl AuthorizationProofSystem {
         let strategy = plonk::SingleVerifier::new(&self.params);
         let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof.0[..]);
 
-        plonk::verify_proof(
-            &self.params,
-            &vk,
-            strategy,
-            &[&[&[], &[]]],
-            &mut transcript,
-        )
-        .map(|_| true)
-        .map_err(|e| CatpError::Serialization(e.to_string()))
+        plonk::verify_proof(&self.params, &vk, strategy, &[&[&[], &[]]], &mut transcript)
+            .map(|_| true)
+            .map_err(|e| CatpError::Serialization(e.to_string()))
     }
 }
 

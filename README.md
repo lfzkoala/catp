@@ -141,19 +141,20 @@ catp/
 
 | Layer | Component | Status |
 |-------|-----------|--------|
-| 0 | `catp-plugin` — Claude Code enforcement + audit log | ✅ Complete (56 tests) |
+| 0 | `catp-plugin` — Claude Code enforcement + audit log | ✅ Complete (72 tests) |
 | 2 | `ProveAuthorization` Halo2 circuit — prove + verify | ✅ Complete (11 tests) |
 | 2 | WASM prover bundle (`catp-circuits/wasm`) | ✅ Complete — `prove_authorization` / `verify_authorization` exported |
 | 2 | `AgentAuthorizer.sol` + `ActionData.sol` | ✅ Complete (16 tests) |
-| 2 | TypeScript SDK — types, `PolicyBuilder`, `AuthorizerClient`, `ProofClient` | ⚠️ API complete; `ProofClient` not yet wired to WASM bundle |
+| 2 | `catp-verify` — Rust REST verification endpoint | ✅ Complete (3 tests) |
+| 2 | TypeScript SDK — types, `PolicyBuilder`, `AuthorizerClient`, `ProofClient` | ✅ Complete — `ProofClient` wired to WASM prover + `catp-verify` REST endpoint |
 | 3 | `CommitRegistry.sol` | ✅ Complete (8 tests) |
 | 3 | `MPAVerifier.sol` | ✅ Complete (9 tests) |
 | 3 | `OptimisticChallenge.sol` | ✅ Complete (10 tests) |
 | 1, 4, 5 | All layers | 🔜 Planned |
 
-**101 tests passing** across TypeScript/Jest (56), Rust (11), and Solidity/Forge (34).
+**120 tests passing** across TypeScript/Jest (72), Rust (14), and Solidity/Forge (34).
 
-> **Phase 1 verification path:** ZK proofs are generated via the WASM bundle and verified via the `catp-verify` REST endpoint (web2 path). The on-chain `IVerifier` remains a stub — direct Solidity verification is deferred to Phase 2 pending stable KZG tooling. `ProofClient` wiring to the WASM prover and verification endpoint is in progress. Do not use the Layer 2 SDK in production.
+> **Phase 1 verification path:** ZK proofs are generated via the WASM bundle and verified via the `catp-verify` REST endpoint (web2 path). `ProofClient` is fully wired — call `prove()` to generate a proof and `verify()` to validate it against the REST endpoint. The on-chain `IVerifier` remains a stub — direct Solidity verification is deferred to Phase 2 pending stable KZG tooling.
 
 ---
 

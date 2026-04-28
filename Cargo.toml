@@ -8,6 +8,7 @@ members = [
     "catp-circuits/layer5",
     "catp-circuits/wasm",
     "catp-node",
+    "catp-verify",
 ]
 
 # Shared dependency versions — edit here to update all crates at once.

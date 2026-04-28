@@ -1,4 +1,6 @@
-use catp_layer2::{Action, AuthorizationPolicy, AuthorizationProofSystem, AuthorizationPublicInputs};
+use catp_layer2::{
+    Action, AuthorizationPolicy, AuthorizationProofSystem, AuthorizationPublicInputs,
+};
 use catp_primitives::proof::Proof;
 use wasm_bindgen::prelude::*;
 

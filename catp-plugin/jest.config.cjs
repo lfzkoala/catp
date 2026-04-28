@@ -26,7 +26,9 @@ module.exports = {
     'src/**/*.ts',
     '!src/cli.ts',
     '!src/hook/**',
-    '!src/commands/**',
+    '!src/commands/init.ts',
+    '!src/commands/validate.ts',
+    '!src/commands/log.ts',
   ],
   coverageThreshold: {
     global: {

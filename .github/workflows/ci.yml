@@ -52,7 +52,7 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - name: Install dependencies
-        run: NODE_ENV=development npm install
+        run: npm install --include=dev
       - name: Type check
         working-directory: catp-plugin
         run: npm run typecheck
