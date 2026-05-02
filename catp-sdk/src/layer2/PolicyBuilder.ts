@@ -73,7 +73,7 @@ export class PolicyBuilder {
   }
 
   static encode(policy: AuthorizationPolicy): Uint8Array {
-    const buf = new ArrayBuffer(8 * 8);
+    const buf = new ArrayBuffer(97);
     const view = new DataView(buf);
     view.setUint8(0, policy.allowedAction);
 
