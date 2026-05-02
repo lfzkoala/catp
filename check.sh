@@ -26,6 +26,6 @@ NODE_ENV=development npm install
 (cd catp-plugin && npm run test:coverage)
 
 echo "==> catp-sdk install + typecheck"
-(cd catp-sdk && NODE_ENV=development pnpm install --frozen-lockfile && pnpm run typecheck)
+(cd catp-sdk && NODE_ENV=development pnpm install --frozen-lockfile && pnpm run typecheck && pnpm test)
 
 echo "All checks passed."

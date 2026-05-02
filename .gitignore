@@ -4,6 +4,7 @@ catp-circuits/wasm/pkg/
 node_modules/
 dist/
 coverage/
+*.tsbuildinfo
 .env
 *.key
 *.pem

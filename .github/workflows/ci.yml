@@ -41,6 +41,9 @@ jobs:
       - name: Type check
         working-directory: catp-sdk
         run: pnpm tsc --noEmit
+      - name: Run tests
+        working-directory: catp-sdk
+        run: pnpm test
 
   catp-plugin:
     name: catp-plugin (type-check + tests)
