@@ -12,77 +12,6 @@ Identity layer (Layer 0) is ceded to existing players (Kite AI, Lit Protocol, et
 
 ---
 
-## Product Strategy
-
-### The Problem
-
-Open-source agent frameworks (Claude Code, AutoGen, Hermes, OpenClaw, etc.) give AI agents broad permissions on local machines and remote systems — file access, shell execution, API calls, browser control — with no standard mechanism for:
-
-1. **Authorization enforcement**: Can you constrain what an agent is allowed to do at runtime?
-2. **Compliance proof**: Can the agent prove it stayed within its authorized scope — to you, your client, or a third party?
-3. **Tamper-proof audit**: If something goes wrong, can the agent's behavior be verified after the fact — without trusting the agent developer?
-
-Today these are handled by trusting the agent developer, or by blunt OS-level permission grants. Neither is sufficient as agents take higher-stakes actions.
-
-**Market evidence (2026):**
-- 70% of enterprise AI agents have more system access than equivalent human roles (Cisco State of AI Security 2026)
-- Only 3% of organizations have automated, machine-speed controls governing agent behavior (Gravitee)
-- AI agents caused security incidents at two-thirds of surveyed enterprises (Infosecurity Magazine)
-- CVE-2025-53773 (CVSS 9.6): prompt injection in a GitHub Copilot PR description triggered remote code execution
-- US federal government issued a formal RFI on AI agent security in January 2026; NIST launched the AI Agent Standards Initiative in February 2026
-
-### Product Market Fit
-
-**Who**: AI agent developers and operators who need to constrain, audit, and prove the behavior of the agents they build or deploy.
-
-**Pain**: There is no standard way to enforce policy on an AI agent at runtime, and no way to prove compliance to a client, platform, or regulator without exposing sensitive policy details.
-
-**Solution**: CATP provides a two-product ladder:
-
-1. **Enforcement Layer (first product)** — a plugin that integrates into any agent framework via its native hooks. Install it in Claude Code, LangChain, or AutoGen. Define a policy. Get real-time enforcement and cryptographic audit logs. No blockchain required to start delivering value.
-
-2. **CATP Protocol Layer (trust upgrade)** — generates ZK proofs from audit logs and anchors policy commitments on-chain. Allows any third party to verify compliance cryptographically, without trusting the agent developer or seeing the policy details.
-
-The enforcement layer alone solves the enforcement and audit problem. The ZK/chain layer solves the *trustless verification* problem — proving compliance to parties who cannot see your machine.
-
-**Analogy — HTTPS:**
-
-| HTTPS | CATP |
-|-------|------|
-| Browser lock icon | Enforcement plugin |
-| TLS handshake + certificates | CATP protocol (ZK proof + policy commitment) |
-| Certificate Authority | Blockchain (immutable policy anchor) |
-
-Without TLS, the lock icon means nothing. Without CATP protocol, the plugin is just a local access control list — it can be bypassed or silently disabled. The ZK proof layer is what gives the enforcement layer its trustlessness.
-
-### First Milestone
-
-**Developers actively using the CATP enforcement plugin in their daily AI agent workflows.**
-
-Specifically: a Claude Code user installs the CATP plugin, defines a policy (e.g., "this agent cannot run shell commands that delete files, push to production branches, or call external APIs outside this allowlist"), and the agent is visibly constrained with a tamper-evident audit trail. No blockchain configuration required.
-
-### Go-to-Market Path
-
-1. **Phase 0**: Enforcement plugin for Claude Code. Zero friction — TOML policy file + hook installation. Immediate value: policy enforcement + local audit log.
-2. **Phase 1**: ZK proof layer wired to enforcement plugin. Audit logs become verifiable ZK proofs. On-chain anchoring optional.
-3. **Phase 2+**: Full protocol (output verification, reputation, registry). Required for multi-agent ecosystems and high-stakes integrations.
-
-### Competitive Landscape
-
-Several industry players launched agent trust solutions in early 2026. CATP's differentiation is the ZK privacy guarantee — no competitor provides policy-private compliance proofs.
-
-| Solution | Provider | Launched | Approach | Policy private? | Trustless? |
-|----------|----------|----------|----------|----------------|------------|
-| Agent Governance Toolkit | Microsoft | Apr 2026 | DID + Ed25519 + Inter-Agent Trust Protocol (IATP) | ✗ | ✗ (relies on DID infrastructure) |
-| Verifiable Intent | Mastercard + Google | 2026 | Tamper-resistant authorization record, open standard | ✗ | ✗ (relies on Mastercard trust anchor) |
-| **CATP** | — | — | ZK proof + on-chain policy commitment | **✓** | **✓** |
-
-Microsoft's IATP and Mastercard's Verifiable Intent solve the *record-keeping* problem but not the *privacy* problem: the verifier sees the policy. CATP is the only approach where an agent can prove compliance with a policy without revealing what the policy says.
-
-**Regulatory alignment**: NIST's AI Agent Standards Initiative (CAISI, Feb 2026) focuses on agent authentication, authorization interoperability, and auditability. CATP's design maps directly to these requirements and should be tracked for standards compatibility as CAISI publishes concrete specifications.
-
----
-
 ## Product Architecture
 
 CATP is deployed as two complementary layers:
@@ -156,68 +85,6 @@ Each integration intercepts the agent's action before execution, checks it again
 | Undecommissioned agents | Agents persist with live credentials after their task ends | Policy TTL and session limits enforced at the hook layer |
 
 The ZK proof layer adds one further guarantee: even after the session ends, the audit log can be proven tamper-free to any external party without replaying or exposing raw logs.
-
-### Day 1 Developer Experience (Claude Code)
-
-```
-1. Install the CATP plugin:
-   Add hook entries to ~/.claude/settings.json pointing at the CATP CLI
-
-2. Define a policy (catp-policy.toml):
-   [agent]
-   id = "my-claude-agent"
-
-   [[rules]]
-   tool = "Bash"
-   allow = false
-   pattern = ["rm -rf", "git push", "curl *prod*"]
-   reason = "Destructive or production-affecting commands blocked"
-
-   [[rules]]
-   tool = "Write"
-   allow = true
-   path_allowlist = ["./src/**", "./tests/**"]
-
-3. Run Claude Code as normal.
-   → Blocked actions are logged and rejected with a clear reason
-   → All actions are recorded with Poseidon commitment hashes
-   → Optional: anchor commitment log on-chain with `catp anchor`
-```
-
-No ZK proof knowledge required to start. No blockchain wallet required.
-
-### Why Not a System Prompt?
-
-A natural question: why not just tell the agent what it's allowed to do in the system prompt?
-
-System prompts ask the model to comply. The CATP enforcement layer runs as a separate process and cannot be bypassed by the model at all.
-
-```
-User prompt
-    ↓
-AI reasoning ("I should run git push...")
-    ↓
-Claude Code attempts Bash tool call
-    ↓
-CATP hook intercepts ← policy evaluated HERE, outside the model
-    ↓
-BLOCKED — model receives "CATP: blocked [reason]"
-    ↓
-Model adjusts behavior ("I need explicit approval to push")
-```
-
-| | System prompt | CATP enforcement |
-|---|---|---|
-| Who evaluates the policy | The AI model | The CATP process (external) |
-| Can be bypassed by prompt injection | Yes | No |
-| Can be bypassed by jailbreak | Yes | No |
-| Produces audit trail | No | Yes — commitment hash per action |
-| Upgrades to cryptographic proof | No | Yes — Phase 1 |
-| Verifiable by third parties | No | Yes — Phase 1+ |
-
-The enforcement layer is closer to a firewall or file permission system than to a policy document. The model does receive the block reason so it can respond gracefully — but enforcement has already happened before the model can respond.
-
-This distinction is also why the ZK proof layer is meaningful: you cannot generate a cryptographically verifiable compliance proof from a system prompt. The commitment hashes that feed the ZK proof come from the enforcement layer's action log — a record that exists independent of what the model said or thought.
 
 ---
 
@@ -304,14 +171,11 @@ The ZK circuit, proof format, and verification key are identical across all rows
 
 The following are documented gaps between the current codebase and the target architecture:
 
-1. **Enforcement layer plugin** — no code exists yet. This is Phase 0 and the highest-priority deliverable. 🔴 Not started.
-2. **Real Halo2 on-chain verifier** — `AgentAuthorizer` uses a stub verifier (`proof.length > 0`). The IPA/pasta backend has no practical Solidity verifier (pasta curves lack EVM precompiles). Switching to KZG requires a git-pinned halo2 dependency (crates.io is stuck at 0.3.2 with no KZG) or a per-circuit trusted setup (contradicts CATP's trustless principle). **Deferred to Phase 2**: the `IVerifier` interface is already in place — once stable KZG tooling ships to crates.io, or Nova/HyperNova matures, the verifier is swapped with zero changes to `AgentAuthorizer` logic. Phase 1 uses the web2 verification path instead (see Gap #7). 🔜 Deferred to Phase 2.
-3. **WASM prover bridge** — WASM bundle built at `catp-circuits/wasm/pkg/` and exports `prove_authorization` / `verify_authorization`. `ProofClient` in the SDK still returns a placeholder proof — wiring to the WASM bundle is pending. 🔜 In progress.
-4. **Policy state in contracts** — `activePolicies` and `cumulativeSpend` mappings should migrate to proof public inputs over time. 🔜 Planned.
-5. **EVM address types throughout SDK** — `0x${string}` assumes 20-byte Ethereum addresses. Future: abstract to `PrincipalId` bytes. 🔜 Planned.
-6. **Layer 5 registry assumes on-chain storage** — registry entries use EVM addresses and contract mappings. Future: content-addressed off-chain store with on-chain commitments. 🔜 Planned.
-7. **Web2 verification path** — Phase 1 primary verification path. `catp-verify` crate exposes `verify_authorization` as a Rust library; a REST endpoint accepts `(proof_bytes, public_inputs_json)` and returns `{ valid: bool }`. This is the production verification path until Gap #2 is resolved. 🔜 In progress — Phase 1.
-8. **Proof system: consider Nova/HyperNova for incremental audit logs** — Halo2 is the current choice (no trusted setup, mature tooling). Nova/HyperNova (Microsoft Research) uses a folding scheme architecturally better suited to CATP's incremental audit log model: each agent tool call is one fold, the running proof accumulates cheaply, and final proof size is small regardless of action count. The `IVerifier` interface already decouples proof verification from authorization logic, so a proof system swap requires no changes to policy or contract code. Revisit when Nova/HyperNova tooling matures. 🔭 Future consideration.
+1. **Real Halo2 on-chain verifier** — `AgentAuthorizer` uses a stub verifier (`proof.length > 0`). The IPA/pasta backend has no practical Solidity verifier (pasta curves lack EVM precompiles). Switching to KZG requires a git-pinned halo2 dependency (crates.io is stuck at 0.3.2 with no KZG) or a per-circuit trusted setup (contradicts CATP's trustless principle). **Deferred to Phase 2**: the `IVerifier` interface is already in place — once stable KZG tooling ships to crates.io, or Nova/HyperNova matures, the verifier is swapped with zero changes to `AgentAuthorizer` logic. Phase 1 uses the `catp-verify` REST endpoint for real off-chain verification. 🔜 Deferred to Phase 2.
+2. **Policy state in contracts** — `activePolicies` and `cumulativeSpend` mappings should migrate to proof public inputs over time. 🔜 Planned.
+3. **EVM address types throughout SDK** — `0x${string}` assumes 20-byte Ethereum addresses. Future: abstract to `PrincipalId` bytes. 🔜 Planned.
+4. **Layer 5 registry assumes on-chain storage** — registry entries use EVM addresses and contract mappings. Future: content-addressed off-chain store with on-chain commitments. 🔜 Planned.
+5. **Proof system: consider Nova/HyperNova for incremental audit logs** — Halo2 is the current choice (no trusted setup, mature tooling). Nova/HyperNova (Microsoft Research) uses a folding scheme architecturally better suited to CATP's incremental audit log model: each agent tool call is one fold, the running proof accumulates cheaply, and final proof size is small regardless of action count. The `IVerifier` interface already decouples proof verification from authorization logic, so a proof system swap requires no changes to policy or contract code. Revisit when Nova/HyperNova tooling matures. 🔭 Future consideration.
 
 ---
 
@@ -738,21 +602,6 @@ AgentRegistryEntry {
 
 See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the full phased roadmap.
 
-### Phase 0: Enforcement Plugin (current priority)
-Build the Claude Code enforcement plugin. Zero ZK, zero blockchain. Developers install it, define a policy file, and get real-time agent action enforcement + local audit logs. This is the deliverable that drives the first adoption milestone.
-
-### Phase 1: ZK Protocol Layer
-Wire real Halo2 proofs to the enforcement layer. Audit logs become verifiable ZK proofs. On-chain anchoring via `AgentAuthorizer` on EVM testnet.
-
-### Phase 2: Output Verification
-Add Layer 3 (commit-and-prove + MPA + optimistic slash). Targets any scenario where the correctness of agent outputs matters, not just their authorization.
-
-### Phase 3: Reputation
-Add Layer 4. Activates network effects once enough agents have meaningful track records.
-
-### Phase 4: Full Platform
-Add Layer 5 (Registry) and Layer 1 (Communication). CATP becomes a protocol, not just a product.
-
 ---
 
 ## Technical Risk Assessment
@@ -768,16 +617,3 @@ Add Layer 5 (Registry) and Layer 1 (Communication). CATP becomes a protocol, not
 | Adoption chicken-and-egg | High | Phase 0 enforcement plugin ships standalone with no protocol dependency |
 | MPA attestor economics not sustainable | Medium | Start permissioned (low cost); token incentive model for decentralized phase |
 
----
-
-## Naming & Positioning
-
-**Protocol name**: CATP (Cryptographic Agent Trust Protocol)
-
-**Positioning**:
-> "The HTTPS of AI agents — you wouldn't send a credit card over HTTP. Why would you let an AI agent operate with unconstrained access and no audit trail?"
-
-**Taglines**:
-- "Cryptographic trust for autonomous agents"
-- "Don't trust agents. Verify them."
-- "The missing trust layer for agentic AI"

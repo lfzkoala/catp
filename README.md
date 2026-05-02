@@ -154,7 +154,7 @@ catp/
 
 **148 tests passing** across TypeScript/Jest (72), Vitest (28), Rust (14), and Solidity/Forge (34).
 
-> **Phase 1 verification path:** ZK proofs are generated via the WASM bundle and verified via the `catp-verify` REST endpoint (web2 path). `ProofClient` is fully wired — call `prove()` to generate a proof and `verify()` to validate it against the REST endpoint. The on-chain `IVerifier` remains a stub — direct Solidity verification is deferred to Phase 2 pending stable KZG tooling.
+> Phase 1 uses a web2 verification path: proofs are generated via the WASM bundle and verified via the `catp-verify` REST endpoint. On-chain Solidity verification is deferred to Phase 2.
 
 ---
 
@@ -178,55 +178,6 @@ catp/
 | Foundry | latest | catp-contracts |
 
 Install Foundry: `curl -L https://foundry.paradigm.xyz | bash`
-
----
-
-## Getting Started
-
-### Layer 0 — enforcement plugin
-
-```bash
-bash install.sh
-```
-
-See the [Quick Start](#quick-start--claude-code-enforcement-layer-0) section above.
-
-### Layer 2 — Halo2 circuits
-
-```bash
-cargo test --workspace
-```
-
-### Layer 2 — Solidity contracts
-
-```bash
-cd catp-contracts
-forge test
-```
-
-### Layer 2 — TypeScript SDK
-
-```bash
-cd catp-sdk
-NODE_ENV=development pnpm install
-pnpm tsc --noEmit
-```
-
----
-
-## How Layer 2 Works
-
-1. A delegator calls `AgentAuthorizer.registerPolicy(policyCommitment)` to register a policy hash on-chain.
-2. The agent uses `PolicyBuilder` to construct an `AuthorizationPolicy` and `ProofClient` to generate a ZK proof that its action satisfies the policy.
-3. The agent calls `AgentAuthorizer.executeAuthorized(policyCommitment, actionData, proof)`.
-4. The contract verifies the proof, tracks cumulative spend, and emits `AuthorizedExecution`.
-
-## How Layer 3 Works
-
-1. Before inference, the agent submits a `preCommitment` hash to `CommitRegistry`.
-2. After inference, it submits a `postCommitment`; MPA attestors submit `outputCommitments` to `MPAVerifier`.
-3. Once ≥ 2/3 of attestors agree, the round is finalized.
-4. Any party can open a challenge via `OptimisticChallenge` within the challenge window. A successful challenge awards the challenger 30% of the slashed attestor stake.
 
 ---
 

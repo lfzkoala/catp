@@ -16,31 +16,7 @@ The enforcement plugin is the entry point. The ZK/chain layer is what gives it t
 
 ---
 
-## Monorepo Structure
-
-```
-catp/
-├── catp-plugin/            # TypeScript — enforcement layer CLI + hooks
-│   ├── src/                # policy loader, action interceptor, audit logger
-│   └── integrations/       # Claude Code, LangChain, AutoGen adapters
-├── catp-circuits/          # Rust — Halo2 ZK circuits
-│   ├── primitives/         # Poseidon hash, SMT, X25519/AES, ProofSystem trait
-│   ├── layer2/             # ProveAuthorization circuit
-│   ├── layer3/             # ProveBoundary circuit
-│   ├── layer4/             # ProveReputation circuit
-│   └── layer5/             # ProveCapability circuit
-├── catp-contracts/         # Solidity — on-chain verifiers + state
-│   ├── src/layer2/         # AgentAuthorizer, ActionData, IAgentAuthorizer, IVerifier
-│   └── src/layer3/         # CommitRegistry, MPAVerifier, OptimisticChallenge
-├── catp-sdk/               # TypeScript — developer-facing SDK
-│   └── src/layer2/         # types, PolicyBuilder, AuthorizerClient, ProofClient
-├── catp-node/              # Rust — MPA attestor node (scaffold)
-└── catp-tests/             # Integration tests across layers
-```
-
----
-
-## Phase 0: Enforcement Plugin (current priority)
+## Phase 0: Enforcement Plugin ✅ Complete
 
 **Goal**: Developers install the CATP plugin into Claude Code (or any agent framework) and get real-time policy enforcement + a local audit log. Zero ZK knowledge required. Zero blockchain wallet required.
 
@@ -143,12 +119,13 @@ After Claude Code:
 
 ### Deliverables
 
-- [ ] `catp-policy.toml` schema + parser
-- [ ] `PreToolUse` / `PostToolUse` hook handlers
-- [ ] Local audit log with Poseidon commitment hashes
-- [ ] `catp` CLI (init, validate, log, hook)
-- [ ] Claude Code integration documented in README
-- [ ] One-command install script
+- [x] `catp-policy.toml` schema + parser
+- [x] `PreToolUse` / `PostToolUse` hook handlers
+- [x] Local audit log with Poseidon commitment hashes
+- [x] `catp` CLI (init, validate, log, hook)
+- [x] Claude Code integration documented in README
+- [x] One-command install script
+- [x] Published to npm as `@catp-protocol/cli`
 
 ---
 
@@ -168,12 +145,7 @@ Expose `verify_authorization` as a lightweight verification service — the prim
 
 ### 1.2 — WASM Prover Bundle ✅
 
-`catp-circuits/wasm` built and published via wasm-pack. Exports `prove_authorization` and `verify_authorization` as wasm-bindgen functions.
-
-Remaining:
-- Wire `ProofClient` in TypeScript SDK to the WASM bundle (currently returns placeholder)
-- Test in both Node.js and browser environments
-- Measure proving time; document latency expectations for developers
+`catp-circuits/wasm` built and published via wasm-pack. Exports `prove_authorization` and `verify_authorization` as wasm-bindgen functions. `ProofClient` in the TypeScript SDK is wired to the WASM bundle for proving and to the `catp-verify` REST endpoint for verification.
 
 ### 1.3 — `catp anchor` Command
 
@@ -190,17 +162,6 @@ Wire Phase 0 audit logs to on-chain:
 - Fuzz witness generator to find edge cases
 - Benchmark prover: target < 30s on developer hardware
 
-### 1.5 — Regulatory Alignment Audit
-
-NIST launched the AI Agent Standards Initiative (CAISI) in February 2026, focusing on agent authentication, authorization interoperability, and auditability. As CAISI publishes draft specifications, verify CATP's interfaces remain compatible:
-
-- Map CATP's policy commitment → NIST's agent authorization model
-- Map CATP's audit log + ZK proof → NIST's auditability requirements
-- Document any gaps; open issues for any required interface changes
-- Track IETF Agent Name Service (ANS) draft for identity interoperability
-
-This is a research + documentation task, not a code change. Output: one-page compatibility matrix added to `ARCHITECTURE.md`.
-
 ### Deliverables
 
 - [x] WASM prover bundle built (`catp-circuits/wasm`)
@@ -208,9 +169,7 @@ This is a research + documentation task, not a code change. Output: one-page com
 - [x] WASM bundle wired into `ProofClient` in TypeScript SDK
 - [x] `ProofClient` verification calls routed to `catp-verify` REST endpoint
 - [x] `catp anchor` command working end-to-end
-- [ ] Circuit review complete
-- [ ] NIST CAISI compatibility matrix documented
-- [ ] Updated README with Phase 1 flow
+- [ ] Circuit formal review complete
 - [ ] On-chain Solidity verifier — deferred to Phase 2 (pending stable KZG crates.io release or Nova/HyperNova tooling)
 
 ---
@@ -317,20 +276,20 @@ This is a research + documentation task, not a code change. Output: one-page com
 
 | Component | Status |
 |-----------|--------|
+| Enforcement plugin (`catp-plugin/`) | ✅ Complete (72 tests) — published as `@catp-protocol/cli` |
 | `ProveAuthorization` Halo2 circuit — prove + real verify | ✅ Complete (11 tests) |
 | WASM prover bundle (`catp-circuits/wasm`) | ✅ Complete — `prove_authorization` / `verify_authorization` |
 | `AgentAuthorizer.sol` + `ActionData.sol` | ✅ Complete (16 tests, stub verifier) |
-| TypeScript SDK Layer 2 (`PolicyBuilder`, `AuthorizerClient`, `ProofClient`) | ✅ Complete — wired to WASM prover + `catp-verify` REST endpoint |
 | `catp-verify` REST verification endpoint | ✅ Complete (3 tests) |
+| TypeScript SDK Layer 2 (`PolicyBuilder`, `AuthorizerClient`, `ProofClient`) | ✅ Complete (28 tests) — wired to WASM prover + `catp-verify` REST endpoint |
 | `CommitRegistry.sol` (Layer 3) | ✅ Complete (8 tests) |
 | `MPAVerifier.sol` (Layer 3) | ✅ Complete (9 tests) |
 | `OptimisticChallenge.sol` (Layer 3) | ✅ Complete (10 tests) |
-| Enforcement plugin (`catp-plugin/`) | 🔴 Not started — **Phase 0 priority** |
 | Real Halo2 on-chain verifier | 🔜 Deferred to Phase 2 — pending stable KZG tooling |
 | Layers 1, 4, 5 circuits | 🔜 Scaffold only |
 | SDK Layers 1, 3, 4, 5 | 🔜 Scaffold only |
 
-**120 tests passing** across TypeScript/Jest (72), Rust (14), and Solidity/Forge (34).
+**148 tests passing** across TypeScript/Jest (72), Vitest (28), Rust (14), and Solidity/Forge (34).
 
 ---
 
