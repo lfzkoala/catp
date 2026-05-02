@@ -29,7 +29,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and [IMPLEMENTATION_P
 npm install -g @catp-protocol/cli
 ```
 
-**Option B — clone and build (requires the repo to be public):**
+**Option B — clone and build:**
 
 ```bash
 git clone https://github.com/lfzkoala/catp.git
@@ -146,13 +146,13 @@ catp/
 | 2 | WASM prover bundle (`catp-circuits/wasm`) | ✅ Complete — `prove_authorization` / `verify_authorization` exported |
 | 2 | `AgentAuthorizer.sol` + `ActionData.sol` | ✅ Complete (16 tests) |
 | 2 | `catp-verify` — Rust REST verification endpoint | ✅ Complete (3 tests) |
-| 2 | TypeScript SDK — types, `PolicyBuilder`, `AuthorizerClient`, `ProofClient` | ✅ Complete — `ProofClient` wired to WASM prover + `catp-verify` REST endpoint |
+| 2 | TypeScript SDK — types, `PolicyBuilder`, `AuthorizerClient`, `ProofClient` | ✅ Complete (28 tests) — `ProofClient` wired to WASM prover + `catp-verify` REST endpoint |
 | 3 | `CommitRegistry.sol` | ✅ Complete (8 tests) |
 | 3 | `MPAVerifier.sol` | ✅ Complete (9 tests) |
 | 3 | `OptimisticChallenge.sol` | ✅ Complete (10 tests) |
 | 1, 4, 5 | All layers | 🔜 Planned |
 
-**120 tests passing** across TypeScript/Jest (72), Rust (14), and Solidity/Forge (34).
+**148 tests passing** across TypeScript/Jest (72), Vitest (28), Rust (14), and Solidity/Forge (34).
 
 > **Phase 1 verification path:** ZK proofs are generated via the WASM bundle and verified via the `catp-verify` REST endpoint (web2 path). `ProofClient` is fully wired — call `prove()` to generate a proof and `verify()` to validate it against the REST endpoint. The on-chain `IVerifier` remains a stub — direct Solidity verification is deferred to Phase 2 pending stable KZG tooling.
 
