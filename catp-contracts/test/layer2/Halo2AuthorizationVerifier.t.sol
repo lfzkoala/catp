@@ -77,4 +77,9 @@ contract Halo2AuthorizationVerifierTest is Test {
         vm.expectRevert("Halo2AuthorizationVerifier: zero address");
         new Halo2AuthorizationVerifier(address(0));
     }
+
+    function test_constructor_revertsOnEOA() public {
+        vm.expectRevert("Halo2AuthorizationVerifier: verifier not contract");
+        new Halo2AuthorizationVerifier(address(0xBEEF));
+    }
 }

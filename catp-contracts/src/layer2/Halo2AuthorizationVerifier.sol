@@ -19,6 +19,7 @@ contract Halo2AuthorizationVerifier is IVerifier {
 
     constructor(address halo2Verifier_) {
         require(halo2Verifier_ != address(0), "Halo2AuthorizationVerifier: zero address");
+        require(halo2Verifier_.code.length > 0, "Halo2AuthorizationVerifier: verifier not contract");
         halo2Verifier = halo2Verifier_;
     }
 

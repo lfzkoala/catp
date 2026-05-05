@@ -247,6 +247,7 @@ pub struct AuthorizationConfig {
     sel_membership: Selector,
     sel_value_limits: Selector,
     sel_time_bounds: Selector,
+    sel_range_start: Selector,
     sel_range: Selector,
     sel_bit: Selector,
 }
@@ -277,6 +278,7 @@ fn range_check_u64(
     value: Option<u64>,
 ) -> Result<usize, Error> {
     let mut acc = 0u64;
+    config.sel_range_start.enable(region, start)?;
     for i in 0..64 {
         config.sel_range.enable(region, start + i)?;
         config.sel_bit.enable(region, start + i)?;
@@ -339,6 +341,7 @@ impl Circuit<Fr> for ProveAuthorization {
         let sel_membership = meta.selector();
         let sel_value_limits = meta.selector();
         let sel_time_bounds = meta.selector();
+        let sel_range_start = meta.selector();
         let sel_range = meta.selector();
         let sel_bit = meta.selector();
 
@@ -396,6 +399,12 @@ impl Circuit<Fr> for ProveAuthorization {
             vec![s * bit.clone() * (bit - Expression::Constant(Fr::ONE))]
         });
 
+        meta.create_gate("u64 accumulator starts at zero", |meta| {
+            let s = meta.query_selector(sel_range_start);
+            let acc = meta.query_advice(range_acc_col, Rotation::cur());
+            vec![s * acc]
+        });
+
         meta.create_gate("u64 accumulator", |meta| {
             let s = meta.query_selector(sel_range);
             let acc = meta.query_advice(range_acc_col, Rotation::cur());
@@ -413,6 +422,7 @@ impl Circuit<Fr> for ProveAuthorization {
             sel_membership,
             sel_value_limits,
             sel_time_bounds,
+            sel_range_start,
             sel_range,
             sel_bit,
         }
@@ -994,5 +1004,72 @@ mod tests {
             ..test_public_inputs()
         };
         assert!(run_circuit(test_policy(), action, public_inputs).is_ok());
+    }
+
+    #[derive(Default)]
+    struct MaliciousRangeStartCircuit;
+
+    impl Circuit<Fr> for MaliciousRangeStartCircuit {
+        type Config = AuthorizationConfig;
+        type FloorPlanner = SimpleFloorPlanner;
+
+        fn without_witnesses(&self) -> Self {
+            Self
+        }
+
+        fn configure(meta: &mut ConstraintSystem<Fr>) -> Self::Config {
+            ProveAuthorization::configure(meta)
+        }
+
+        fn synthesize(
+            &self,
+            config: Self::Config,
+            mut layouter: impl Layouter<Fr>,
+        ) -> Result<(), Error> {
+            let final_cell = layouter.assign_region(
+                || "malicious range witness",
+                |mut region| {
+                    let mut acc = Fr::ONE;
+                    config.sel_range_start.enable(&mut region, 0)?;
+                    for i in 0..64 {
+                        config.sel_range.enable(&mut region, i)?;
+                        config.sel_bit.enable(&mut region, i)?;
+                        region.assign_advice(
+                            || format!("acc_{i}"),
+                            config.range_acc_col,
+                            i,
+                            || Value::known(acc),
+                        )?;
+                        region.assign_advice(
+                            || format!("bit_{i}"),
+                            config.range_bit_col,
+                            i,
+                            || Value::known(Fr::ZERO),
+                        )?;
+                        acc = acc + acc;
+                    }
+                    region.assign_advice(
+                        || "claimed_value",
+                        config.range_acc_col,
+                        64,
+                        || Value::known(acc),
+                    )
+                },
+            )?;
+            layouter.constrain_instance(final_cell.cell(), config.mg.instance, 0)
+        }
+    }
+
+    #[test]
+    fn range_check_rejects_nonzero_initial_accumulator() {
+        let mut claimed = Fr::ONE;
+        for _ in 0..64 {
+            claimed = claimed + claimed;
+        }
+        let circuit = MaliciousRangeStartCircuit;
+        assert!(MockProver::run(12, &circuit, vec![vec![claimed]])
+            .unwrap()
+            .verify()
+            .is_err());
     }
 }

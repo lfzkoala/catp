@@ -90,10 +90,11 @@ pub struct AuthorizationPolicy {
 }
 
 impl AuthorizationPolicy {
-    /// Compute the native commitment to this policy using SHA-256.
-    /// Layer 2 proof verification uses the Poseidon commitment exposed in
-    /// `AuthorizationPublicInputs`.
-    pub fn commitment(&self) -> catp_primitives::Commitment {
+    /// Compute a SHA-256 commitment for local audit-log compatibility.
+    ///
+    /// Do not use this for Layer 2 authorization proofs. Layer 2 uses the
+    /// Poseidon-BN254 commitment from `native_policy_commitment`.
+    pub fn sha256_audit_commitment(&self) -> catp_primitives::Commitment {
         use catp_primitives::CommitmentScheme;
         CommitmentScheme::commit_fields(&[
             &self.allowed_action.as_u64().to_le_bytes(),
