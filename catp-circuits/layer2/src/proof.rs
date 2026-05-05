@@ -6,7 +6,7 @@
 //!
 //! Note: `ParamsKZG::new(k)` generates a random SRS suitable for development and
 //! testing. Production deployments must load SRS from the Ethereum KZG ceremony
-//! (EIP-4844 powers-of-tau) via `ParamsKZG::read`.
+//! (EIP-4844 powers-of-tau) via `ParamsKZG::read`. See Phase C in IMPLEMENTATION_PLAN.md.
 
 use catp_primitives::error::{CatpError, CatpResult};
 use catp_primitives::proof::Proof;
@@ -22,7 +22,7 @@ use halo2_proofs::{
     },
     transcript::{TranscriptReadBuffer, TranscriptWriterBuffer},
 };
-use halo2curves::bn256::{Bn256, G1Affine};
+use halo2curves::bn256::{Bn256, Fr, G1Affine};
 use snark_verifier::system::halo2::transcript::evm::EvmTranscript;
 
 use crate::circuit::{AuthorizationPublicInputs, ProveAuthorization};
@@ -34,11 +34,11 @@ pub struct AuthorizationProofSystem {
 }
 
 impl AuthorizationProofSystem {
-    /// Create a new proof system. `k` controls circuit size: 2^k rows.
-    /// k=8 (256 rows) is sufficient for ProveAuthorization.
+    /// Create a new proof system with a random SRS of size 2^k rows.
+    /// k=12 (4096 rows) is required for in-circuit Poseidon-3-2 over 9 inputs.
     ///
-    /// Uses a randomly generated SRS. For production, load from the Ethereum
-    /// KZG ceremony file with `ParamsKZG::read`.
+    /// For production, load SRS from the Ethereum KZG ceremony file with
+    /// `ParamsKZG::read` (see Phase C in IMPLEMENTATION_PLAN.md).
     pub fn new(k: u32) -> Self {
         Self {
             params: ParamsKZG::<Bn256>::new(k),
@@ -46,6 +46,9 @@ impl AuthorizationProofSystem {
     }
 
     /// Generate a ZK proof that `action` is authorized by `policy`.
+    ///
+    /// `public_inputs.policy_commitment` must equal `native_policy_commitment(&policy)`.
+    /// The prover will fail to verify if this invariant is violated.
     pub fn prove_authorization(
         &self,
         policy: AuthorizationPolicy,
@@ -58,6 +61,7 @@ impl AuthorizationProofSystem {
         let pk = keygen_pk(&self.params, vk, &empty_circuit)
             .map_err(|e| CatpError::Serialization(e.to_string()))?;
 
+        let instance = build_instance(&public_inputs);
         let circuit = ProveAuthorization {
             policy: Some(policy),
             action: Some(action),
@@ -65,11 +69,18 @@ impl AuthorizationProofSystem {
         };
 
         let mut transcript = TranscriptWriterBuffer::<_, G1Affine, _>::init(vec![]);
-        plonk::create_proof::<KZGCommitmentScheme<Bn256>, ProverGWC<_>, _, _, EvmTranscript<_, _, _, _>, _>(
+        plonk::create_proof::<
+            KZGCommitmentScheme<Bn256>,
+            ProverGWC<_>,
+            _,
+            _,
+            EvmTranscript<_, _, _, _>,
+            _,
+        >(
             &self.params,
             &pk,
             &[circuit],
-            &[&[&[], &[]]],
+            &[&[instance.as_slice()]],
             rand::rngs::OsRng,
             &mut transcript,
         )
@@ -78,21 +89,33 @@ impl AuthorizationProofSystem {
         Ok(Proof(transcript.finalize()))
     }
 
-    /// Verify a ZK proof for the ProveAuthorization circuit.
-    pub fn verify_authorization(&self, proof: &Proof) -> CatpResult<bool> {
+    /// Verify a ZK proof. Public inputs must match those used during proving.
+    pub fn verify_authorization(
+        &self,
+        proof: &Proof,
+        public_inputs: &AuthorizationPublicInputs,
+    ) -> CatpResult<bool> {
         let empty_circuit = ProveAuthorization::default();
         let vk = keygen_vk(&self.params, &empty_circuit)
             .map_err(|e| CatpError::Serialization(e.to_string()))?;
 
+        let instance = build_instance(public_inputs);
         let params_verifier = self.params.verifier_params();
         let strategy = SingleStrategy::new(params_verifier);
-        let mut transcript = TranscriptReadBuffer::<_, G1Affine, _>::init(proof.0.as_slice());
+        let mut transcript =
+            TranscriptReadBuffer::<_, G1Affine, _>::init(proof.0.as_slice());
 
-        plonk::verify_proof::<KZGCommitmentScheme<Bn256>, VerifierGWC<_>, _, EvmTranscript<_, _, _, _>, _>(
+        plonk::verify_proof::<
+            KZGCommitmentScheme<Bn256>,
+            VerifierGWC<_>,
+            _,
+            EvmTranscript<_, _, _, _>,
+            _,
+        >(
             params_verifier,
             &vk,
             strategy,
-            &[&[&[], &[]]],
+            &[&[instance.as_slice()]],
             &mut transcript,
         )
         .map(|_| true)
@@ -100,9 +123,19 @@ impl AuthorizationProofSystem {
     }
 }
 
+/// Build the flat instance vector [commitment, timestamp, spend].
+fn build_instance(pub_in: &AuthorizationPublicInputs) -> Vec<Fr> {
+    vec![
+        pub_in.policy_commitment,
+        Fr::from(pub_in.current_timestamp),
+        Fr::from(pub_in.cumulative_spend),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::circuit::native_policy_commitment;
     use crate::types::{Action, ActionType, AuthorizationPolicy};
 
     fn test_policy() -> AuthorizationPolicy {
@@ -128,7 +161,7 @@ mod tests {
 
     fn test_public_inputs() -> AuthorizationPublicInputs {
         AuthorizationPublicInputs {
-            policy_commitment: [0u8; 32],
+            policy_commitment: native_policy_commitment(&test_policy()),
             current_timestamp: 5000,
             cumulative_spend: 2000,
         }
@@ -136,21 +169,23 @@ mod tests {
 
     #[test]
     fn prove_and_verify_roundtrip() {
-        let ps = AuthorizationProofSystem::new(8);
+        let ps = AuthorizationProofSystem::new(12);
+        let pub_in = test_public_inputs();
         let proof = ps
-            .prove_authorization(test_policy(), test_action(), test_public_inputs())
+            .prove_authorization(test_policy(), test_action(), pub_in.clone())
             .unwrap();
         assert!(!proof.0.is_empty());
-        assert!(ps.verify_authorization(&proof).unwrap());
+        assert!(ps.verify_authorization(&proof, &pub_in).unwrap());
     }
 
     #[test]
     fn tampered_proof_fails_verification() {
-        let ps = AuthorizationProofSystem::new(8);
+        let ps = AuthorizationProofSystem::new(12);
+        let pub_in = test_public_inputs();
         let mut proof = ps
-            .prove_authorization(test_policy(), test_action(), test_public_inputs())
+            .prove_authorization(test_policy(), test_action(), pub_in.clone())
             .unwrap();
         proof.0[0] ^= 0xFF;
-        assert!(ps.verify_authorization(&proof).is_err());
+        assert!(ps.verify_authorization(&proof, &pub_in).is_err());
     }
 }
