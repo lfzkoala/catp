@@ -1,15 +1,19 @@
 //! Generates a Solidity verifier for the ProveAuthorization circuit.
 //!
-//! Outputs `Halo2SolidityVerifier.sol` in the current directory. Deploy this
-//! contract and set it as the `IVerifier` in `AgentAuthorizer.sol`.
+//! Outputs `Halo2SolidityVerifier.sol` and `catp-layer2-k12.srs` in the current
+//! directory. The SRS file must be passed to `AuthorizationProofSystem::from_file`
+//! so that proofs and the deployed verifier share the same trusted setup.
 //!
-//! WARNING: Uses a randomly-generated SRS. The deployed Solidity verifier must
-//! be regenerated from the same SRS used to create proofs. For production, load
-//! both the SRS and verifying key from the Ethereum KZG ceremony files.
+//! For production, replace the generated SRS with one from the Ethereum KZG
+//! ceremony (EIP-4844 powers-of-tau) via `ParamsKZG::read`. See Phase C in
+//! IMPLEMENTATION_PLAN.md.
 
 use halo2_proofs::{
     plonk::keygen_vk,
-    poly::{commitment::ParamsProver, kzg::commitment::ParamsKZG},
+    poly::{
+        commitment::{Params, ParamsProver},
+        kzg::commitment::ParamsKZG,
+    },
 };
 use halo2curves::bn256::{Bn256, Fq, Fr, G1Affine};
 use snark_verifier::{
@@ -18,7 +22,7 @@ use snark_verifier::{
     system::halo2::{compile, transcript::evm::EvmTranscript, Config},
     verifier::{self, SnarkVerifier},
 };
-use std::rc::Rc;
+use std::{fs::File, rc::Rc};
 
 use catp_layer2::circuit::ProveAuthorization;
 
@@ -50,16 +54,28 @@ fn gen_solidity_verifier(
 }
 
 fn main() {
-    let k = 8u32;
-    println!("Generating SRS (k={k})...");
-    let params = ParamsKZG::<Bn256>::new(k);
+    let k = 12u32;
+    let srs_path = "catp-layer2-k12.srs";
+
+    let params = if std::path::Path::new(srs_path).exists() {
+        println!("Loading SRS from {srs_path}...");
+        let mut f = File::open(srs_path).expect("failed to open SRS file");
+        ParamsKZG::<Bn256>::read(&mut f).expect("failed to read SRS")
+    } else {
+        println!("Generating SRS (k={k})...");
+        let p = ParamsKZG::<Bn256>::new(k);
+        let mut f = File::create(srs_path).expect("failed to create SRS file");
+        p.write(&mut f).expect("failed to write SRS");
+        println!("SRS written to {srs_path}");
+        p
+    };
 
     let empty_circuit = ProveAuthorization::default();
     println!("Generating verifying key...");
     let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk failed");
 
-    // Two instance columns, both empty (all witnesses are private).
-    let num_instance = vec![0, 0];
+    // One instance column with 3 values: [policy_commitment, timestamp, spend].
+    let num_instance = vec![3];
 
     println!("Generating Solidity verifier...");
     let solidity = gen_solidity_verifier(&params, &vk, num_instance);

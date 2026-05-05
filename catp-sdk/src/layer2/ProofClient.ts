@@ -8,10 +8,13 @@ export interface ProofResult {
 
 /** Subset of the catp-wasm WASM exports needed for proof generation. */
 export interface WasmProver {
+  compute_policy_commitment(policy_json: string): Uint8Array;
   prove_authorization(
     policy_json: string,
     action_json: string,
-    public_inputs_json: string,
+    policy_commitment_be: Uint8Array,
+    current_timestamp: bigint,
+    cumulative_spend: bigint,
   ): Uint8Array;
 }
 
@@ -57,7 +60,6 @@ export class ProofClient {
   async prove(
     policy: AuthorizationPolicy,
     action: Action,
-    policyCommitment: `0x${string}`,
     cumulativeSpend: bigint,
   ): Promise<ProofResult> {
     const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
@@ -79,16 +81,15 @@ export class ProofClient {
       value: Number(action.value),
     });
 
-    const publicInputsJson = JSON.stringify({
-      policy_commitment: Array.from(hexToBytes(policyCommitment)),
-      current_timestamp: Number(currentTimestamp),
-      cumulative_spend: Number(cumulativeSpend),
-    });
+    const commitmentBe = this.wasm.compute_policy_commitment(policyJson);
+    const policyCommitment = bytesToHex(commitmentBe);
 
     const proofBytes = this.wasm.prove_authorization(
       policyJson,
       actionJson,
-      publicInputsJson,
+      commitmentBe,
+      currentTimestamp,
+      cumulativeSpend,
     );
 
     return {

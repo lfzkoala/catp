@@ -4,8 +4,11 @@ import { ActionType } from "../../src/layer2/types.js";
 
 const ZERO32 = `0x${"00".repeat(32)}` as `0x${string}`;
 const FAKE_BYTES = new Uint8Array([1, 2, 3, 4, 5]);
+// compute_policy_commitment returns 32 zero bytes → policyCommitment = ZERO32
+const FAKE_COMMITMENT = new Uint8Array(32);
 
 const mockWasm: WasmProver = {
+  compute_policy_commitment: vi.fn(() => FAKE_COMMITMENT),
   prove_authorization: vi.fn(() => FAKE_BYTES),
 };
 
@@ -35,50 +38,56 @@ describe("ProofClient", () => {
   describe("prove()", () => {
     it("calls wasm.prove_authorization once", async () => {
       const client = new ProofClient(mockWasm);
-      await client.prove(policy, action, ZERO32, 0n);
+      await client.prove(policy, action, 0n);
       expect(mockWasm.prove_authorization).toHaveBeenCalledOnce();
+    });
+
+    it("calls wasm.compute_policy_commitment once", async () => {
+      const client = new ProofClient(mockWasm);
+      await client.prove(policy, action, 0n);
+      expect(mockWasm.compute_policy_commitment).toHaveBeenCalledOnce();
     });
 
     it("passes correct action_type string to WASM", async () => {
       const client = new ProofClient(mockWasm);
-      await client.prove(policy, action, ZERO32, 0n);
-      const [, actionJson] = (mockWasm.prove_authorization as ReturnType<typeof vi.fn>).mock.calls[0] as string[];
+      await client.prove(policy, action, 0n);
+      const [, actionJson] = (mockWasm.prove_authorization as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string];
       expect(JSON.parse(actionJson).action_type).toBe("Swap");
     });
 
     it("passes correct value to WASM action JSON", async () => {
       const client = new ProofClient(mockWasm);
-      await client.prove(policy, action, ZERO32, 0n);
-      const [, actionJson] = (mockWasm.prove_authorization as ReturnType<typeof vi.fn>).mock.calls[0] as string[];
+      await client.prove(policy, action, 0n);
+      const [, actionJson] = (mockWasm.prove_authorization as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string];
       expect(JSON.parse(actionJson).value).toBe(50);
     });
 
     it("passes correct policy fields to WASM", async () => {
       const client = new ProofClient(mockWasm);
-      await client.prove(policy, action, ZERO32, 0n);
-      const [policyJson] = (mockWasm.prove_authorization as ReturnType<typeof vi.fn>).mock.calls[0] as string[];
+      await client.prove(policy, action, 0n);
+      const [policyJson] = (mockWasm.prove_authorization as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
       const p = JSON.parse(policyJson);
       expect(p.allowed_action).toBe("Swap");
       expect(p.max_value_per_tx).toBe(100);
       expect(p.max_value_total).toBe(1000);
     });
 
-    it("passes cumulative_spend to WASM public inputs", async () => {
+    it("passes cumulative_spend as bigint to WASM", async () => {
       const client = new ProofClient(mockWasm);
-      await client.prove(policy, action, ZERO32, 7n);
-      const [, , pubJson] = (mockWasm.prove_authorization as ReturnType<typeof vi.fn>).mock.calls[0] as string[];
-      expect(JSON.parse(pubJson).cumulative_spend).toBe(7);
+      await client.prove(policy, action, 7n);
+      const [, , , , spend] = (mockWasm.prove_authorization as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string, Uint8Array, bigint, bigint];
+      expect(spend).toBe(7n);
     });
 
     it("returns proof bytes as hex string", async () => {
       const client = new ProofClient(mockWasm);
-      const result = await client.prove(policy, action, ZERO32, 0n);
+      const result = await client.prove(policy, action, 0n);
       expect(result.proof).toBe("0x0102030405");
     });
 
-    it("returns publicInputs with policyCommitment and cumulativeSpend", async () => {
+    it("returns publicInputs with policyCommitment from WASM and cumulativeSpend", async () => {
       const client = new ProofClient(mockWasm);
-      const result = await client.prove(policy, action, ZERO32, 42n);
+      const result = await client.prove(policy, action, 42n);
       expect(result.publicInputs.policyCommitment).toBe(ZERO32);
       expect(result.publicInputs.cumulativeSpend).toBe(42n);
     });

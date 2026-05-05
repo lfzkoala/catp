@@ -120,8 +120,8 @@ verify(publicInputs: bytes32[], proof: bytes) → bool
 ```
 
 Implementations:
-- **EVM**: auto-generated Halo2 Solidity verifier contract implementing `IVerifier` (deferred to Phase 2 — see Known Gap #2)
-- **Web2 (Phase 1)**: `catp-verify` Rust crate exposing `verify_authorization` as a REST endpoint; `AgentAuthorizer` continues to use `StubVerifier` until Phase 2
+- **EVM**: `Halo2Verifier.sol` (auto-generated, k=12, KZG/BN254, GWC + EvmTranscript) wrapped by `Halo2AuthorizationVerifier`, which encodes the three public inputs (policyCommitment, timestamp, cumulativeSpend) before the staticcall — ✅ complete
+- **Web2**: `catp-verify` Rust crate exposing `verify_authorization` as a REST endpoint — ✅ complete
 - **Non-EVM chains**: native verifier library — same circuit, same verification key, different host
 
 The Solidity `AgentAuthorizer` accepts an `IVerifier` at construction time. Swapping the verifier (e.g., upgrading from stub to real Halo2 verifier, or replacing with a different proof system) requires no changes to policy or authorization logic.
@@ -171,7 +171,7 @@ The ZK circuit, proof format, and verification key are identical across all rows
 
 The following are documented gaps between the current codebase and the target architecture:
 
-1. **Real Halo2 on-chain verifier** — `AgentAuthorizer` uses a stub verifier (`proof.length > 0`). The IPA/pasta backend has no practical Solidity verifier (pasta curves lack EVM precompiles). Switching to KZG requires a git-pinned halo2 dependency (crates.io is stuck at 0.3.2 with no KZG) or a per-circuit trusted setup (contradicts CATP's trustless principle). **Deferred to Phase 2**: the `IVerifier` interface is already in place — once stable KZG tooling ships to crates.io, or Nova/HyperNova matures, the verifier is swapped with zero changes to `AgentAuthorizer` logic. Phase 1 uses the `catp-verify` REST endpoint for real off-chain verification. 🔜 Deferred to Phase 2.
+1. ~~**Real Halo2 on-chain verifier**~~ — ✅ **Resolved (Phase 2A–G)**. `Halo2Verifier.sol` (k=12, KZG/BN254, GWC + EvmTranscript) is auto-generated and deployed. `Halo2AuthorizationVerifier` wraps it, encoding the three public inputs before the staticcall. A shared SRS (`catp-layer2-k12.srs`) ensures prover and verifier are consistent. The `catp-verify` REST endpoint remains available as an off-chain verification path. `AgentAuthorizer` accepts `Halo2AuthorizationVerifier` as its `IVerifier`.
 2. **Policy state in contracts** — `activePolicies` and `cumulativeSpend` mappings should migrate to proof public inputs over time. 🔜 Planned.
 3. **EVM address types throughout SDK** — `0x${string}` assumes 20-byte Ethereum addresses. Future: abstract to `PrincipalId` bytes. 🔜 Planned.
 4. **Layer 5 registry assumes on-chain storage** — registry entries use EVM addresses and contract mappings. Future: content-addressed off-chain store with on-chain commitments. 🔜 Planned.
@@ -226,7 +226,8 @@ These primitives are reused across multiple layers. Defining them once ensures c
 - **Used by**: Layer 2 (authorization proofs), Layer 3 (boundary proofs), Layer 4 (reputation proofs), Layer 5 (capability proofs)
 - **Language**: Rust. Circuit implementations in `catp-circuits/`. Proof system abstracted behind `ProofSystem` trait to allow future migration if needed.
 - **Key libraries**: halo2_proofs, halo2_gadgets (Poseidon, range check, etc.)
-- **Verification path (Phase 1)**: The IPA/pasta backend produces proofs verifiable in Rust but not cheaply on-chain — pasta curves have no EVM precompiles. Cheap on-chain verification (via EIP-196/197) requires KZG/BN256, which in turn needs either a git-pinned dependency or a trusted setup, both in tension with CATP's stability and trustless goals. Phase 1 ships a web2 verification path (`catp-verify` REST endpoint). On-chain verification is deferred to Phase 2 pending a stable crates.io KZG release or Nova/HyperNova tooling maturity.
+- **Backend**: KZG/BN254 (GWC opening, EvmTranscript) — proofs are directly verifiable on EVM via EIP-196/197 precompiles. Uses PSE halo2 (git-pinned, `v0.3.0` tag) with `snark-verifier` for the EVM transcript.
+- **Verification paths**: (a) off-chain via `catp-verify` REST endpoint using Rust `VerifierGWC`; (b) on-chain via auto-generated `Halo2Verifier.sol` (k=12, 3 public inputs). Both paths share the same KZG SRS (`catp-layer2-k12.srs`).
 
 ### P3: Multi-Party Attestation (MPA)
 - **What**: N independent attestor nodes verify AI outputs, ≥ t-of-n agreement required
@@ -409,7 +410,7 @@ contract AgentAuthorizer {
 }
 ```
 
-**Verifier progression**: Phase 0 — enforcement plugin (local, no proof). Phase 1 — stub on-chain (`proof.length > 0`) + `catp-verify` REST endpoint for real off-chain verification. Phase 2 — auto-generated Halo2 Solidity verifier replacing the stub (pending stable KZG tooling).
+**Verifier progression**: Phase 0 — enforcement plugin (local, no proof). Phase 1 — `catp-verify` REST endpoint for off-chain verification. Phase 2 — auto-generated `Halo2Verifier.sol` (k=12, KZG/BN254) with `Halo2AuthorizationVerifier` wrapper replacing the stub — ✅ complete.
 
 ---
 

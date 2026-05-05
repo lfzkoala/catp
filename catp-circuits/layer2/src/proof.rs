@@ -13,7 +13,7 @@ use catp_primitives::proof::Proof;
 use halo2_proofs::{
     plonk::{self, keygen_pk, keygen_vk},
     poly::{
-        commitment::ParamsProver,
+        commitment::{Params, ParamsProver},
         kzg::{
             commitment::{KZGCommitmentScheme, ParamsKZG},
             multiopen::{ProverGWC, VerifierGWC},
@@ -36,13 +36,23 @@ pub struct AuthorizationProofSystem {
 impl AuthorizationProofSystem {
     /// Create a new proof system with a random SRS of size 2^k rows.
     /// k=12 (4096 rows) is required for in-circuit Poseidon-3-2 over 9 inputs.
-    ///
-    /// For production, load SRS from the Ethereum KZG ceremony file with
-    /// `ParamsKZG::read` (see Phase C in IMPLEMENTATION_PLAN.md).
+    /// Intended for development and testing only — random SRS cannot be used
+    /// to verify proofs on-chain.
     pub fn new(k: u32) -> Self {
         Self {
             params: ParamsKZG::<Bn256>::new(k),
         }
+    }
+
+    /// Load a proof system from a serialized SRS file written by `generate_verifier`.
+    /// The SRS must have been generated with k=12. Use this in production so that
+    /// proofs verify against the deployed `Halo2SolidityVerifier.sol`.
+    pub fn from_file(path: &std::path::Path) -> CatpResult<Self> {
+        let mut f = std::fs::File::open(path)
+            .map_err(|e| CatpError::Serialization(e.to_string()))?;
+        let params = ParamsKZG::<Bn256>::read(&mut f)
+            .map_err(|e| CatpError::Serialization(e.to_string()))?;
+        Ok(Self { params })
     }
 
     /// Generate a ZK proof that `action` is authorized by `policy`.

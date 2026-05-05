@@ -5,9 +5,10 @@ import "./IVerifier.sol";
 
 /// @title Halo2AuthorizationVerifier
 /// @notice IVerifier wrapper around the auto-generated Halo2Verifier assembly contract.
-/// @dev The ProveAuthorization circuit exposes 0 public instance columns; the Halo2Verifier
-///      fallback therefore expects raw proof bytes as calldata.
-///      If the proof is valid the fallback returns successfully; if invalid it reverts.
+/// @dev The ProveAuthorization circuit exposes 3 public instance values:
+///        [0] policyCommitment (Poseidon/BN254 Fr), [1] current_timestamp, [2] cumulative_spend.
+///      The Halo2Verifier expects calldata: instance_0 || instance_1 || instance_2 || proof_bytes
+///      where each instance is a 32-byte big-endian Fr field element.
 ///
 ///      IMPORTANT: Halo2Verifier.sol is generated from a specific SRS. Both the on-chain
 ///      verifier and the off-chain prover MUST use the same SRS. For production, regenerate
@@ -21,13 +22,21 @@ contract Halo2AuthorizationVerifier is IVerifier {
     }
 
     /// @inheritdoc IVerifier
-    /// @dev publicInputs is ignored; all circuit witnesses are private.
-    ///      Forwards raw proof bytes to the Halo2Verifier fallback via staticcall.
+    /// @dev Prepends the 3 public inputs (32 bytes each) to the proof, then forwards
+    ///      the concatenated calldata to the Halo2Verifier via staticcall.
+    ///      publicInputs[0] = policyCommitment, [1] = timestamp, [2] = spend.
     function verify(
-        bytes32[] calldata,
+        bytes32[] calldata publicInputs,
         bytes calldata proof
     ) external view override returns (bool) {
-        (bool ok,) = halo2Verifier.staticcall(proof);
+        require(publicInputs.length == 3, "Halo2AuthorizationVerifier: expected 3 public inputs");
+        bytes memory callData = abi.encodePacked(
+            publicInputs[0],
+            publicInputs[1],
+            publicInputs[2],
+            proof
+        );
+        (bool ok,) = halo2Verifier.staticcall(callData);
         return ok;
     }
 }

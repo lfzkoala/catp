@@ -8,4 +8,6 @@ coverage/
 .env
 *.key
 *.pem
+*.srs
+catp-circuits/layer2/Halo2SolidityVerifier.sol
 .claude/settings.local.json

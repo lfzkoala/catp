@@ -6,7 +6,7 @@ use halo2_proofs::{
     plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Selector},
     poly::Rotation,
 };
-use halo2curves::bn256::Fr;
+use halo2curves::{bn256::Fr, ff::PrimeField};
 use maingate::{MainGate, MainGateConfig, MainGateInstructions, RegionCtx, Term};
 use poseidon::Spec;
 
@@ -173,6 +173,25 @@ pub fn native_policy_commitment(policy: &AuthorizationPolicy) -> Fr {
     let mut h = poseidon::Poseidon::<Fr, 3, 2>::new(R_F, R_P);
     h.update(&fields);
     h.squeeze()
+}
+
+/// Convert a BN254 Fr field element to 32 big-endian bytes (EVM `bytes32` format).
+pub fn fr_to_be_bytes(fr: Fr) -> [u8; 32] {
+    let le = fr.to_repr(); // [u8; 32] little-endian
+    let mut be = [0u8; 32];
+    for (i, b) in le.as_ref().iter().enumerate() {
+        be[31 - i] = *b;
+    }
+    be
+}
+
+/// Parse 32 big-endian bytes back to Fr. Returns `None` if the value is out of field.
+pub fn fr_from_be_bytes(be: &[u8; 32]) -> Option<Fr> {
+    let mut le = [0u8; 32];
+    for (i, b) in be.iter().enumerate() {
+        le[31 - i] = *b;
+    }
+    Fr::from_repr(le.into()).into()
 }
 
 // ── Circuit ───────────────────────────────────────────────────────────────────
