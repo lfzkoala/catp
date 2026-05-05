@@ -13,6 +13,7 @@ contract MPAVerifier {
     mapping(address => uint256) private _stakes;
     address[] private _attestorList;
     uint256 private _attestorCount;
+    mapping(bytes32 => mapping(bytes32 => bool)) private _slashedCommitments;
 
     struct OutputRound {
         mapping(address => bytes32) submissions;
@@ -123,6 +124,8 @@ contract MPAVerifier {
         require(rewardRecipient != address(0), "MPAVerifier: zero recipient");
         OutputRound storage round = _rounds[roundId];
         require(round.finalized, "MPAVerifier: round not finalized");
+        require(!_slashedCommitments[roundId][badCommitment], "MPAVerifier: commitment already slashed");
+        _slashedCommitments[roundId][badCommitment] = true;
 
         for (uint256 i = 0; i < _attestorList.length; i++) {
             address attestor = _attestorList[i];

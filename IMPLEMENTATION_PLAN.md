@@ -95,7 +95,7 @@ Each entry:
 }
 ```
 
-- Commitment hashes computed using Poseidon from `catp-circuits/primitives`
+- Commitment hashes are SHA-256 chained in Phase 0 so the JSONL log is self-verifiable; Poseidon action commitments are part of the proof-layer upgrade path.
 - Log is append-only; chain breaks in commitment sequence are detectable
 - `catp log show` for human-readable output; `catp log verify` to check integrity
 
@@ -121,7 +121,7 @@ After Claude Code:
 
 - [x] `catp-policy.toml` schema + parser
 - [x] `PreToolUse` / `PostToolUse` hook handlers
-- [x] Local audit log with Poseidon commitment hashes
+- [x] Local audit log with SHA-256 commitment chain
 - [x] `catp` CLI (init, validate, log, hook)
 - [x] Claude Code integration documented in README
 - [x] One-command install script
@@ -131,17 +131,17 @@ After Claude Code:
 
 ## Phase 1: ZK Protocol Layer (Month 3–9)
 
-**Goal**: Audit logs become cryptographically verifiable. ZK proofs are generated from the WASM prover and verifiable via a Rust endpoint. On-chain verification is deferred pending stable KZG tooling on crates.io. Upgrades the enforcement plugin from "local policy file" to "provable compliance."
+**Goal**: Audit logs become cryptographically verifiable. ZK proofs are generated from the WASM prover and verifiable via a Rust endpoint. The on-chain path is completed in Phase 2. Upgrades the enforcement plugin from "local policy file" to "provable compliance."
 
 ### 1.1 — Web2 Verification Path
 
 Expose `verify_authorization` as a lightweight verification service — the primary verification path for Phase 1:
 
 - Extract a `catp-verify` crate from `catp-circuits/layer2` with lean dependencies
-- Expose a REST endpoint: accepts base64 proof bytes plus public inputs (`policyCommitment`, `currentTimestamp`, `cumulativeSpend`), returns `{ valid: bool }`
+- Expose a REST endpoint: accepts base64 proof bytes plus the 13 Layer 2 public inputs (`policyCommitment`, public action fields, `currentTimestamp`, `cumulativeSpend`), returns `{ valid: bool }`
 - Wire `ProofClient` in the TypeScript SDK to call this endpoint for verification
 
-**Why not on-chain yet**: the IPA/pasta backend used by `halo2_proofs 0.3.x` (crates.io) has no practical Solidity verifier — pasta curves lack EVM precompiles. Switching to KZG requires either a git-pinned dependency (fragile to maintain as APIs drift) or a per-circuit trusted setup (contradicts CATP's trustless principle). On-chain verification is deferred to Phase 2 when the ecosystem matures. The `IVerifier` interface is already in place — swapping to a real verifier requires no changes to `AgentAuthorizer` logic.
+**Historical note**: the first proof path was REST-only while the EVM verifier wiring was being hardened. Phase 2 now provides the KZG/BN254 Solidity verifier path behind the same `IVerifier` interface.
 
 ### 1.2 — WASM Prover Bundle ✅
 
@@ -170,7 +170,7 @@ Wire Phase 0 audit logs to on-chain:
 - [x] `ProofClient` verification calls routed to `catp-verify` REST endpoint
 - [x] `catp anchor` command working end-to-end
 - [ ] Circuit formal review complete
-- [ ] On-chain Solidity verifier — deferred to Phase 2 (pending stable KZG crates.io release or Nova/HyperNova tooling)
+- [x] On-chain Solidity verifier — completed in Phase 2 with KZG/BN254 and `Halo2AuthorizationVerifier`
 
 ---
 
@@ -180,7 +180,7 @@ Wire Phase 0 audit logs to on-chain:
 
 ### Background: What Was Built vs. What's Needed
 
-Phase 1 shipped a working proof system (GWC + EvmTranscript over BN254, 11/11 Rust tests passing) and a generated Solidity verifier. However several gaps remain before the system is truly trustless:
+Phase 1 shipped a working proof system (GWC + EvmTranscript over BN254, with the current Layer 2 suite at 15 unit tests + 3 E2E tests) and a generated Solidity verifier. However several gaps remain before the system is truly trustless:
 
 | Gap | Root Cause |
 |-----|-----------|
@@ -261,7 +261,7 @@ Phases A–G close these gaps in dependency order.
 - [x] `prove()` passes instance slice to `create_proof`
 - [x] `verify()` passes same instance slice to `verify_proof`
 - [x] Native Poseidon used to compute `policyCommitment` in `AuthorizationProofSystem`
-- [x] All 11 Rust proof tests pass at k=12
+- [x] All Layer 2 Rust proof/circuit tests pass at k=12
 
 ---
 
@@ -320,7 +320,7 @@ Phases A–G close these gaps in dependency order.
 - [x] `generate_verifier` uses loaded SRS and `num_instance = [13]`
 - [x] `Halo2Verifier.sol` regenerated and updated in contracts
 - [x] `forge build` passes with updated verifier
-- [x] `forge test` — all 48 tests pass (43 existing + 5 Phase E)
+- [x] `forge test` — all 59 tests pass
 
 ---
 
@@ -399,7 +399,7 @@ function verify(
 - [x] WASM export of `compute_policy_commitment`
 - [x] `PolicyBuilder.ts` uses WASM commitment helper
 - [x] `AuthorizerClient.ts` passes Fr commitment in `publicInputs[0]`
-- [x] TypeScript SDK tests updated and passing (29 Vitest tests)
+- [x] TypeScript SDK tests updated and passing (36 Vitest tests)
 
 ---
 
@@ -416,13 +416,16 @@ fn e2e_trustless_verification() {
     let policy = AuthorizationPolicy { /* ... */ };
     let commitment = compute_policy_commitment(&policy);
 
-    // 2. Prove authorization
-    let prover = AuthorizationProofSystem::new(Some("catp-layer2-k12.srs")).unwrap();
-    let action = Action { tool: "Bash", timestamp: 1_000_000, spend: 0 };
-    let proof = prover.prove(&policy, &action).unwrap();
+    // 2. Prove authorization with the same public inputs the verifier will check
+    let ps = AuthorizationProofSystem::from_file(srs_path()).unwrap();
+    let action = Action { /* ... */ };
+    let public_inputs = test_public_inputs(commitment);
+    let proof = ps
+        .prove_authorization(policy, action, public_inputs.clone())
+        .unwrap();
 
     // 3. Verify off-chain (Rust VerifierGWC path)
-    assert!(prover.verify(&proof).unwrap());
+    assert!(ps.verify_authorization(&proof, &public_inputs).unwrap());
 
     // 4. Verify on-chain (Solidity via alloy / revm)
     // Deploy Halo2Verifier + Halo2AuthorizationVerifier in a local EVM
@@ -459,7 +462,7 @@ Also add a negative test: tampered `publicInputs[0]` must return `false`.
 
 ### 3.1 — Defense Layer 1: Commit-and-Prove
 
-- `CommitRegistry.sol` + SDK helpers ✅ (contracts exist, real verifier wired after Phase 2)
+- `CommitRegistry.sol` + SDK helpers ✅ (contracts exist; Layer 2 verifier path is wired)
 - Generate and submit pre/post commitments around inference
 
 ### 3.2 — Defense Layer 2: MPA Attestor Node
@@ -558,12 +561,12 @@ Also add a negative test: tampered `publicInputs[0]` must return `false`.
 | Enforcement plugin (`catp-plugin/`) | ✅ Complete (72 tests) — published as `@catp-protocol/cli` |
 | `ProveAuthorization` Halo2 circuit — full protocol/token binding, range checks, 13 public inputs, k=12 | ✅ Complete (15 unit tests + 3 E2E tests) |
 | WASM prover bundle (`catp-circuits/wasm`) | ✅ Complete — shared SRS, `compute_policy_commitment` / `prove_authorization` / `verify_authorization` |
-| `AgentAuthorizer.sol` + `ActionData.sol` | ✅ Complete (16 tests) |
+| `AgentAuthorizer.sol` + `ActionData.sol` | ✅ Complete (19 tests) |
 | `catp-verify` REST verification endpoint | ✅ Complete (3 tests) — verifies proof + public inputs |
-| TypeScript SDK Layer 2 (`PolicyBuilder`, `AuthorizerClient`, `ProofClient`) | ✅ Complete (25 tests) — WASM Poseidon commitment + `catp-verify` proof/public-input verification |
+| TypeScript SDK Layer 2 (`PolicyBuilder`, `AuthorizerClient`, `ProofClient`) | ✅ Complete (36 tests) — WASM Poseidon commitment + `catp-verify` proof/public-input verification |
 | `CommitRegistry.sol` (Layer 3) | ✅ Complete (10 tests) |
-| `MPAVerifier.sol` (Layer 3) | ✅ Complete (11 tests) — requires staked attestors |
-| `OptimisticChallenge.sol` (Layer 3) | ✅ Complete (8 tests) — upheld challenges slash MPA stake |
+| `MPAVerifier.sol` (Layer 3) | ✅ Complete (12 tests) — requires staked attestors |
+| `OptimisticChallenge.sol` (Layer 3) | ✅ Complete (13 tests) — authorized resolvers uphold challenges and slash MPA stake |
 | `Halo2Verifier.sol` — regenerated for current k=12 circuit, 13 public inputs, shared SRS | ✅ Complete (via_ir; testnet SRS) |
 | `Halo2AuthorizationVerifier.sol` wrapper — forwards publicInputs | ✅ Complete (5 tests) |
 | SRS persistence (`catp-layer2-k12.srs`) | ✅ Complete — load-or-generate, shared between prover and verifier |
@@ -573,7 +576,21 @@ Also add a negative test: tampered `publicInputs[0]` must return `false`.
 | Layers 1, 4, 5 circuits | 🔜 Scaffold only |
 | SDK Layers 1, 3, 4, 5 | 🔜 Scaffold only |
 
-**172 tests passing** across TypeScript/Jest (72), Vitest (29), Rust (21), and Solidity/Forge (50).
+**214 tests passing** across TypeScript/Jest (72), Vitest (36), Rust (47), and Solidity/Forge (59).
+
+---
+
+## Immediate Next Work
+
+| Priority | Work | Why it matters | Exit criteria |
+|----------|------|----------------|---------------|
+| P0 | Finalize release packaging for the current Layer 0/2/3 slice | The core path now passes locally, but consumers need reproducible artifacts and clear install/deploy steps | WASM `pkg/` committed or generated in CI, npm package contents audited, contract deployment commands documented |
+| P0 | Run a formal Layer 2 circuit/security review | Authorization correctness depends on circuit soundness, not just unit tests | Independent review of public inputs, range checks, Poseidon commitment, SRS/verifier generation, and Solidity calldata encoding |
+| P1 | Sepolia smoke test for `catp anchor` and Layer 2 contracts | Confirms gas, env vars, ABIs, and deployment scripts outside local tests | `catp anchor` registers a real commitment root on a testnet contract and records gas/tx hash |
+| P1 | Define the Layer 3 resolver/oracle trust model | `OptimisticChallenge` is safe against unauthorized callers, but resolver authority is still an operational trust assumption | Resolver role, evidence format, rotation, and failure handling documented and tested |
+| P1 | Connect plugin audit logs to Layer 2 proofs | The CLI can anchor SHA-256 audit roots, while Layer 2 proves structured authorization actions | A documented bridge from audit entries to `AuthorizationPolicy`/`Action` witnesses and shareable verification output |
+| P2 | Build SDK Layer 3 helpers and `catp-node` attestor flow | Contracts exist, but no production attestor node/client path exists yet | Attestor can stake, submit output, reach consensus, and resolve challenge in an integration test |
+| P2 | Decide Layer 1/4/5 sequencing | These layers are still scaffolds; building all at once will dilute the next milestone | One chosen next layer has API sketch, data model, circuit scope, and acceptance tests |
 
 ---
 

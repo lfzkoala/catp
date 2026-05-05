@@ -8,7 +8,12 @@ interface IAgentAuthorizer {
 
     function registerPolicy(bytes32 policyCommitment) external;
     function revokePolicy(bytes32 policyCommitment) external;
-    function executeAuthorized(bytes32 policyCommitment, bytes calldata actionData, bytes calldata proof) external;
+    function executeAuthorized(
+        bytes32 policyCommitment,
+        bytes calldata actionData,
+        uint256 currentTimestamp,
+        bytes calldata proof
+    ) external;
     function isPolicyActive(bytes32 policyCommitment) external view returns (bool);
     function getCumulativeSpend(bytes32 policyCommitment) external view returns (uint256);
 }

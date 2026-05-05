@@ -13,6 +13,7 @@ contract OptimisticChallengeTest is Test {
     address attestor2;
     address attestor3;
     address challenger;
+    address resolver;
 
     bytes32 constant ROUND    = keccak256("round1");
     bytes32 constant COMMIT_A = keccak256("output-a");
@@ -23,6 +24,7 @@ contract OptimisticChallengeTest is Test {
         attestor2  = makeAddr("attestor2");
         attestor3  = makeAddr("attestor3");
         challenger = makeAddr("challenger");
+        resolver   = makeAddr("resolver");
         mpa = new MPAVerifier();
         oc  = new OptimisticChallenge(address(mpa));
         mpa.setChallengeContract(address(oc));
@@ -69,11 +71,52 @@ contract OptimisticChallengeTest is Test {
         oc.openChallenge(ROUND, COMMIT_B);
     }
 
+    function test_openChallenge_rejectsConsensusClaim() public {
+        _reachConsensus(COMMIT_A);
+        vm.prank(challenger);
+        vm.expectRevert("OptimisticChallenge: claim equals consensus");
+        oc.openChallenge(ROUND, COMMIT_A);
+    }
+
+    function test_openChallenge_allowsNewChallengeAfterRejectedResolution() public {
+        bytes32 commitC = keccak256("output-c");
+        _reachConsensus(COMMIT_A);
+        vm.prank(challenger);
+        oc.openChallenge(ROUND, COMMIT_B);
+        oc.setResolver(resolver, true);
+        vm.prank(resolver);
+        oc.resolveChallenge(ROUND, COMMIT_A);
+
+        vm.prank(challenger);
+        oc.openChallenge(ROUND, commitC);
+        (address ch, bytes32 claimed,, bool resolved,) = oc.getChallenge(ROUND);
+        assertEq(ch, challenger);
+        assertEq(claimed, commitC);
+        assertFalse(resolved);
+    }
+
+    function test_openChallenge_allowsNewChallengeAfterExpiredChallenge() public {
+        bytes32 commitC = keccak256("output-c");
+        _reachConsensus(COMMIT_A);
+        vm.prank(challenger);
+        oc.openChallenge(ROUND, COMMIT_B);
+        vm.warp(block.timestamp + oc.CHALLENGE_WINDOW() + 1);
+
+        vm.prank(challenger);
+        oc.openChallenge(ROUND, commitC);
+        (, bytes32 claimed, uint256 deadline, bool resolved,) = oc.getChallenge(ROUND);
+        assertEq(claimed, commitC);
+        assertGt(deadline, block.timestamp);
+        assertFalse(resolved);
+    }
+
     function test_resolveChallenge_upheld() public {
         _reachConsensus(COMMIT_A);
         vm.prank(challenger);
         oc.openChallenge(ROUND, COMMIT_B);
         uint256 balanceBefore = challenger.balance;
+        oc.setResolver(resolver, true);
+        vm.prank(resolver);
         oc.resolveChallenge(ROUND, COMMIT_B);
         (,,, bool resolved, bool upheld) = oc.getChallenge(ROUND);
         assertTrue(resolved);
@@ -81,10 +124,29 @@ contract OptimisticChallengeTest is Test {
         assertGt(challenger.balance, balanceBefore);
     }
 
+    function test_resolveChallenge_rejectsRepeatedSlashForSameConsensus() public {
+        bytes32 commitC = keccak256("output-c");
+        _reachConsensus(COMMIT_A);
+        oc.setResolver(resolver, true);
+
+        vm.prank(challenger);
+        oc.openChallenge(ROUND, COMMIT_B);
+        vm.prank(resolver);
+        oc.resolveChallenge(ROUND, COMMIT_B);
+
+        vm.prank(challenger);
+        oc.openChallenge(ROUND, commitC);
+        vm.prank(resolver);
+        vm.expectRevert("MPAVerifier: commitment already slashed");
+        oc.resolveChallenge(ROUND, commitC);
+    }
+
     function test_resolveChallenge_rejected() public {
         _reachConsensus(COMMIT_A);
         vm.prank(challenger);
         oc.openChallenge(ROUND, COMMIT_B);
+        oc.setResolver(resolver, true);
+        vm.prank(resolver);
         oc.resolveChallenge(ROUND, COMMIT_A);
         (,,, bool resolved, bool upheld) = oc.getChallenge(ROUND);
         assertTrue(resolved);
@@ -96,6 +158,8 @@ contract OptimisticChallengeTest is Test {
         vm.prank(challenger);
         oc.openChallenge(ROUND, COMMIT_B);
         vm.warp(block.timestamp + oc.CHALLENGE_WINDOW() + 1);
+        oc.setResolver(resolver, true);
+        vm.prank(resolver);
         vm.expectRevert("OptimisticChallenge: window expired");
         oc.resolveChallenge(ROUND, COMMIT_B);
     }
@@ -109,8 +173,20 @@ contract OptimisticChallengeTest is Test {
         _reachConsensus(COMMIT_A);
         vm.prank(challenger);
         oc.openChallenge(ROUND, COMMIT_B);
+        oc.setResolver(resolver, true);
+        vm.prank(resolver);
         oc.resolveChallenge(ROUND, COMMIT_B);
+        vm.prank(resolver);
         vm.expectRevert("OptimisticChallenge: already resolved");
+        oc.resolveChallenge(ROUND, COMMIT_B);
+    }
+
+    function test_resolveChallenge_rejectsUnauthorizedResolver() public {
+        _reachConsensus(COMMIT_A);
+        vm.prank(challenger);
+        oc.openChallenge(ROUND, COMMIT_B);
+        vm.prank(challenger);
+        vm.expectRevert("OptimisticChallenge: not resolver");
         oc.resolveChallenge(ROUND, COMMIT_B);
     }
 }

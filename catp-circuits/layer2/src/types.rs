@@ -69,7 +69,7 @@ pub struct Action {
 /// All fields are private inputs to the circuit except `policy_commitment`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthorizationPolicy {
-    /// Allowed action type (single value; multi-set deferred to Phase 2).
+    /// Allowed action type (single value; multi-set support is a future policy extension).
     pub allowed_action: ActionType,
     /// Allowed protocol (single value).
     pub allowed_protocol: [u8; 32],
@@ -91,7 +91,8 @@ pub struct AuthorizationPolicy {
 
 impl AuthorizationPolicy {
     /// Compute the native commitment to this policy using SHA-256.
-    /// Inside the ZK circuit, Poseidon is used instead (see circuit.rs TODO).
+    /// Layer 2 proof verification uses the Poseidon commitment exposed in
+    /// `AuthorizationPublicInputs`.
     pub fn commitment(&self) -> catp_primitives::Commitment {
         use catp_primitives::CommitmentScheme;
         CommitmentScheme::commit_fields(&[

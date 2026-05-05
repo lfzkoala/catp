@@ -124,7 +124,7 @@ Implementations:
 - **Web2**: `catp-verify` Rust crate exposing a REST endpoint that verifies proof bytes against the same 13 public inputs — ✅ complete
 - **Non-EVM chains**: native verifier library — same circuit, same verification key, different host
 
-The Solidity `AgentAuthorizer` accepts an `IVerifier` at construction time. Swapping the verifier (e.g., upgrading from stub to real Halo2 verifier, or replacing with a different proof system) requires no changes to policy or authorization logic.
+The Solidity `AgentAuthorizer` accepts an `IVerifier` at construction time. Swapping the verifier (e.g., from `StubVerifier` in tests to the real `Halo2AuthorizationVerifier`, or to a different proof system) requires no changes to policy or authorization logic.
 
 ### Proof-Centric State Design
 
@@ -136,7 +136,7 @@ A key architectural principle: **push state into proofs, not contracts.**
 | Spend tracking | `mapping(bytes32 => uint256) cumulativeSpend` | Cumulative spend as proof public input, monotonicity enforced in circuit |
 | Reputation | On-chain counters | State commitment in proof, updated off-chain |
 
-The current Phase 1 implementation uses the naive approach for simplicity. The target architecture moves toward proof-centric state, reducing contract surface area to a thin event log + verifier call. A contract with no application state is trivial to port to any chain.
+The current implementation still keeps policy activation and cumulative spend in the EVM contract for simplicity, while the proof binds the action fields, proven timestamp, and current spend. The target architecture moves toward proof-centric state, reducing contract surface area to a thin event log + verifier call. A contract with no application state is trivial to port to any chain.
 
 ### Deployment Environments
 
@@ -390,6 +390,7 @@ interface IVerifier {
 
 contract AgentAuthorizer {
     IVerifier public immutable verifier;
+    uint256 public constant PROOF_MAX_AGE = 5 minutes;
 
     mapping(bytes32 => bool)    public activePolicies;
     mapping(bytes32 => uint256) public cumulativeSpend;
@@ -401,15 +402,22 @@ contract AgentAuthorizer {
     function executeAuthorized(
         bytes32 policyCommitment,
         bytes calldata actionData,
+        uint256 currentTimestamp,
         bytes calldata proof
     ) external {
         require(activePolicies[policyCommitment], "Policy not active");
-        bytes32[] memory pub = _buildPublicInputs(policyCommitment);
+        uint256 value = _extractValue(actionData);
+        require(value > 0, "Zero-value actions are not replay-safe");
+        require(currentTimestamp <= block.timestamp, "Proof from the future");
+        require(block.timestamp <= currentTimestamp + PROOF_MAX_AGE, "Proof is stale");
+        bytes32[] memory pub = _buildPublicInputs(policyCommitment, actionData, currentTimestamp);
         require(verifier.verify(pub, proof), "Invalid proof");
-        cumulativeSpend[policyCommitment] += _extractValue(actionData);
+        cumulativeSpend[policyCommitment] += value;
     }
 }
 ```
+
+Zero-value actions are rejected in the current on-chain adapter because cumulative spend is the replay-binding public input. A future proof-centric design can replace that with an explicit nonce or nullifier if zero-value actions need to be repeatable without replay risk.
 
 **Verifier progression**: Phase 0 — enforcement plugin (local, no proof). Phase 1 — `catp-verify` REST endpoint for off-chain verification. Phase 2 — auto-generated `Halo2Verifier.sol` (k=12, KZG/BN254) with `Halo2AuthorizationVerifier` wrapper replacing the stub — ✅ complete.
 
@@ -444,11 +452,11 @@ Guarantees: input-output binding, timeline correctness, model version consistenc
 
 **Defense Layer 2: Multi-Party Attestation (MPA)**
 
-Same inference request sent to N independent attestor nodes. ≥ 2/3 must agree on `output_commitment`. Attestors stake collateral; incorrect attestation → slashed. Security model: honest majority (same as blockchain consensus).
+Same inference request sent to N independent attestor nodes. ≥ 2/3 must agree on `output_commitment`. Attestors must stake collateral before submitting; incorrect consensus attestations can be slashed once per finalized round/commitment. Security model: honest majority (same as blockchain consensus).
 
 **Defense Layer 3: Optimistic + Economic Stake**
 
-Model operator stakes collateral at registration. Challenge window after each inference (e.g., 1 hour). Anyone can challenge by re-executing — successful challenge slashes operator. Same security model as Optimistic Rollups.
+Challenge window after each finalized inference round (currently 1 hour). Anyone can open a challenge with a non-consensus claimed commitment; an authorized resolver supplies the trusted re-execution result. If the result matches the challenge and differs from MPA consensus, the attestors behind the bad consensus are slashed and the challenger receives a reward. Rejected or expired challenges do not permanently block later challenges for the same round.
 
 **Combined security**: breaking all three requires forging a hash + controlling ≥ 2/3 attestors + accepting economic slash loss simultaneously. No hardware trust required.
 

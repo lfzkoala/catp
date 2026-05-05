@@ -99,6 +99,32 @@ describe("PolicyBuilder", () => {
       expect(encoded[72]).toBe(0);
     });
 
+    it("rejects numeric fields outside u64 range", () => {
+      const base = fullPolicy();
+      expect(() => PolicyBuilder.encode({ ...base, maxValuePerTx: 1n << 64n })).toThrow(
+        "maxValuePerTx must fit in u64",
+      );
+      expect(() => PolicyBuilder.encode({ ...base, maxValueTotal: -1n })).toThrow(
+        "maxValueTotal must fit in u64",
+      );
+      expect(() => PolicyBuilder.encode({ ...base, validFrom: 1n << 64n })).toThrow(
+        "validFrom must fit in u64",
+      );
+      expect(() => PolicyBuilder.encode({ ...base, validUntil: -1n })).toThrow(
+        "validUntil must fit in u64",
+      );
+    });
+
+    it("rejects protocol or token values that are not bytes32", () => {
+      const base = fullPolicy();
+      expect(() => PolicyBuilder.encode({ ...base, allowedProtocol: "0x1234" })).toThrow(
+        "policy bytes32 field must be a 32-byte hex string",
+      );
+      expect(() =>
+        PolicyBuilder.encode({ ...base, allowedToken: `0x${"11".repeat(33)}` }),
+      ).toThrow("policy bytes32 field must be a 32-byte hex string");
+    });
+
     it("produces different encodings for different policies", () => {
       const base = fullPolicy();
       const altered = { ...base, maxValuePerTx: 999n };

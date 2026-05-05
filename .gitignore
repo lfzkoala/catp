@@ -1,11 +1,13 @@
 .worktrees/
+.DS_Store
 target/
-catp-circuits/wasm/pkg/
 node_modules/
 dist/
 coverage/
 *.tsbuildinfo
 .env
+.env.*
+!.env.example
 *.key
 *.pem
 *.srs

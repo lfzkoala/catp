@@ -123,4 +123,20 @@ contract MPAVerifierTest is Test {
         vm.expectRevert("MPAVerifier: round finalized");
         mpa.submitOutput(ROUND, COMMIT_B);
     }
+
+    function test_slashCommitment_rejectsRepeatSlash() public {
+        _addAndStake(attestor1);
+        _addAndStake(attestor2);
+        _addAndStake(attestor3);
+        mpa.setChallengeContract(address(this));
+
+        vm.prank(attestor1);
+        mpa.submitOutput(ROUND, COMMIT_A);
+        vm.prank(attestor2);
+        mpa.submitOutput(ROUND, COMMIT_A);
+
+        mpa.slashCommitment(ROUND, COMMIT_A, address(this), 0);
+        vm.expectRevert("MPAVerifier: commitment already slashed");
+        mpa.slashCommitment(ROUND, COMMIT_A, address(this), 0);
+    }
 }

@@ -120,7 +120,7 @@ fn poseidon_in_circuit(
     // Pad: append 1 then zeros to next RATE=2 boundary.
     let mut buf: Vec<_> = inputs.to_vec();
     buf.push(gate.assign_constant(ctx, Fr::ONE)?);
-    while buf.len() % 2 != 0 {
+    while !buf.len().is_multiple_of(2) {
         buf.push(gate.assign_constant(ctx, Fr::ZERO)?);
     }
 
@@ -129,18 +129,18 @@ fn poseidon_in_circuit(
         for (i, inp) in chunk.iter().enumerate() {
             state[i + 1] = gate.add_with_constant(ctx, &state[i + 1], inp, c_start[0][i + 1])?;
         }
-        for round in 1..r_f {
-            for j in 0..3 {
+        for constants in c_start.iter().take(r_f).skip(1) {
+            for (j, constant) in constants.iter().enumerate().take(3) {
                 let t = gate.mul(ctx, &state[j], &state[j])?;
                 let t = gate.mul(ctx, &t, &t)?;
-                state[j] = gate.mul_add_constant(ctx, &t, &state[j], c_start[round][j])?;
+                state[j] = gate.mul_add_constant(ctx, &t, &state[j], *constant)?;
             }
             state = apply_mds(ctx, gate, &state, &mds)?;
         }
-        for j in 0..3 {
+        for (j, constant) in c_start.last().unwrap().iter().enumerate().take(3) {
             let t = gate.mul(ctx, &state[j], &state[j])?;
             let t = gate.mul(ctx, &t, &t)?;
-            state[j] = gate.mul_add_constant(ctx, &t, &state[j], c_start.last().unwrap()[j])?;
+            state[j] = gate.mul_add_constant(ctx, &t, &state[j], *constant)?;
         }
         state = apply_mds(ctx, gate, &state, &pre_sparse)?;
         for (constant, sp) in c_partial.iter().zip(sparse.iter()) {
@@ -149,18 +149,18 @@ fn poseidon_in_circuit(
             state[0] = gate.mul_add_constant(ctx, &t, &state[0], *constant)?;
             state = apply_sparse_mds(ctx, gate, &state, sp)?;
         }
-        for constants in c_end.iter() {
-            for j in 0..3 {
+        for constants in c_end {
+            for (j, constant) in constants.iter().enumerate().take(3) {
                 let t = gate.mul(ctx, &state[j], &state[j])?;
                 let t = gate.mul(ctx, &t, &t)?;
-                state[j] = gate.mul_add_constant(ctx, &t, &state[j], constants[j])?;
+                state[j] = gate.mul_add_constant(ctx, &t, &state[j], *constant)?;
             }
             state = apply_mds(ctx, gate, &state, &mds)?;
         }
-        for j in 0..3 {
-            let t = gate.mul(ctx, &state[j], &state[j])?;
+        for state_word in state.iter_mut().take(3) {
+            let t = gate.mul(ctx, state_word, state_word)?;
             let t = gate.mul(ctx, &t, &t)?;
-            state[j] = gate.mul_add_constant(ctx, &t, &state[j], Fr::ZERO)?;
+            *state_word = gate.mul_add_constant(ctx, &t, state_word, Fr::ZERO)?;
         }
         state = apply_mds(ctx, gate, &state, &mds)?;
     }
@@ -231,7 +231,7 @@ pub fn fr_from_be_bytes(be: &[u8; 32]) -> Option<Fr> {
     for (i, b) in be.iter().enumerate() {
         le[31 - i] = *b;
     }
-    Fr::from_repr(le.into()).into()
+    Fr::from_repr(le).into()
 }
 
 // ── Circuit ───────────────────────────────────────────────────────────────────

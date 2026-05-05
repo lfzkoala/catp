@@ -7,16 +7,16 @@ import "./ActionData.sol";
 
 /// @title AgentAuthorizer
 /// @notice CATP Layer 2: policy registry and ZK proof verifier.
-/// @dev Accepts an IVerifier at construction time. Phase 1 uses a stub verifier;
-///      Phase 2 injects the auto-generated Halo2 Solidity verifier.
+/// @dev Accepts an IVerifier at construction time. Tests can use StubVerifier;
+///      deployments should inject Halo2AuthorizationVerifier.
 ///      Swapping the verifier requires no changes to authorization logic.
 contract AgentAuthorizer is IAgentAuthorizer {
     IVerifier public immutable verifier;
+    uint256 public constant PROOF_MAX_AGE = 5 minutes;
 
     mapping(bytes32 => address) private _policyDelegators;
     mapping(bytes32 => bool)    private _activePolicies;
     mapping(bytes32 => uint256) private _cumulativeSpend;
-    mapping(bytes32 => uint256) private _policyNonces;
 
     constructor(address verifier_) {
         require(verifier_ != address(0), "AgentAuthorizer: zero verifier");
@@ -42,6 +42,7 @@ contract AgentAuthorizer is IAgentAuthorizer {
     function executeAuthorized(
         bytes32 policyCommitment,
         bytes calldata actionData,
+        uint256 currentTimestamp,
         bytes calldata proof
     ) external override {
         require(_activePolicies[policyCommitment], "AgentAuthorizer: policy not active");
@@ -54,8 +55,12 @@ contract AgentAuthorizer is IAgentAuthorizer {
             uint256 value
         ) = _decodeAction(actionData);
 
+        require(value > 0, "AgentAuthorizer: zero value");
         require(value <= type(uint64).max, "AgentAuthorizer: value too large");
         require(currentSpend <= type(uint64).max, "AgentAuthorizer: spend too large");
+        require(currentTimestamp <= type(uint64).max, "AgentAuthorizer: timestamp too large");
+        require(currentTimestamp <= block.timestamp, "AgentAuthorizer: future proof");
+        require(block.timestamp <= currentTimestamp + PROOF_MAX_AGE, "AgentAuthorizer: stale proof");
 
         bytes32[] memory pub = new bytes32[](13);
         pub[0] = policyCommitment;
@@ -65,11 +70,10 @@ contract AgentAuthorizer is IAgentAuthorizer {
             pub[6 + i] = _leU64(token, i);
         }
         pub[10] = bytes32(uint256(value));
-        pub[11] = bytes32(uint256(block.timestamp));
+        pub[11] = bytes32(uint256(currentTimestamp));
         pub[12] = bytes32(uint256(currentSpend));
         require(verifier.verify(pub, proof), "AgentAuthorizer: invalid proof");
         _cumulativeSpend[policyCommitment] += value;
-        _policyNonces[policyCommitment]++;
         emit AuthorizedExecution(policyCommitment, actionHash, value);
     }
 

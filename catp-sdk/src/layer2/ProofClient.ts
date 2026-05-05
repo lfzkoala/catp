@@ -26,7 +26,10 @@ const ACTION_TYPE_NAME: Record<ActionType, string> = {
   [ActionType.Withdraw]: "Withdraw",
 };
 
-function hexToBytes(hex: `0x${string}`): Uint8Array {
+const MAX_U64 = (1n << 64n) - 1n;
+
+function hexToBytes(hex: `0x${string}`, field: string): Uint8Array {
+  assertHex(hex, field);
   const h = hex.slice(2);
   const bytes = new Uint8Array(h.length / 2);
   for (let i = 0; i < bytes.length; i++) {
@@ -35,8 +38,45 @@ function hexToBytes(hex: `0x${string}`): Uint8Array {
   return bytes;
 }
 
+function bytes32ToBytes(hex: `0x${string}`, field: string): Uint8Array {
+  assertBytes32Hex(hex, field);
+  return hexToBytes(hex, field);
+}
+
+function assertHex(hex: `0x${string}`, field: string): void {
+  if (!hex.startsWith("0x")) {
+    throw new Error(`${field} must be 0x-prefixed hex`);
+  }
+  const h = hex.slice(2);
+  if (h.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(h)) {
+    throw new Error(`${field} must be an even-length hex string`);
+  }
+}
+
+function assertBytes32Hex(hex: `0x${string}`, field: string): void {
+  if (!hex.startsWith("0x")) {
+    throw new Error(`${field} must be 0x-prefixed hex`);
+  }
+  const h = hex.slice(2);
+  if (!/^[0-9a-fA-F]{64}$/.test(h)) {
+    throw new Error(`${field} must be a 32-byte hex string`);
+  }
+}
+
+function assertU64(value: bigint, field: string): void {
+  if (value < 0n || value > MAX_U64) {
+    throw new Error(`${field} must fit in u64`);
+  }
+}
+
+function assertPositiveU64(value: bigint, field: string): void {
+  if (value <= 0n || value > MAX_U64) {
+    throw new Error(`${field} must be between 1 and u64::MAX`);
+  }
+}
+
 function u64LimbsLE(hex: `0x${string}`): [bigint, bigint, bigint, bigint] {
-  const bytes = hexToBytes(hex);
+  const bytes = bytes32ToBytes(hex, "action bytes32 field");
   const limbs: bigint[] = [];
   for (let limb = 0; limb < 4; limb++) {
     let value = 0n;
@@ -75,12 +115,19 @@ export class ProofClient {
     action: Action,
     cumulativeSpend: bigint,
   ): Promise<ProofResult> {
+    assertU64(policy.maxValuePerTx, "maxValuePerTx");
+    assertU64(policy.maxValueTotal, "maxValueTotal");
+    assertU64(policy.validFrom, "validFrom");
+    assertU64(policy.validUntil, "validUntil");
+    assertPositiveU64(action.value, "action.value");
+    assertU64(cumulativeSpend, "cumulativeSpend");
+
     const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
 
     const policyJson = JSON.stringify({
       allowed_action: ACTION_TYPE_NAME[policy.allowedAction],
-      allowed_protocol: Array.from(hexToBytes(policy.allowedProtocol)),
-      allowed_token: Array.from(hexToBytes(policy.allowedToken)),
+      allowed_protocol: Array.from(bytes32ToBytes(policy.allowedProtocol, "policy bytes32 field")),
+      allowed_token: Array.from(bytes32ToBytes(policy.allowedToken, "policy bytes32 field")),
       max_value_per_tx: policy.maxValuePerTx.toString(),
       max_value_total: policy.maxValueTotal.toString(),
       valid_from: policy.validFrom.toString(),
@@ -89,8 +136,8 @@ export class ProofClient {
 
     const actionJson = JSON.stringify({
       action_type: ACTION_TYPE_NAME[action.actionType],
-      protocol: Array.from(hexToBytes(action.protocol)),
-      token: Array.from(hexToBytes(action.token)),
+      protocol: Array.from(bytes32ToBytes(action.protocol, "action bytes32 field")),
+      token: Array.from(bytes32ToBytes(action.token, "action bytes32 field")),
       value: action.value.toString(),
     });
 
@@ -124,7 +171,7 @@ export class ProofClient {
     proof: `0x${string}`,
     publicInputs: AuthorizationPublicInputs,
   ): Promise<boolean> {
-    const base64 = bytesToBase64(hexToBytes(proof));
+    const base64 = bytesToBase64(hexToBytes(proof, "proof"));
     const res = await fetch(`${this.verifyUrl}/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

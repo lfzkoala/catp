@@ -35,7 +35,8 @@ pub struct AuthorizationProofSystem {
 
 impl AuthorizationProofSystem {
     /// Create a new proof system with a random SRS of size 2^k rows.
-    /// k=12 (4096 rows) is required for in-circuit Poseidon-3-2 over 9 inputs.
+    /// k=12 (4096 rows) is required for in-circuit Poseidon-3-2 over the policy
+    /// fields and the 13 public authorization inputs.
     /// Intended for development and testing only — random SRS cannot be used
     /// to verify proofs on-chain.
     pub fn new(k: u32) -> Self {

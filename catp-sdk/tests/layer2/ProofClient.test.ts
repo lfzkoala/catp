@@ -103,6 +103,46 @@ describe("ProofClient", () => {
       expect(result.publicInputs.actionValue).toBe(50n);
       expect(result.publicInputs.cumulativeSpend).toBe(42n);
     });
+
+    it("rejects malformed policy bytes32 fields before calling WASM", async () => {
+      const client = new ProofClient(mockWasm);
+      await expect(
+        client.prove({ ...policy, allowedProtocol: "0x1234" as `0x${string}` }, action, 0n),
+      ).rejects.toThrow("policy bytes32 field must be a 32-byte hex string");
+      expect(mockWasm.prove_authorization).not.toHaveBeenCalled();
+    });
+
+    it("rejects malformed action bytes32 fields before calling WASM", async () => {
+      const client = new ProofClient(mockWasm);
+      await expect(
+        client.prove(policy, { ...action, token: `0x${"00".repeat(31)}zz` as `0x${string}` }, 0n),
+      ).rejects.toThrow("action bytes32 field must be a 32-byte hex string");
+      expect(mockWasm.prove_authorization).not.toHaveBeenCalled();
+    });
+
+    it("rejects unprefixed bytes32 fields before calling WASM", async () => {
+      const client = new ProofClient(mockWasm);
+      await expect(
+        client.prove(policy, { ...action, protocol: "00".repeat(32) as `0x${string}` }, 0n),
+      ).rejects.toThrow("action bytes32 field must be 0x-prefixed hex");
+      expect(mockWasm.prove_authorization).not.toHaveBeenCalled();
+    });
+
+    it("rejects values outside the circuit u64 range before calling WASM", async () => {
+      const client = new ProofClient(mockWasm);
+      const tooLarge = 1n << 64n;
+      await expect(client.prove({ ...policy, maxValueTotal: tooLarge }, action, 0n)).rejects.toThrow(
+        "maxValueTotal must fit in u64",
+      );
+      await expect(client.prove(policy, { ...action, value: -1n }, 0n)).rejects.toThrow(
+        "action.value must be between 1 and u64::MAX",
+      );
+      await expect(client.prove(policy, { ...action, value: 0n }, 0n)).rejects.toThrow(
+        "action.value must be between 1 and u64::MAX",
+      );
+      await expect(client.prove(policy, action, tooLarge)).rejects.toThrow("cumulativeSpend must fit in u64");
+      expect(mockWasm.prove_authorization).not.toHaveBeenCalled();
+    });
   });
 
   describe("verify()", () => {
@@ -153,6 +193,26 @@ describe("ProofClient", () => {
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
       const client = new ProofClient(mockWasm);
       await expect(client.verify("0x0102030405", publicInputs)).rejects.toThrow("catp-verify returned 500");
+    });
+
+    it("rejects malformed proof hex before POSTing", async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      const client = new ProofClient(mockWasm);
+      await expect(client.verify("0x123" as `0x${string}`, publicInputs)).rejects.toThrow(
+        "proof must be an even-length hex string",
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects unprefixed proof hex before POSTing", async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      const client = new ProofClient(mockWasm);
+      await expect(client.verify("0102" as `0x${string}`, publicInputs)).rejects.toThrow(
+        "proof must be 0x-prefixed hex",
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 });

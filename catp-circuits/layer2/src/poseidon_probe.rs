@@ -1,5 +1,5 @@
 //! Probes the minimum k required for in-circuit Poseidon (MainGate-based) over
-//! the 9 Fr elements that encode an AuthorizationPolicy.
+//! the 13 Fr elements that encode an AuthorizationPolicy.
 //! Run: cargo test poseidon_probe -- --nocapture
 
 #[cfg(test)]
@@ -15,7 +15,7 @@ mod tests {
 
     const R_F: usize = 8;
     const R_P: usize = 57;
-    const N_INPUTS: usize = 9; // 7 u64 policy fields + 2 extra limbs for 32-byte values
+    const N_INPUTS: usize = 13; // action + protocol/token limbs + value/time bounds
 
     // ── helpers ──────────────────────────────────────────────────────────────
 

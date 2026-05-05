@@ -1,5 +1,7 @@
 import { ActionType, AuthorizationPolicy } from "./types.js";
 
+const MAX_U64 = (1n << 64n) - 1n;
+
 export class PolicyBuilder {
   private policy: Partial<AuthorizationPolicy> = {};
 
@@ -73,15 +75,20 @@ export class PolicyBuilder {
   }
 
   static encode(policy: AuthorizationPolicy): Uint8Array {
+    assertU64(policy.maxValuePerTx, "maxValuePerTx");
+    assertU64(policy.maxValueTotal, "maxValueTotal");
+    assertU64(policy.validFrom, "validFrom");
+    assertU64(policy.validUntil, "validUntil");
+
     const buf = new ArrayBuffer(97);
     const view = new DataView(buf);
     view.setUint8(0, policy.allowedAction);
 
     const encodeHex = (hex: string, offset: number) => {
+      assertBytes32Hex(hex, "policy bytes32 field");
       const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
-      const padded = clean.padStart(64, "0");
       for (let i = 0; i < 32; i++) {
-        view.setUint8(offset + i, parseInt(padded.slice(i * 2, i * 2 + 2), 16));
+        view.setUint8(offset + i, parseInt(clean.slice(i * 2, i * 2 + 2), 16));
       }
     };
 
@@ -100,5 +107,18 @@ export class PolicyBuilder {
     encodeBigInt(policy.validUntil, 89);
 
     return new Uint8Array(buf, 0, 97);
+  }
+}
+
+function assertU64(value: bigint, field: string): void {
+  if (value < 0n || value > MAX_U64) {
+    throw new Error(`${field} must fit in u64`);
+  }
+}
+
+function assertBytes32Hex(hex: string, field: string): void {
+  const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
+  if (!/^[0-9a-fA-F]{64}$/.test(clean)) {
+    throw new Error(`${field} must be a 32-byte hex string`);
   }
 }
