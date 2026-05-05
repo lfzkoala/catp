@@ -5,6 +5,7 @@ use halo2_proofs::{
     plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Instance, Selector},
     poly::Rotation,
 };
+use halo2curves::bn256::Fr;
 
 use crate::types::{Action, AuthorizationPolicy};
 
@@ -45,7 +46,7 @@ pub struct ProveAuthorization {
     pub public_inputs: Option<AuthorizationPublicInputs>,
 }
 
-impl Circuit<halo2_proofs::pasta::Fp> for ProveAuthorization {
+impl Circuit<Fr> for ProveAuthorization {
     type Config = AuthorizationConfig;
     type FloorPlanner = SimpleFloorPlanner;
 
@@ -53,7 +54,7 @@ impl Circuit<halo2_proofs::pasta::Fp> for ProveAuthorization {
         Self::default()
     }
 
-    fn configure(meta: &mut ConstraintSystem<halo2_proofs::pasta::Fp>) -> Self::Config {
+    fn configure(meta: &mut ConstraintSystem<Fr>) -> Self::Config {
         let action_cols = [
             meta.advice_column(),
             meta.advice_column(),
@@ -136,15 +137,13 @@ impl Circuit<halo2_proofs::pasta::Fp> for ProveAuthorization {
     fn synthesize(
         &self,
         config: Self::Config,
-        mut layouter: impl Layouter<halo2_proofs::pasta::Fp>,
+        mut layouter: impl Layouter<Fr>,
     ) -> Result<(), Error> {
-        use halo2_proofs::pasta::Fp;
-
         let policy = self.policy.as_ref();
         let action = self.action.as_ref();
         let pub_in = self.public_inputs.as_ref();
 
-        let fp = |v: u64| -> Value<Fp> { Value::known(Fp::from(v)) };
+        let fp = |v: u64| -> Value<Fr> { Value::known(Fr::from(v)) };
         let unk = || Value::unknown();
 
         // Region 0: membership (constraints 2–4).

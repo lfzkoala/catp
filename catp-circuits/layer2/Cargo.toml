@@ -5,7 +5,12 @@ edition = "2021"
 
 [dependencies]
 catp-primitives = { path = "../primitives" }
-halo2_proofs = { version = "0.3", default-features = false }
+# PSE fork — KZG/BN254 backend. Pin to a specific rev before production deploy.
+halo2_proofs = { git = "https://github.com/privacy-scaling-explorations/halo2", tag = "v0.3.0" }
+halo2curves = { version = "0.6", default-features = false, features = ["bits"] }
+maingate = { git = "https://github.com/privacy-scaling-explorations/halo2wrong", tag = "v2024_01_31" }
+poseidon = { git = "https://github.com/privacy-scaling-explorations/poseidon", tag = "v2024_01_31" }
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
+snark-verifier = { git = "https://github.com/privacy-scaling-explorations/snark-verifier", version = "0.1.1", features = ["loader_evm"] }
 thiserror = "1"

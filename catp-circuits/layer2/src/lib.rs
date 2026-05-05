@@ -8,6 +8,9 @@ pub mod circuit;
 pub mod proof;
 pub mod types;
 
+#[cfg(test)]
+mod poseidon_probe;
+
 pub use circuit::{AuthorizationConfig, AuthorizationPublicInputs, ProveAuthorization};
 pub use proof::AuthorizationProofSystem;
 pub use types::{Action, ActionType, AuthorizationPolicy};
