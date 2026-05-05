@@ -6,7 +6,7 @@ A modular, cryptography-native protocol stack that enables trustworthy autonomou
 
 The protocol treats AI agents and humans as two types of the same abstraction: **principals**. A principal is any entity (human wallet, AI agent, smart contract, DAO multisig) that can be authorized, verified, and reputation-scored. This design ensures CATP is not limited to any single market — it serves any scenario where one entity delegates authority to another with cryptographic trust.
 
-**CATP is a ZK proof protocol, not an Ethereum protocol.** The ZK proof is the universal trust primitive. Any system that can verify a Halo2 proof can participate in CATP — whether it is an EVM chain, a non-EVM blockchain, or a web2 service. The Ethereum implementation is the reference deployment, not the protocol boundary.
+**CATP is a proof-centric protocol, not an Ethereum protocol.** The proof is the portable trust primitive. The current reference proof backend is Halo2/KZG on BN254 because it is directly verifiable on EVM, but the protocol boundary is the verifier interface and public input schema, not a specific chain or proof library. Any system that can verify the selected CATP proof version can participate — whether it is an EVM chain, a non-EVM blockchain, or a web2 service. The Ethereum implementation is the reference deployment, not the protocol boundary.
 
 Identity layer (Layer 0) is ceded to existing players (Kite AI, Lit Protocol, etc. for agents; ENS, Polygon ID, etc. for humans). CATP owns everything above identity: authorization, verification, reputation, discovery, and communication.
 
@@ -28,7 +28,7 @@ CATP is deployed as two complementary layers:
                          ▼
 ┌───────────────────────────────────────────────────────┐
 │                  CATP Protocol Layer                  │
-│   (ZK proof + blockchain — async, trustless)          │
+│   (ZK proof + blockchain — async, verifiable)         │
 │                                                       │
 │   ZK proof generated in background →                 │
 │   Policy commitment anchored on-chain →               │
@@ -54,7 +54,7 @@ In background (seconds — non-blocking)
 
 If challenged by any party (on demand)
   Proof retrieved
-  → Verified trustlessly (no honest party required)
+  → Verified cryptographically (no online attestor required)
   → Agent's compliance is mathematically guaranteed
 ```
 
@@ -92,14 +92,14 @@ The ZK proof layer adds one further guarantee: even after the session ends, the 
 
 ### The Core Principle
 
-The ZK proof is self-contained. It encodes all claims about policy compliance, output correctness, and reputation — and can be verified by any system that has the verification key. The chain or environment is just where state is anchored and proofs are submitted. It is an adapter, not the protocol.
+The ZK proof is self-contained for a specific circuit version. It encodes claims about policy compliance, output boundaries, and reputation properties, and can be verified by any system that has the matching verification key and public input schema. The chain or environment is where state is anchored and proofs are submitted. It is an adapter, not the protocol.
 
 ```
 ┌─────────────────────────────────────────────┐
 │           CATP Protocol Core                │
 │                                             │
-│  ZK circuits (Rust/Halo2)                  │
-│  Proof format (universal)                   │
+│  Versioned ZK circuits (Rust/Halo2 MVP)    │
+│  Versioned proof format + public inputs     │
 │  Policy encoding (chain-agnostic)           │
 │  SDK (TypeScript)                           │
 └──────────────────┬──────────────────────────┘
@@ -122,9 +122,9 @@ verify(publicInputs: bytes32[], proof: bytes) → bool
 Implementations:
 - **EVM**: `Halo2Verifier.sol` (auto-generated, k=12, KZG/BN254, GWC + EvmTranscript) wrapped by `Halo2AuthorizationVerifier`, which encodes 13 public inputs (`policyCommitment`, public action fields, `currentTimestamp`, `cumulativeSpend`) before the staticcall — ✅ complete
 - **Web2**: `catp-verify` Rust crate exposing a REST endpoint that verifies proof bytes against the same 13 public inputs — ✅ complete
-- **Non-EVM chains**: native verifier library — same circuit, same verification key, different host
+- **Non-EVM chains**: native verifier library — same circuit version and public input schema, host-specific verifier
 
-The Solidity `AgentAuthorizer` accepts an `IVerifier` at construction time. Swapping the verifier (e.g., from `StubVerifier` in tests to the real `Halo2AuthorizationVerifier`, or to a different proof system) requires no changes to policy or authorization logic.
+The Solidity `AgentAuthorizer` accepts an `IVerifier` at construction time. Swapping the verifier (e.g., from `StubVerifier` in tests to the real `Halo2AuthorizationVerifier`, or to a future proof backend) requires no changes to authorization control flow as long as the same public input contract is preserved. Changes to the proof statement itself should be released as a new versioned verifier and policy schema.
 
 ### Proof-Centric State Design
 
@@ -132,11 +132,11 @@ A key architectural principle: **push state into proofs, not contracts.**
 
 | Concern | Naive (state-in-contract) | Proof-centric (target) |
 |---------|--------------------------|------------------------|
-| Policy validity | `mapping(bytes32 => bool) activePolicies` | Delegator signature in proof public inputs |
-| Spend tracking | `mapping(bytes32 => uint256) cumulativeSpend` | Cumulative spend as proof public input, monotonicity enforced in circuit |
-| Reputation | On-chain counters | State commitment in proof, updated off-chain |
+| Policy validity | `mapping(bytes32 => bool) activePolicies` | Delegator signature or policy-root checkpoint bound into proof |
+| Spend tracking | `mapping(bytes32 => uint256) cumulativeSpend` | Cumulative spend bound to a canonical state root, nonce, or nullifier |
+| Reputation | On-chain counters | State commitment in proof, updated off-chain and checkpointed |
 
-The current implementation still keeps policy activation and cumulative spend in the EVM contract for simplicity, while the proof binds the action fields, proven timestamp, and current spend. The target architecture moves toward proof-centric state, reducing contract surface area to a thin event log + verifier call. A contract with no application state is trivial to port to any chain.
+The current implementation still keeps policy activation and cumulative spend in the EVM contract for simplicity, while the proof binds the action fields, proven timestamp, and current spend. This is intentional for the MVP: a proof can show that a spend value satisfies a policy, but the host must still know that the value is the latest canonical value. The target architecture can move more state into proofs over time, but only when each proof is also bound to a canonical state root, nonce, nullifier set, or checkpoint that prevents stale-state replay.
 
 ### Deployment Environments
 
@@ -148,7 +148,7 @@ The current implementation still keeps policy activation and cumulative spend in
 | Solana | Native Rust verifier | Account data | Pubkey-derived |
 | Offline / air-gapped | Rust binary | File / HSM | Hash |
 
-The ZK circuit, proof format, and verification key are identical across all rows. EVM is the reference deployment for MVP. Web2 and non-EVM support are post-MVP.
+For a given proof version, the circuit statement and public input schema should be identical across all rows. The concrete verifier implementation may differ by host. EVM is the reference deployment for MVP. Web2 and non-EVM support are post-MVP.
 
 ### Architecture Tradeoffs
 
@@ -159,7 +159,7 @@ The ZK circuit, proof format, and verification key are identical across all rows
 | Proving time | Seconds to minutes (mitigated by pre-compute) | Milliseconds |
 | Portability | Any system with verification key | Any system with signature check |
 | Developer complexity | High — circuit expertise required | Low — standard crypto |
-| Trusted parties required | None (trustless) | Honest attestor majority |
+| Trusted parties required | No online attestor for authorization; KZG backend depends on a reusable SRS ceremony | Honest attestor majority |
 | Auditability of logic | Hard — circuit bugs are subtle | Easy — policy checks are readable |
 | Upgrade cost | New circuit + new verifier per change | Update policy schema |
 
@@ -171,11 +171,11 @@ The ZK circuit, proof format, and verification key are identical across all rows
 
 The following are documented gaps between the current codebase and the target architecture:
 
-1. ~~**Real Halo2 on-chain verifier**~~ — ✅ **Resolved (Phase 2A–G)**. `Halo2Verifier.sol` (k=12, KZG/BN254, GWC + EvmTranscript) is auto-generated and deployed. `Halo2AuthorizationVerifier` wraps it, encoding 13 public inputs before the staticcall. A shared SRS (`catp-layer2-k12.srs`) ensures prover and verifier are consistent. The `catp-verify` REST endpoint remains available as an off-chain verification path. `AgentAuthorizer` accepts `Halo2AuthorizationVerifier` as its `IVerifier`.
-2. **Policy state in contracts** — `activePolicies` and `cumulativeSpend` mappings should migrate to proof public inputs over time. 🔜 Planned.
+1. ~~**Real Halo2 on-chain verifier**~~ — ✅ **Resolved (Phase 2A–G)**. `Halo2Verifier.sol` (k=12, KZG/BN254, GWC + EvmTranscript) is auto-generated and deployed. `Halo2AuthorizationVerifier` wraps it, encoding 13 public inputs before the staticcall. A shared KZG SRS (`catp-layer2-k12.srs`) ensures prover and verifier are consistent. The `catp-verify` REST endpoint remains available as an off-chain verification path. `AgentAuthorizer` accepts `Halo2AuthorizationVerifier` as its `IVerifier`.
+2. **Policy state in contracts** — `activePolicies` and `cumulativeSpend` mappings should remain in-contract until proof-centric state has a canonical root, nonce, nullifier, or checkpoint mechanism. 🔜 Planned.
 3. **EVM address types throughout SDK** — `0x${string}` assumes 20-byte Ethereum addresses. Future: abstract to `PrincipalId` bytes. 🔜 Planned.
 4. **Layer 5 registry assumes on-chain storage** — registry entries use EVM addresses and contract mappings. Future: content-addressed off-chain store with on-chain commitments. 🔜 Planned.
-5. **Proof system: consider Nova/HyperNova for incremental audit logs** — Halo2 is the current choice (no trusted setup, mature tooling). Nova/HyperNova (Microsoft Research) uses a folding scheme architecturally better suited to CATP's incremental audit log model: each agent tool call is one fold, the running proof accumulates cheaply, and final proof size is small regardless of action count. The `IVerifier` interface already decouples proof verification from authorization logic, so a proof system swap requires no changes to policy or contract code. Revisit when Nova/HyperNova tooling matures. 🔭 Future consideration.
+5. **Proof system lifecycle** — Halo2/KZG is the current MVP backend because it has mature Rust tooling and an EVM verification path, but it is not treated as a permanent protocol dependency. PSE Halo2 is in maintenance mode, KZG requires a reusable SRS, and each statement change still requires a new circuit/verifier. Keep every proof statement versioned (`authorization_v1`, `boundary_v1`, `reputation_v1`) and revisit Nova/HyperNova or another folding/recursive backend for incremental audit logs when tooling matures. 🔭 Future consideration.
 
 ---
 
@@ -217,17 +217,18 @@ These primitives are reused across multiple layers. Defining them once ensures c
 - **Why Poseidon**: ~8x cheaper than SHA-256 inside ZK circuits; already standard in Ethereum ZK ecosystem
 
 ### P2: ZK Proof System
-- **Choice**: Halo2 (PSE/Zcash fork)
+- **MVP choice**: Halo2/KZG on BN254 (PSE fork)
 - **Rationale**:
-  - No trusted setup — aligns with CATP's "trustless from the ground up" philosophy
+  - Direct EVM verification — KZG/BN254 works with Ethereum precompiles and generated Solidity verifiers
   - Plonkish constraint system — lookup tables make membership proofs natural, custom gates enable flexible policy constraints
-  - Future-proof — new policy constraint types can be added without re-running a ceremony
+  - Reusable setup — one KZG SRS can support many circuits up to its size bound, but production security depends on the ceremony and SRS provenance
   - Rust-native — first-class Rust support
-- **Used by**: Layer 2 (authorization proofs), Layer 3 (boundary proofs), Layer 4 (reputation proofs), Layer 5 (capability proofs)
-- **Language**: Rust. Circuit implementations in `catp-circuits/`. Proof system abstracted behind `ProofSystem` trait to allow future migration if needed.
+- **Used by**: Layer 2 (authorization proofs) in the MVP; Layer 3 boundary proofs, Layer 4 reputation proofs, and Layer 5 capability proofs should be added as separately versioned circuits rather than assuming one proof statement covers all layers.
+- **Language**: Rust. Circuit implementations in `catp-circuits/`. Proof statements should be exposed behind a small proof-system abstraction so the backend can migrate without rewriting authorization logic.
 - **Key libraries**: halo2_proofs, halo2_gadgets (Poseidon, range check, etc.)
-- **Backend**: KZG/BN254 (GWC opening, EvmTranscript) — proofs are directly verifiable on EVM via EIP-196/197 precompiles. Uses PSE halo2 (git-pinned, `v0.3.0` tag) with `snark-verifier` for the EVM transcript.
+- **Backend**: KZG/BN254 (GWC opening, EvmTranscript) — proofs are directly verifiable on EVM via EIP-196/197 precompiles. Uses PSE halo2 (git-pinned, `v0.3.0` tag) with `snark-verifier` for the EVM transcript. PSE Halo2 is a maintenance-mode dependency, so CATP should pin versions, keep verifier generation reproducible, and maintain a migration path to another Halo2 fork or proof system.
 - **Verification paths**: (a) off-chain via `catp-verify` REST endpoint using Rust `VerifierGWC`; (b) on-chain via auto-generated `Halo2Verifier.sol` (k=12, 13 public inputs). Both paths share the same KZG SRS (`catp-layer2-k12.srs`).
+- **Versioning rule**: Any change to public inputs, policy encoding, hash layout, circuit constraints, SRS size, transcript, or proving backend creates a new proof version and verifier address. Old verifiers remain valid for historical proofs.
 
 ### P3: Multi-Party Attestation (MPA)
 - **What**: N independent attestor nodes verify AI outputs, ≥ t-of-n agreement required
