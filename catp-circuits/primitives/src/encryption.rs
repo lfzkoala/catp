@@ -50,6 +50,15 @@ fn derive_session_key(dh_output: &[u8; 32], context: &[u8]) -> SessionKey {
     SessionKey(okm)
 }
 
+fn reject_non_contributory_shared_secret(dh_output: &[u8; 32]) -> CatpResult<()> {
+    if dh_output.iter().all(|&b| b == 0) {
+        return Err(CatpError::KeyExchange(
+            "non-contributory X25519 shared secret".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// Perform X25519 ephemeral key exchange with a remote public key.
 ///
 /// Returns `(ephemeral_public_key, session_key)`.
@@ -61,6 +70,7 @@ pub fn key_exchange(remote_public_bytes: &[u8; 32]) -> CatpResult<(PublicKey, Se
     let ephemeral_public = PublicKey::from(&ephemeral_secret);
     let remote_public = PublicKey::from(*remote_public_bytes);
     let shared = ephemeral_secret.diffie_hellman(&remote_public);
+    reject_non_contributory_shared_secret(shared.as_bytes())?;
 
     // Bind both public keys into the HKDF context to prevent unknown-key-share attacks.
     let mut context = Vec::with_capacity(64 + CATP_HKDF_INFO.len());
@@ -84,6 +94,7 @@ pub fn static_key_exchange(
 ) -> CatpResult<SessionKey> {
     let remote_public = PublicKey::from(*remote_public_bytes);
     let shared = keypair.secret.diffie_hellman(&remote_public);
+    reject_non_contributory_shared_secret(shared.as_bytes())?;
 
     // Bind both parties' static public keys in a canonical (sorted) order so that
     // both sides derive the same key regardless of who initiates the exchange.
@@ -212,6 +223,19 @@ mod tests {
         let bob = AgentKeyPair::generate();
         let (_ephemeral_pub, session_key) = key_exchange(&bob.public_key_bytes()).unwrap();
         assert_ne!(session_key.0, [0u8; 32]);
+    }
+
+    #[test]
+    fn ephemeral_key_exchange_rejects_all_zero_public_key() {
+        let err = key_exchange(&[0u8; 32]).unwrap_err();
+        assert!(matches!(err, CatpError::KeyExchange(_)));
+    }
+
+    #[test]
+    fn static_key_exchange_rejects_all_zero_public_key() {
+        let alice = AgentKeyPair::generate();
+        let err = static_key_exchange(&alice, &[0u8; 32]).unwrap_err();
+        assert!(matches!(err, CatpError::KeyExchange(_)));
     }
 
     #[test]

@@ -24,7 +24,7 @@ function makeEntry(
     tool,
     decision,
     rule_matched: null,
-    commitment: computeCommitment(tool, decision, ts, prev),
+    commitment: computeCommitment(tool, decision, ts, prev, null, '{}'),
     input_summary: '{}',
   };
 }

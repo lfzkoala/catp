@@ -12,13 +12,12 @@ export function computeCommitment(
   tool: string,
   decision: "allow" | "deny",
   ts: string,
-  prev: string = "0"
+  prev: string = "0",
+  ruleMatched: string | null = null,
+  inputSummary: string = ""
 ): string {
   return createHash("sha256")
-    .update(tool)
-    .update(decision)
-    .update(ts)
-    .update(prev)
+    .update(JSON.stringify({ tool, decision, ts, ruleMatched, inputSummary, prev }))
     .digest("hex");
 }
 
@@ -59,12 +58,13 @@ export function buildEntry(
   prevCommitment: string = "0"
 ): AuditEntry {
   const ts = new Date().toISOString();
+  const inputSummary = summarizeInput(input);
   return {
     ts,
     tool: input.tool_name,
     decision,
     rule_matched: ruleMatched,
-    commitment: computeCommitment(input.tool_name, decision, ts, prevCommitment),
-    input_summary: summarizeInput(input),
+    commitment: computeCommitment(input.tool_name, decision, ts, prevCommitment, ruleMatched, inputSummary),
+    input_summary: inputSummary,
   };
 }

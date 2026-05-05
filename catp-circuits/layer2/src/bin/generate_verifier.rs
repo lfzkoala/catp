@@ -46,8 +46,7 @@ fn gen_solidity_verifier(
     let mut transcript = EvmTranscript::<_, Rc<EvmLoader>, _, _>::new(&loader);
 
     let instances = transcript.load_instances(num_instance);
-    let proof =
-        PlonkVerifier::read_proof(&vk_kzg, &protocol, &instances, &mut transcript).unwrap();
+    let proof = PlonkVerifier::read_proof(&vk_kzg, &protocol, &instances, &mut transcript).unwrap();
     PlonkVerifier::verify(&vk_kzg, &protocol, &instances, &proof).unwrap();
 
     loader.solidity_code()
@@ -74,13 +73,16 @@ fn main() {
     println!("Generating verifying key...");
     let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk failed");
 
-    // One instance column with 3 values: [policy_commitment, timestamp, spend].
-    let num_instance = vec![3];
+    // One instance column with 13 values: policy commitment, action fields, timestamp, spend.
+    let num_instance = vec![13];
 
     println!("Generating Solidity verifier...");
     let solidity = gen_solidity_verifier(&params, &vk, num_instance);
 
     let out_path = "Halo2SolidityVerifier.sol";
     std::fs::write(out_path, &solidity).expect("failed to write verifier");
-    println!("Solidity verifier written to {out_path} ({} bytes)", solidity.len());
+    println!(
+        "Solidity verifier written to {out_path} ({} bytes)",
+        solidity.len()
+    );
 }

@@ -121,7 +121,7 @@ contract AgentAuthorizerTest is Test {
         vm.prank(delegator); authorizer.revokePolicy(c);
         assertFalse(authorizer.isPolicyActive(c));
     }
-    function testFuzz_accumulatesSpend(uint128 v1, uint128 v2) public {
+    function testFuzz_accumulatesSpend(uint64 v1, uint64 v2) public {
         vm.prank(delegator); authorizer.registerPolicy(POLICY);
         vm.prank(agent); authorizer.executeAuthorized(POLICY, _ad(v1), VALID_PROOF);
         vm.prank(agent); authorizer.executeAuthorized(POLICY, _ad(v2), VALID_PROOF);

@@ -47,15 +47,27 @@ contract AgentAuthorizer is IAgentAuthorizer {
         require(_activePolicies[policyCommitment], "AgentAuthorizer: policy not active");
         bytes32 actionHash = keccak256(actionData);
         uint256 currentSpend = _cumulativeSpend[policyCommitment];
-        uint256 currentNonce = _policyNonces[policyCommitment];
-        bytes32[] memory pub = new bytes32[](5);
+        (
+            ActionData.ActionType actionType,
+            bytes32 protocol,
+            bytes32 token,
+            uint256 value
+        ) = _decodeAction(actionData);
+
+        require(value <= type(uint64).max, "AgentAuthorizer: value too large");
+        require(currentSpend <= type(uint64).max, "AgentAuthorizer: spend too large");
+
+        bytes32[] memory pub = new bytes32[](13);
         pub[0] = policyCommitment;
-        pub[1] = actionHash;
-        pub[2] = bytes32(block.timestamp);
-        pub[3] = bytes32(currentSpend);
-        pub[4] = bytes32(currentNonce);
+        pub[1] = bytes32(uint256(uint8(actionType)));
+        for (uint256 i = 0; i < 4; i++) {
+            pub[2 + i] = _leU64(protocol, i);
+            pub[6 + i] = _leU64(token, i);
+        }
+        pub[10] = bytes32(uint256(value));
+        pub[11] = bytes32(uint256(block.timestamp));
+        pub[12] = bytes32(uint256(currentSpend));
         require(verifier.verify(pub, proof), "AgentAuthorizer: invalid proof");
-        uint256 value = _extractValue(actionData);
         _cumulativeSpend[policyCommitment] += value;
         _policyNonces[policyCommitment]++;
         emit AuthorizedExecution(policyCommitment, actionHash, value);
@@ -69,10 +81,20 @@ contract AgentAuthorizer is IAgentAuthorizer {
         return _cumulativeSpend[policyCommitment];
     }
 
-    /// @dev Decode value from ABI-encoded ActionData using full abi.decode (type-safe).
-    function _extractValue(bytes calldata actionData) internal pure returns (uint256) {
-        if (actionData.length < 128) return 0;
-        (, , , uint256 value) = abi.decode(actionData, (ActionData.ActionType, bytes32, bytes32, uint256));
-        return value;
+    /// @dev Decode action from ABI-encoded ActionData using full abi.decode (type-safe).
+    function _decodeAction(
+        bytes calldata actionData
+    ) internal pure returns (ActionData.ActionType actionType, bytes32 protocol, bytes32 token, uint256 value) {
+        require(actionData.length == 128, "AgentAuthorizer: invalid action data");
+        return abi.decode(actionData, (ActionData.ActionType, bytes32, bytes32, uint256));
+    }
+
+    function _leU64(bytes32 word, uint256 limbIndex) internal pure returns (bytes32) {
+        uint256 value;
+        uint256 offset = limbIndex * 8;
+        for (uint256 i = 0; i < 8; i++) {
+            value |= uint256(uint8(word[offset + i])) << (8 * i);
+        }
+        return bytes32(value);
     }
 }

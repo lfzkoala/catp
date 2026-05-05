@@ -1,21 +1,8 @@
 import { describe, it, expect } from "vitest";
-import {
-  encodeActionData,
-  encodePolicyCommitment,
-} from "../../src/layer2/AuthorizerClient.js";
+import { encodeActionData } from "../../src/layer2/AuthorizerClient.js";
 import { ActionType } from "../../src/layer2/types.js";
 
 const ZERO32 = `0x${"00".repeat(32)}` as `0x${string}`;
-
-const basePolicy = {
-  allowedAction: ActionType.Swap,
-  allowedProtocol: ZERO32,
-  allowedToken: ZERO32,
-  maxValuePerTx: 100n,
-  maxValueTotal: 1000n,
-  validFrom: 0n,
-  validUntil: 9999999999n,
-};
 
 describe("encodeActionData()", () => {
   it("produces a 0x-prefixed hex string of 128 bytes (258 chars total)", () => {
@@ -64,27 +51,5 @@ describe("encodeActionData()", () => {
     const swap = encodeActionData({ actionType: ActionType.Swap, protocol: ZERO32, token: ZERO32, value: 0n });
     const transfer = encodeActionData({ actionType: ActionType.Transfer, protocol: ZERO32, token: ZERO32, value: 0n });
     expect(swap).not.toBe(transfer);
-  });
-});
-
-describe("encodePolicyCommitment()", () => {
-  it("returns a non-empty 0x-prefixed hex string", () => {
-    expect(encodePolicyCommitment(basePolicy)).toMatch(/^0x[0-9a-f]+$/);
-  });
-
-  it("produces different commitments for different action types", () => {
-    const a = encodePolicyCommitment(basePolicy);
-    const b = encodePolicyCommitment({ ...basePolicy, allowedAction: ActionType.Transfer });
-    expect(a).not.toBe(b);
-  });
-
-  it("produces different commitments for different spend limits", () => {
-    const a = encodePolicyCommitment(basePolicy);
-    const b = encodePolicyCommitment({ ...basePolicy, maxValuePerTx: 999n });
-    expect(a).not.toBe(b);
-  });
-
-  it("produces the same commitment for identical policies", () => {
-    expect(encodePolicyCommitment(basePolicy)).toBe(encodePolicyCommitment({ ...basePolicy }));
   });
 });

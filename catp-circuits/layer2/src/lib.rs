@@ -12,8 +12,8 @@ pub mod types;
 mod poseidon_probe;
 
 pub use circuit::{
+    action_public_fields, fr_from_be_bytes, fr_to_be_bytes, native_policy_commitment,
     AuthorizationConfig, AuthorizationPublicInputs, ProveAuthorization,
-    fr_from_be_bytes, fr_to_be_bytes, native_policy_commitment,
 };
 pub use proof::AuthorizationProofSystem;
 pub use types::{Action, ActionType, AuthorizationPolicy};

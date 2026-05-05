@@ -24,6 +24,10 @@ export interface AuthorizationPolicy {
 
 export interface AuthorizationPublicInputs {
   policyCommitment: `0x${string}`;
+  actionType: bigint;
+  actionProtocol: [bigint, bigint, bigint, bigint];
+  actionToken: [bigint, bigint, bigint, bigint];
+  actionValue: bigint;
   currentTimestamp: bigint;
   cumulativeSpend: bigint;
 }

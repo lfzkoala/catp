@@ -1,5 +1,4 @@
 import { Action, ActionType } from "./types.js";
-import { PolicyBuilder } from "./PolicyBuilder.js";
 import type { AuthorizationPolicy } from "./types.js";
 
 export interface AuthorizerClientConfig {
@@ -78,11 +77,6 @@ export function encodeActionData(action: Action): `0x${string}` {
   return bufferToHex(new Uint8Array(buf));
 }
 
-export function encodePolicyCommitment(policy: AuthorizationPolicy): `0x${string}` {
-  const encoded = PolicyBuilder.encode(policy);
-  return bufferToHex(encoded);
-}
-
 /** Compute the Poseidon-BN254 policy commitment via the catp-wasm module.
  *  Returns a `bytes32` hex string suitable for `registerPolicy` and `publicInputs[0]`.
  */
@@ -95,10 +89,10 @@ export function computePolicyCommitment(
     allowed_action: ACTION_NAME[policy.allowedAction],
     allowed_protocol: Array.from(hexToBytes(policy.allowedProtocol as `0x${string}`)),
     allowed_token: Array.from(hexToBytes(policy.allowedToken as `0x${string}`)),
-    max_value_per_tx: Number(policy.maxValuePerTx),
-    max_value_total: Number(policy.maxValueTotal),
-    valid_from: Number(policy.validFrom),
-    valid_until: Number(policy.validUntil),
+    max_value_per_tx: policy.maxValuePerTx.toString(),
+    max_value_total: policy.maxValueTotal.toString(),
+    valid_from: policy.validFrom.toString(),
+    valid_until: policy.validUntil.toString(),
   });
   return bufferToHex(wasm.compute_policy_commitment(policyJson));
 }

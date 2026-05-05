@@ -36,7 +36,6 @@ contract CommitRegistry {
         PreCommit storage pre = _preCommits[agentId];
         require(pre.exists, "CommitRegistry: no pre-commit found");
         require(postCommitment != bytes32(0), "CommitRegistry: zero post-commitment");
-        require(!_hasPostCommit(agentId), "CommitRegistry: post-commit already exists");
         require(block.timestamp >= pre.timestamp + MIN_COMMIT_DELAY, "CommitRegistry: delay not elapsed");
         _postCommits[agentId] = PostCommit({
             preCommitment:  pre.commitment,
@@ -57,9 +56,5 @@ contract CommitRegistry {
         PostCommit storage post = _postCommits[agentId];
         require(post.postCommitment != bytes32(0), "CommitRegistry: no post-commit found");
         return (post.preCommitment, post.postCommitment, post.timestamp);
-    }
-
-    function _hasPostCommit(bytes32 agentId) internal view returns (bool) {
-        return _postCommits[agentId].postCommitment != bytes32(0);
     }
 }

@@ -48,9 +48,19 @@ impl AuthorizationProofSystem {
     /// The SRS must have been generated with k=12. Use this in production so that
     /// proofs verify against the deployed `Halo2SolidityVerifier.sol`.
     pub fn from_file(path: &std::path::Path) -> CatpResult<Self> {
-        let mut f = std::fs::File::open(path)
-            .map_err(|e| CatpError::Serialization(e.to_string()))?;
-        let params = ParamsKZG::<Bn256>::read(&mut f)
+        let mut f =
+            std::fs::File::open(path).map_err(|e| CatpError::Serialization(e.to_string()))?;
+        Self::from_reader(&mut f)
+    }
+
+    /// Load a proof system from serialized SRS bytes.
+    pub fn from_bytes(bytes: &[u8]) -> CatpResult<Self> {
+        let mut cursor = std::io::Cursor::new(bytes);
+        Self::from_reader(&mut cursor)
+    }
+
+    fn from_reader(reader: &mut impl std::io::Read) -> CatpResult<Self> {
+        let params = ParamsKZG::<Bn256>::read(reader)
             .map_err(|e| CatpError::Serialization(e.to_string()))?;
         Ok(Self { params })
     }
@@ -112,8 +122,7 @@ impl AuthorizationProofSystem {
         let instance = build_instance(public_inputs);
         let params_verifier = self.params.verifier_params();
         let strategy = SingleStrategy::new(params_verifier);
-        let mut transcript =
-            TranscriptReadBuffer::<_, G1Affine, _>::init(proof.0.as_slice());
+        let mut transcript = TranscriptReadBuffer::<_, G1Affine, _>::init(proof.0.as_slice());
 
         plonk::verify_proof::<
             KZGCommitmentScheme<Bn256>,
@@ -133,19 +142,24 @@ impl AuthorizationProofSystem {
     }
 }
 
-/// Build the flat instance vector [commitment, timestamp, spend].
+/// Build the flat instance vector:
+/// [commitment, action_type, protocol[4], token[4], value, timestamp, spend].
 fn build_instance(pub_in: &AuthorizationPublicInputs) -> Vec<Fr> {
-    vec![
-        pub_in.policy_commitment,
-        Fr::from(pub_in.current_timestamp),
-        Fr::from(pub_in.cumulative_spend),
-    ]
+    let mut instance = Vec::with_capacity(13);
+    instance.push(pub_in.policy_commitment);
+    instance.push(Fr::from(pub_in.action_type));
+    instance.extend(pub_in.action_protocol.iter().copied().map(Fr::from));
+    instance.extend(pub_in.action_token.iter().copied().map(Fr::from));
+    instance.push(Fr::from(pub_in.action_value));
+    instance.push(Fr::from(pub_in.current_timestamp));
+    instance.push(Fr::from(pub_in.cumulative_spend));
+    instance
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::circuit::native_policy_commitment;
+    use crate::circuit::{action_public_fields, native_policy_commitment};
     use crate::types::{Action, ActionType, AuthorizationPolicy};
 
     fn test_policy() -> AuthorizationPolicy {
@@ -170,8 +184,14 @@ mod tests {
     }
 
     fn test_public_inputs() -> AuthorizationPublicInputs {
+        let (action_type, action_protocol, action_token, action_value) =
+            action_public_fields(&test_action());
         AuthorizationPublicInputs {
             policy_commitment: native_policy_commitment(&test_policy()),
+            action_type,
+            action_protocol,
+            action_token,
+            action_value,
             current_timestamp: 5000,
             cumulative_spend: 2000,
         }

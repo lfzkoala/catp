@@ -13,6 +13,7 @@ path = "src/main.rs"
 [dependencies]
 catp-layer2 = { path = "../catp-circuits/layer2" }
 catp-primitives = { path = "../catp-circuits/primitives" }
+halo2curves = { version = "0.6", default-features = false, features = ["bits"] }
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }

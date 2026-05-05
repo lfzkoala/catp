@@ -6,6 +6,7 @@ const TREE_DEPTH: usize = 256;
 /// A Merkle inclusion proof.
 #[derive(Debug, Clone)]
 pub struct MerkleProof {
+    pub key: [u8; 32],
     pub leaf: Commitment,
     pub siblings: Vec<Commitment>,
     pub path_bits: Vec<bool>, // true = go right
@@ -14,13 +15,26 @@ pub struct MerkleProof {
 impl MerkleProof {
     /// Verify that this proof is valid for the given root.
     pub fn verify(&self, root: &Commitment) -> bool {
+        if self.siblings.len() != TREE_DEPTH || self.path_bits.len() != TREE_DEPTH {
+            return false;
+        }
+
+        let mut expected_key = self.key;
         let mut current = self.leaf.clone();
-        for (sibling, &goes_right) in self.siblings.iter().zip(self.path_bits.iter()) {
+        for (i, (sibling, &goes_right)) in
+            self.siblings.iter().zip(self.path_bits.iter()).enumerate()
+        {
+            let depth = TREE_DEPTH - 1 - i;
+            let bit = (expected_key[depth / 8] >> (7 - (depth % 8))) & 1;
+            if goes_right != (bit == 1) {
+                return false;
+            }
             current = if !goes_right {
                 SparseMerkleTree::hash_nodes(&current, sibling)
             } else {
                 SparseMerkleTree::hash_nodes(sibling, &current)
             };
+            expected_key = SparseMerkleTree::parent_key(expected_key, depth);
         }
         &current == root
     }
@@ -145,6 +159,7 @@ impl SparseMerkleTree {
         }
 
         Ok(MerkleProof {
+            key,
             leaf,
             siblings,
             path_bits,
@@ -234,6 +249,36 @@ mod tests {
         let proof = tree.prove(key(1)).unwrap();
         let wrong_root = CommitmentScheme::commit(b"wrong");
         assert!(!proof.verify(&wrong_root));
+    }
+
+    #[test]
+    fn empty_proof_does_not_verify() {
+        let leaf = CommitmentScheme::commit(b"leaf");
+        let proof = MerkleProof {
+            key: key(1),
+            leaf: leaf.clone(),
+            siblings: vec![],
+            path_bits: vec![],
+        };
+        assert!(!proof.verify(&leaf));
+    }
+
+    #[test]
+    fn truncated_proof_does_not_verify() {
+        let mut tree = SparseMerkleTree::new();
+        tree.insert(key(1), CommitmentScheme::commit(b"v"));
+        let mut proof = tree.prove(key(1)).unwrap();
+        proof.siblings.pop();
+        assert!(!proof.verify(tree.root()));
+    }
+
+    #[test]
+    fn proof_invalid_for_wrong_key() {
+        let mut tree = SparseMerkleTree::new();
+        tree.insert(key(1), CommitmentScheme::commit(b"v"));
+        let mut proof = tree.prove(key(1)).unwrap();
+        proof.key = key(2);
+        assert!(!proof.verify(tree.root()));
     }
 
     #[test]

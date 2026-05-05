@@ -1,7 +1,8 @@
 use catp_layer2::{
-    Action, ActionType, AuthorizationPolicy, AuthorizationProofSystem, AuthorizationPublicInputs,
-    fr_from_be_bytes, fr_to_be_bytes, native_policy_commitment,
+    action_public_fields, fr_from_be_bytes, fr_to_be_bytes, native_policy_commitment, Action,
+    ActionType, AuthorizationPolicy, AuthorizationProofSystem, AuthorizationPublicInputs,
 };
+use halo2curves::bn256::Fr;
 use std::path::Path;
 
 fn srs_path() -> &'static Path {
@@ -29,6 +30,20 @@ fn test_action() -> Action {
     }
 }
 
+fn test_public_inputs(policy_commitment: Fr) -> AuthorizationPublicInputs {
+    let (action_type, action_protocol, action_token, action_value) =
+        action_public_fields(&test_action());
+    AuthorizationPublicInputs {
+        policy_commitment,
+        action_type,
+        action_protocol,
+        action_token,
+        action_value,
+        current_timestamp: 5_000,
+        cumulative_spend: 200,
+    }
+}
+
 /// Full trustless path: policy → Poseidon commitment → ZK proof → off-chain verify.
 #[test]
 fn e2e_trustless_verification() {
@@ -38,11 +53,7 @@ fn e2e_trustless_verification() {
     let ps = AuthorizationProofSystem::from_file(srs_path())
         .expect("failed to load SRS — run `cargo run --bin generate_verifier` first");
 
-    let public_inputs = AuthorizationPublicInputs {
-        policy_commitment: commitment,
-        current_timestamp: 5_000,
-        cumulative_spend: 200,
-    };
+    let public_inputs = test_public_inputs(commitment);
 
     let proof = ps
         .prove_authorization(test_policy(), test_action(), public_inputs.clone())
@@ -63,14 +74,9 @@ fn e2e_tampered_commitment_fails() {
     let policy = test_policy();
     let good_commitment = native_policy_commitment(&policy);
 
-    let ps = AuthorizationProofSystem::from_file(srs_path())
-        .expect("failed to load SRS");
+    let ps = AuthorizationProofSystem::from_file(srs_path()).expect("failed to load SRS");
 
-    let good_inputs = AuthorizationPublicInputs {
-        policy_commitment: good_commitment,
-        current_timestamp: 5_000,
-        cumulative_spend: 200,
-    };
+    let good_inputs = test_public_inputs(good_commitment);
 
     let proof = ps
         .prove_authorization(test_policy(), test_action(), good_inputs)
@@ -81,11 +87,7 @@ fn e2e_tampered_commitment_fails() {
     bad_be[0] ^= 0x01;
     let bad_commitment = fr_from_be_bytes(&bad_be).expect("tampered commitment must be a valid Fr");
 
-    let bad_inputs = AuthorizationPublicInputs {
-        policy_commitment: bad_commitment,
-        current_timestamp: 5_000,
-        cumulative_spend: 200,
-    };
+    let bad_inputs = test_public_inputs(bad_commitment);
 
     let result = ps.verify_authorization(&proof, &bad_inputs);
     assert!(

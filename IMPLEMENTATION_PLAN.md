@@ -138,7 +138,7 @@ After Claude Code:
 Expose `verify_authorization` as a lightweight verification service — the primary verification path for Phase 1:
 
 - Extract a `catp-verify` crate from `catp-circuits/layer2` with lean dependencies
-- Expose a REST endpoint: accepts `(proof_bytes, public_inputs_json)`, returns `{ valid: bool }`
+- Expose a REST endpoint: accepts base64 proof bytes plus public inputs (`policyCommitment`, `currentTimestamp`, `cumulativeSpend`), returns `{ valid: bool }`
 - Wire `ProofClient` in the TypeScript SDK to call this endpoint for verification
 
 **Why not on-chain yet**: the IPA/pasta backend used by `halo2_proofs 0.3.x` (crates.io) has no practical Solidity verifier — pasta curves lack EVM precompiles. Switching to KZG requires either a git-pinned dependency (fragile to maintain as APIs drift) or a per-circuit trusted setup (contradicts CATP's trustless principle). On-chain verification is deferred to Phase 2 when the ecosystem matures. The `IVerifier` interface is already in place — swapping to a real verifier requires no changes to `AgentAuthorizer` logic.
@@ -195,7 +195,7 @@ Phases A–G close these gaps in dependency order.
 
 ### Phase A — In-Circuit Poseidon + Public Inputs
 
-**Goal**: The circuit computes `policyCommitment = Poseidon(policy_fields)` in-circuit and exposes three public values (commitment, timestamp, spend) on the instance column.
+**Goal**: The circuit computes `policyCommitment = Poseidon(policy_fields)` in-circuit and exposes 13 public values (commitment, action fields, timestamp, spend) on the instance column.
 
 **Key facts (empirically confirmed via `poseidon_probe` tests):**
 - Both T=5/RATE=4 and T=3/RATE=2 Poseidon require **k=12** (4096 rows); k=11 is insufficient
@@ -303,13 +303,13 @@ Phases A–G close these gaps in dependency order.
 
 ### Phase D — Regenerate Solidity Verifier
 
-**Goal**: The on-chain verifier reflects the updated circuit (k=12, 3 public inputs).
+**Goal**: The on-chain verifier reflects the updated circuit (k=12, 13 public inputs).
 
 **Changes to `catp-circuits/layer2/src/bin/generate_verifier.rs`**:
 
 1. Update `num_instance`:
    ```rust
-   let num_instance = vec![3]; // policyCommitment, timestamp, spend
+   let num_instance = vec![13]; // policyCommitment, action fields, timestamp, spend
    ```
 
 2. Load SRS from `catp-layer2-k12.srs` instead of calling `ParamsKZG::new(k)`.
@@ -317,7 +317,7 @@ Phases A–G close these gaps in dependency order.
 3. Run the binary and copy the output to `catp-contracts/src/layer2/Halo2Verifier.sol`.
 
 **Deliverables:**
-- [x] `generate_verifier` uses loaded SRS and `num_instance = [3]`
+- [x] `generate_verifier` uses loaded SRS and `num_instance = [13]`
 - [x] `Halo2Verifier.sol` regenerated and updated in contracts
 - [x] `forge build` passes with updated verifier
 - [x] `forge test` — all 48 tests pass (43 existing + 5 Phase E)
@@ -328,7 +328,7 @@ Phases A–G close these gaps in dependency order.
 
 **Goal**: The wrapper contract forwards public inputs to the Halo2 verifier instead of ignoring them.
 
-**Background**: The generated `Halo2Verifier.sol` expects calldata in the format `[instance_0, instance_1, instance_2, proof_bytes...]` where instance values are 32-byte big-endian Fr elements prepended to the proof.
+**Background**: The generated `Halo2Verifier.sol` expects calldata in the format `[13 public inputs, proof_bytes...]` where instance values are 32-byte big-endian Fr elements prepended to the proof.
 
 **Changes to `catp-contracts/src/layer2/Halo2AuthorizationVerifier.sol`**:
 
@@ -337,11 +337,21 @@ function verify(
     bytes32[] calldata publicInputs,
     bytes calldata proof
 ) external view override returns (bool) {
-    // publicInputs[0] = policyCommitment, [1] = timestamp, [2] = spend
+    // publicInputs = policyCommitment, action fields, timestamp, spend
     bytes memory callData = abi.encodePacked(
         publicInputs[0],
         publicInputs[1],
         publicInputs[2],
+        publicInputs[3],
+        publicInputs[4],
+        publicInputs[5],
+        publicInputs[6],
+        publicInputs[7],
+        publicInputs[8],
+        publicInputs[9],
+        publicInputs[10],
+        publicInputs[11],
+        publicInputs[12],
         proof
     );
     (bool ok,) = halo2Verifier.staticcall(callData);
@@ -433,10 +443,10 @@ Also add a negative test: tampered `publicInputs[0]` must return `false`.
 
 | Phase | What | Status |
 |-------|------|--------|
-| A | In-circuit Poseidon + expose 3 public values | ✅ Complete |
+| A | In-circuit Poseidon + expose 13 public values | ✅ Complete |
 | B | proof.rs: k=12, native Poseidon commitment, instance slice | ✅ Complete |
 | C | SRS persistence: write/read `.srs` file | ✅ Complete |
-| D | Regenerate Halo2Verifier.sol with k=12 + num_instance=[3] | ✅ Complete |
+| D | Regenerate Halo2Verifier.sol with k=12 + num_instance=[13] | ✅ Complete |
 | E | Fix Halo2AuthorizationVerifier to forward publicInputs | ✅ Complete |
 | F | Off-chain Poseidon commitment in primitives + SDK | ✅ Complete |
 | G | E2E test: policy → proof → off-chain verify | ✅ Complete (Sepolia anchor pending) |
@@ -546,15 +556,15 @@ Also add a negative test: tampered `publicInputs[0]` must return `false`.
 | Component | Status |
 |-----------|--------|
 | Enforcement plugin (`catp-plugin/`) | ✅ Complete (72 tests) — published as `@catp-protocol/cli` |
-| `ProveAuthorization` Halo2 circuit — in-circuit Poseidon, 3 public inputs, k=12 | ✅ Complete (11 tests) |
-| WASM prover bundle (`catp-circuits/wasm`) | ✅ Complete — `compute_policy_commitment` / `prove_authorization` / `verify_authorization` |
-| `AgentAuthorizer.sol` + `ActionData.sol` | ✅ Complete (16 tests, stub verifier) |
-| `catp-verify` REST verification endpoint | ✅ Complete (3 tests) |
-| TypeScript SDK Layer 2 (`PolicyBuilder`, `AuthorizerClient`, `ProofClient`) | ✅ Complete (29 tests) — WASM Poseidon commitment + `catp-verify` REST endpoint |
-| `CommitRegistry.sol` (Layer 3) | ✅ Complete (8 tests) |
-| `MPAVerifier.sol` (Layer 3) | ✅ Complete (9 tests) |
-| `OptimisticChallenge.sol` (Layer 3) | ✅ Complete (10 tests) |
-| `Halo2Verifier.sol` — k=12, 3 public inputs, shared SRS | ✅ Complete (via_ir; testnet SRS) |
+| `ProveAuthorization` Halo2 circuit — full protocol/token binding, range checks, 13 public inputs, k=12 | ✅ Complete (15 unit tests + 3 E2E tests) |
+| WASM prover bundle (`catp-circuits/wasm`) | ✅ Complete — shared SRS, `compute_policy_commitment` / `prove_authorization` / `verify_authorization` |
+| `AgentAuthorizer.sol` + `ActionData.sol` | ✅ Complete (16 tests) |
+| `catp-verify` REST verification endpoint | ✅ Complete (3 tests) — verifies proof + public inputs |
+| TypeScript SDK Layer 2 (`PolicyBuilder`, `AuthorizerClient`, `ProofClient`) | ✅ Complete (25 tests) — WASM Poseidon commitment + `catp-verify` proof/public-input verification |
+| `CommitRegistry.sol` (Layer 3) | ✅ Complete (10 tests) |
+| `MPAVerifier.sol` (Layer 3) | ✅ Complete (11 tests) — requires staked attestors |
+| `OptimisticChallenge.sol` (Layer 3) | ✅ Complete (8 tests) — upheld challenges slash MPA stake |
+| `Halo2Verifier.sol` — regenerated for current k=12 circuit, 13 public inputs, shared SRS | ✅ Complete (via_ir; testnet SRS) |
 | `Halo2AuthorizationVerifier.sol` wrapper — forwards publicInputs | ✅ Complete (5 tests) |
 | SRS persistence (`catp-layer2-k12.srs`) | ✅ Complete — load-or-generate, shared between prover and verifier |
 | `poseidon_probe` k-sizing test | ✅ Complete — k=12 confirmed for T=3/RATE=2 and T=5/RATE=4 |
@@ -563,7 +573,7 @@ Also add a negative test: tampered `publicInputs[0]` must return `false`.
 | Layers 1, 4, 5 circuits | 🔜 Scaffold only |
 | SDK Layers 1, 3, 4, 5 | 🔜 Scaffold only |
 
-**166 tests passing** across TypeScript/Jest (72), Vitest (29), Rust (17), and Solidity/Forge (48).
+**172 tests passing** across TypeScript/Jest (72), Vitest (29), Rust (21), and Solidity/Forge (50).
 
 ---
 

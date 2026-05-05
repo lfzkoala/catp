@@ -35,6 +35,19 @@ function hexToBytes(hex: `0x${string}`): Uint8Array {
   return bytes;
 }
 
+function u64LimbsLE(hex: `0x${string}`): [bigint, bigint, bigint, bigint] {
+  const bytes = hexToBytes(hex);
+  const limbs: bigint[] = [];
+  for (let limb = 0; limb < 4; limb++) {
+    let value = 0n;
+    for (let i = 0; i < 8; i++) {
+      value |= BigInt(bytes[limb * 8 + i]) << BigInt(i * 8);
+    }
+    limbs.push(value);
+  }
+  return limbs as [bigint, bigint, bigint, bigint];
+}
+
 function bytesToHex(bytes: Uint8Array): `0x${string}` {
   return `0x${Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))
@@ -68,17 +81,17 @@ export class ProofClient {
       allowed_action: ACTION_TYPE_NAME[policy.allowedAction],
       allowed_protocol: Array.from(hexToBytes(policy.allowedProtocol)),
       allowed_token: Array.from(hexToBytes(policy.allowedToken)),
-      max_value_per_tx: Number(policy.maxValuePerTx),
-      max_value_total: Number(policy.maxValueTotal),
-      valid_from: Number(policy.validFrom),
-      valid_until: Number(policy.validUntil),
+      max_value_per_tx: policy.maxValuePerTx.toString(),
+      max_value_total: policy.maxValueTotal.toString(),
+      valid_from: policy.validFrom.toString(),
+      valid_until: policy.validUntil.toString(),
     });
 
     const actionJson = JSON.stringify({
       action_type: ACTION_TYPE_NAME[action.actionType],
       protocol: Array.from(hexToBytes(action.protocol)),
       token: Array.from(hexToBytes(action.token)),
-      value: Number(action.value),
+      value: action.value.toString(),
     });
 
     const commitmentBe = this.wasm.compute_policy_commitment(policyJson);
@@ -94,17 +107,39 @@ export class ProofClient {
 
     return {
       proof: bytesToHex(proofBytes),
-      publicInputs: { policyCommitment, currentTimestamp, cumulativeSpend },
+      publicInputs: {
+        policyCommitment,
+        actionType: BigInt(action.actionType),
+        actionProtocol: u64LimbsLE(action.protocol),
+        actionToken: u64LimbsLE(action.token),
+        actionValue: action.value,
+        currentTimestamp,
+        cumulativeSpend,
+      },
     };
   }
 
   /** Verify a proof via the catp-verify REST endpoint. */
-  async verify(proof: `0x${string}`): Promise<boolean> {
+  async verify(
+    proof: `0x${string}`,
+    publicInputs: AuthorizationPublicInputs,
+  ): Promise<boolean> {
     const base64 = bytesToBase64(hexToBytes(proof));
     const res = await fetch(`${this.verifyUrl}/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ proof: base64 }),
+      body: JSON.stringify({
+        proof: base64,
+        publicInputs: {
+          policyCommitment: publicInputs.policyCommitment,
+          actionType: publicInputs.actionType.toString(),
+          actionProtocol: publicInputs.actionProtocol.map((v) => v.toString()),
+          actionToken: publicInputs.actionToken.map((v) => v.toString()),
+          actionValue: publicInputs.actionValue.toString(),
+          currentTimestamp: publicInputs.currentTimestamp.toString(),
+          cumulativeSpend: publicInputs.cumulativeSpend.toString(),
+        },
+      }),
     });
     if (!res.ok) throw new Error(`catp-verify returned ${res.status}`);
     const data = (await res.json()) as { valid: boolean; error?: string };

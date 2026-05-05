@@ -29,10 +29,11 @@ contract Halo2AuthorizationVerifierTest is Test {
         mock     = new MockHalo2Verifier();
         verifier = new Halo2AuthorizationVerifier(address(mock));
 
-        inputs = new bytes32[](3);
+        inputs = new bytes32[](13);
         inputs[0] = bytes32(uint256(0xAAAA)); // policyCommitment
-        inputs[1] = bytes32(uint256(0xBBBB)); // timestamp
-        inputs[2] = bytes32(uint256(0xCCCC)); // spend
+        for (uint256 i = 1; i < 13; i++) {
+            inputs[i] = bytes32(uint256(0xAAAA + i));
+        }
         proof  = hex"deadbeef01020304";
     }
 
@@ -41,7 +42,22 @@ contract Halo2AuthorizationVerifierTest is Test {
     }
 
     function test_verify_forwardsPublicInputsAndProof() public {
-        bytes memory expected = abi.encodePacked(inputs[0], inputs[1], inputs[2], proof);
+        bytes memory expected = abi.encodePacked(
+            inputs[0],
+            inputs[1],
+            inputs[2],
+            inputs[3],
+            inputs[4],
+            inputs[5],
+            inputs[6],
+            inputs[7],
+            inputs[8],
+            inputs[9],
+            inputs[10],
+            inputs[11],
+            inputs[12],
+            proof
+        );
         vm.expectCall(address(mock), expected);
         verifier.verify(inputs, proof);
     }
@@ -53,7 +69,7 @@ contract Halo2AuthorizationVerifierTest is Test {
 
     function test_verify_revertsOnWrongInputCount() public {
         bytes32[] memory bad = new bytes32[](2);
-        vm.expectRevert("Halo2AuthorizationVerifier: expected 3 public inputs");
+        vm.expectRevert("Halo2AuthorizationVerifier: expected 13 public inputs");
         verifier.verify(bad, proof);
     }
 

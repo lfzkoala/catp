@@ -25,7 +25,7 @@ contract OptimisticChallengeTest is Test {
         challenger = makeAddr("challenger");
         mpa = new MPAVerifier();
         oc  = new OptimisticChallenge(address(mpa));
-        vm.deal(address(oc), 1 ether);
+        mpa.setChallengeContract(address(oc));
     }
 
     function _addAndStake(address a) internal {

@@ -120,8 +120,8 @@ verify(publicInputs: bytes32[], proof: bytes) → bool
 ```
 
 Implementations:
-- **EVM**: `Halo2Verifier.sol` (auto-generated, k=12, KZG/BN254, GWC + EvmTranscript) wrapped by `Halo2AuthorizationVerifier`, which encodes the three public inputs (policyCommitment, timestamp, cumulativeSpend) before the staticcall — ✅ complete
-- **Web2**: `catp-verify` Rust crate exposing `verify_authorization` as a REST endpoint — ✅ complete
+- **EVM**: `Halo2Verifier.sol` (auto-generated, k=12, KZG/BN254, GWC + EvmTranscript) wrapped by `Halo2AuthorizationVerifier`, which encodes 13 public inputs (`policyCommitment`, public action fields, `currentTimestamp`, `cumulativeSpend`) before the staticcall — ✅ complete
+- **Web2**: `catp-verify` Rust crate exposing a REST endpoint that verifies proof bytes against the same 13 public inputs — ✅ complete
 - **Non-EVM chains**: native verifier library — same circuit, same verification key, different host
 
 The Solidity `AgentAuthorizer` accepts an `IVerifier` at construction time. Swapping the verifier (e.g., upgrading from stub to real Halo2 verifier, or replacing with a different proof system) requires no changes to policy or authorization logic.
@@ -171,7 +171,7 @@ The ZK circuit, proof format, and verification key are identical across all rows
 
 The following are documented gaps between the current codebase and the target architecture:
 
-1. ~~**Real Halo2 on-chain verifier**~~ — ✅ **Resolved (Phase 2A–G)**. `Halo2Verifier.sol` (k=12, KZG/BN254, GWC + EvmTranscript) is auto-generated and deployed. `Halo2AuthorizationVerifier` wraps it, encoding the three public inputs before the staticcall. A shared SRS (`catp-layer2-k12.srs`) ensures prover and verifier are consistent. The `catp-verify` REST endpoint remains available as an off-chain verification path. `AgentAuthorizer` accepts `Halo2AuthorizationVerifier` as its `IVerifier`.
+1. ~~**Real Halo2 on-chain verifier**~~ — ✅ **Resolved (Phase 2A–G)**. `Halo2Verifier.sol` (k=12, KZG/BN254, GWC + EvmTranscript) is auto-generated and deployed. `Halo2AuthorizationVerifier` wraps it, encoding 13 public inputs before the staticcall. A shared SRS (`catp-layer2-k12.srs`) ensures prover and verifier are consistent. The `catp-verify` REST endpoint remains available as an off-chain verification path. `AgentAuthorizer` accepts `Halo2AuthorizationVerifier` as its `IVerifier`.
 2. **Policy state in contracts** — `activePolicies` and `cumulativeSpend` mappings should migrate to proof public inputs over time. 🔜 Planned.
 3. **EVM address types throughout SDK** — `0x${string}` assumes 20-byte Ethereum addresses. Future: abstract to `PrincipalId` bytes. 🔜 Planned.
 4. **Layer 5 registry assumes on-chain storage** — registry entries use EVM addresses and contract mappings. Future: content-addressed off-chain store with on-chain commitments. 🔜 Planned.
@@ -227,7 +227,7 @@ These primitives are reused across multiple layers. Defining them once ensures c
 - **Language**: Rust. Circuit implementations in `catp-circuits/`. Proof system abstracted behind `ProofSystem` trait to allow future migration if needed.
 - **Key libraries**: halo2_proofs, halo2_gadgets (Poseidon, range check, etc.)
 - **Backend**: KZG/BN254 (GWC opening, EvmTranscript) — proofs are directly verifiable on EVM via EIP-196/197 precompiles. Uses PSE halo2 (git-pinned, `v0.3.0` tag) with `snark-verifier` for the EVM transcript.
-- **Verification paths**: (a) off-chain via `catp-verify` REST endpoint using Rust `VerifierGWC`; (b) on-chain via auto-generated `Halo2Verifier.sol` (k=12, 3 public inputs). Both paths share the same KZG SRS (`catp-layer2-k12.srs`).
+- **Verification paths**: (a) off-chain via `catp-verify` REST endpoint using Rust `VerifierGWC`; (b) on-chain via auto-generated `Halo2Verifier.sol` (k=12, 13 public inputs). Both paths share the same KZG SRS (`catp-layer2-k12.srs`).
 
 ### P3: Multi-Party Attestation (MPA)
 - **What**: N independent attestor nodes verify AI outputs, ≥ t-of-n agreement required
@@ -354,7 +354,6 @@ AuthorizationPolicy {
 ```
 Public inputs:
   - policy_commitment (Poseidon hash of the full policy)
-  - action_hash (hash of the proposed action)
   - current_timestamp
   - cumulative_spend (from on-chain state)
 
@@ -364,13 +363,15 @@ Private inputs:
 
 Constraints:
   1. Poseidon(full_policy) == policy_commitment
-  2. action.type ∈ policy.allowed_actions
-  3. action.target ∈ policy.allowed_targets
-  4. action.resource ∈ policy.allowed_resources
+  2. action.type == policy.allowed_action
+  3. action.protocol == policy.allowed_protocol (all 32 bytes)
+  4. action.token == policy.allowed_token (all 32 bytes)
   5. action.value ≤ policy.max_value_per_op
   6. cumulative_spend + action.value ≤ policy.max_value_total
   7. current_timestamp ≥ policy.valid_from
   8. current_timestamp ≤ policy.valid_until
+
+The inequality witnesses are range-checked as `u64` values so the equalities cannot be satisfied by field-wrapped negative differences.
 
 Output: proof π (Halo2)
 ```
@@ -403,7 +404,7 @@ contract AgentAuthorizer {
         bytes calldata proof
     ) external {
         require(activePolicies[policyCommitment], "Policy not active");
-        bytes32[] memory pub = _buildPublicInputs(policyCommitment, actionData);
+        bytes32[] memory pub = _buildPublicInputs(policyCommitment);
         require(verifier.verify(pub, proof), "Invalid proof");
         cumulativeSpend[policyCommitment] += _extractValue(actionData);
     }
@@ -617,4 +618,3 @@ See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the full phased roadmap
 | Gas costs for on-chain verification | Medium | ~200-400K gas per verification; target L2 deployment (Arbitrum/Base); batch |
 | Adoption chicken-and-egg | High | Phase 0 enforcement plugin ships standalone with no protocol dependency |
 | MPA attestor economics not sustainable | Medium | Start permissioned (low cost); token incentive model for decentralized phase |
-

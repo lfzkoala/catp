@@ -1,4 +1,40 @@
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
+use std::fmt;
+
+fn deserialize_u64<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct U64Visitor;
+
+    impl<'de> de::Visitor<'de> for U64Visitor {
+        type Value = u64;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a u64 number or decimal string")
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
+            Ok(value)
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            value.parse::<u64>().map_err(E::custom)
+        }
+
+        fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            self.visit_str(&value)
+        }
+    }
+
+    deserializer.deserialize_any(U64Visitor)
+}
 
 /// Type of action an agent can perform.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -25,6 +61,7 @@ pub struct Action {
     /// Token address as a 32-byte identifier.
     pub token: [u8; 32],
     /// Value in base units (e.g., USDC smallest unit).
+    #[serde(deserialize_with = "deserialize_u64")]
     pub value: u64,
 }
 
@@ -39,12 +76,16 @@ pub struct AuthorizationPolicy {
     /// Allowed token (single value).
     pub allowed_token: [u8; 32],
     /// Maximum value per transaction.
+    #[serde(deserialize_with = "deserialize_u64")]
     pub max_value_per_tx: u64,
     /// Maximum cumulative value across all transactions.
+    #[serde(deserialize_with = "deserialize_u64")]
     pub max_value_total: u64,
     /// Policy validity start (Unix timestamp).
+    #[serde(deserialize_with = "deserialize_u64")]
     pub valid_from: u64,
     /// Policy validity end (Unix timestamp).
+    #[serde(deserialize_with = "deserialize_u64")]
     pub valid_until: u64,
 }
 

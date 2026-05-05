@@ -26,7 +26,14 @@ export async function verifyChain(logFile: string): Promise<VerifyResult> {
     }
 
     const decision = entry.decision as "allow" | "deny";
-    const expected = computeCommitment(entry.tool, decision, entry.ts, prev);
+    const expected = computeCommitment(
+      entry.tool,
+      decision,
+      entry.ts,
+      prev,
+      entry.rule_matched,
+      entry.input_summary
+    );
     if (entry.commitment !== expected) {
       return {
         ok: false,

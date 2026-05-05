@@ -61,10 +61,7 @@ mod tests {
         for (coeff, s) in mds.col_hat().iter().zip(state.iter().skip(1)) {
             new_state.push(gate.compose(
                 ctx,
-                &[
-                    Term::Assigned(&state[0], *coeff),
-                    Term::Assigned(s, F::ONE),
-                ],
+                &[Term::Assigned(&state[0], *coeff), Term::Assigned(s, F::ONE)],
                 F::ZERO,
             )?);
         }
@@ -109,9 +106,8 @@ mod tests {
             // absorb pre-constants
             state[0] = gate.add_constant(ctx, &state[0], c_start[0][0])?;
             for (i, inp) in chunk.iter().enumerate() {
-                state[i + 1] = gate.add_with_constant(
-                    ctx, &state[i + 1], inp, c_start[0][i + 1],
-                )?;
+                state[i + 1] =
+                    gate.add_with_constant(ctx, &state[i + 1], inp, c_start[0][i + 1])?;
             }
             // first r_f-1 full rounds
             for round in 1..r_f {
@@ -126,9 +122,7 @@ mod tests {
             for j in 0..T {
                 let t = gate.mul(ctx, &state[j], &state[j])?;
                 let t = gate.mul(ctx, &t, &t)?;
-                state[j] = gate.mul_add_constant(
-                    ctx, &t, &state[j], c_start.last().unwrap()[j],
-                )?;
+                state[j] = gate.mul_add_constant(ctx, &t, &state[j], c_start.last().unwrap()[j])?;
             }
             state = apply_mds(ctx, gate, &state, &pre_sparse)?;
             // partial rounds
@@ -191,11 +185,16 @@ mod tests {
         type FloorPlanner = SimpleFloorPlanner;
 
         fn without_witnesses(&self) -> Self {
-            Self { inputs: [Fr::zero(); N_INPUTS], expected: Fr::zero() }
+            Self {
+                inputs: [Fr::zero(); N_INPUTS],
+                expected: Fr::zero(),
+            }
         }
 
         fn configure(meta: &mut ConstraintSystem<Fr>) -> Self::Config {
-            ProbeConfig { mg: MainGate::<Fr>::configure(meta) }
+            ProbeConfig {
+                mg: MainGate::<Fr>::configure(meta),
+            }
         }
 
         fn synthesize(
@@ -245,7 +244,10 @@ mod tests {
         println!();
         for k in 8u32..=16 {
             let ok = probe_k::<5, 4>(k);
-            println!("  T=5 RATE=4  k={k}: {}", if ok { "PASS ✓" } else { "too small" });
+            println!(
+                "  T=5 RATE=4  k={k}: {}",
+                if ok { "PASS ✓" } else { "too small" }
+            );
             if ok {
                 return;
             }
@@ -258,7 +260,10 @@ mod tests {
         println!();
         for k in 8u32..=16 {
             let ok = probe_k::<3, 2>(k);
-            println!("  T=3 RATE=2  k={k}: {}", if ok { "PASS ✓" } else { "too small" });
+            println!(
+                "  T=3 RATE=2  k={k}: {}",
+                if ok { "PASS ✓" } else { "too small" }
+            );
             if ok {
                 return;
             }

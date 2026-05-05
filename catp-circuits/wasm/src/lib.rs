@@ -1,9 +1,11 @@
 use catp_layer2::{
-    Action, AuthorizationPolicy, AuthorizationProofSystem, AuthorizationPublicInputs,
-    fr_from_be_bytes, fr_to_be_bytes, native_policy_commitment,
+    action_public_fields, fr_from_be_bytes, fr_to_be_bytes, native_policy_commitment, Action,
+    AuthorizationPolicy, AuthorizationProofSystem, AuthorizationPublicInputs,
 };
 use catp_primitives::proof::Proof;
 use wasm_bindgen::prelude::*;
+
+const LAYER2_SRS: &[u8] = include_bytes!("../../layer2/catp-layer2-k12.srs");
 
 /// Compute the Poseidon-BN254 commitment to a policy.
 ///
@@ -43,14 +45,20 @@ pub fn prove_authorization(
         .map_err(|_| JsError::new("policy_commitment_be must be 32 bytes"))?;
     let policy_commitment = fr_from_be_bytes(bytes)
         .ok_or_else(|| JsError::new("policy_commitment_be is not a valid BN254 Fr element"))?;
+    let (action_type, action_protocol, action_token, action_value) = action_public_fields(&action);
 
     let public_inputs = AuthorizationPublicInputs {
         policy_commitment,
+        action_type,
+        action_protocol,
+        action_token,
+        action_value,
         current_timestamp,
         cumulative_spend,
     };
 
-    let ps = AuthorizationProofSystem::new(12);
+    let ps = AuthorizationProofSystem::from_bytes(LAYER2_SRS)
+        .map_err(|e| JsError::new(&e.to_string()))?;
     let proof = ps
         .prove_authorization(policy, action, public_inputs)
         .map_err(|e| JsError::new(&e.to_string()))?;
@@ -64,23 +72,32 @@ pub fn prove_authorization(
 #[wasm_bindgen]
 pub fn verify_authorization(
     proof_bytes: &[u8],
+    action_json: &str,
     policy_commitment_be: &[u8],
     current_timestamp: u64,
     cumulative_spend: u64,
 ) -> Result<bool, JsError> {
+    let action: Action =
+        serde_json::from_str(action_json).map_err(|e| JsError::new(&e.to_string()))?;
     let bytes: &[u8; 32] = policy_commitment_be
         .try_into()
         .map_err(|_| JsError::new("policy_commitment_be must be 32 bytes"))?;
     let policy_commitment = fr_from_be_bytes(bytes)
         .ok_or_else(|| JsError::new("policy_commitment_be is not a valid BN254 Fr element"))?;
+    let (action_type, action_protocol, action_token, action_value) = action_public_fields(&action);
 
     let public_inputs = AuthorizationPublicInputs {
         policy_commitment,
+        action_type,
+        action_protocol,
+        action_token,
+        action_value,
         current_timestamp,
         cumulative_spend,
     };
 
-    let ps = AuthorizationProofSystem::new(12);
+    let ps = AuthorizationProofSystem::from_bytes(LAYER2_SRS)
+        .map_err(|e| JsError::new(&e.to_string()))?;
     let proof = Proof(proof_bytes.to_vec());
     ps.verify_authorization(&proof, &public_inputs)
         .map_err(|e| JsError::new(&e.to_string()))

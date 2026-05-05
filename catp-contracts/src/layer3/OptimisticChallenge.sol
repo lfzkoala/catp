@@ -10,7 +10,6 @@ contract OptimisticChallenge {
 
     uint256 public constant CHALLENGE_WINDOW = 1 hours;
     uint256 public constant CHALLENGER_REWARD = 30; // 30% of slashed stake
-    uint256 public constant SLASH_AMOUNT      = 0.1 ether;
 
     struct Challenge {
         address challenger;
@@ -66,9 +65,7 @@ contract OptimisticChallenge {
         emit ChallengeResolved(roundId, upheld, ch.challenger);
 
         if (upheld) {
-            uint256 reward = (SLASH_AMOUNT * CHALLENGER_REWARD) / 100;
-            (bool sent,) = ch.challenger.call{value: reward}("");
-            require(sent, "OptimisticChallenge: reward transfer failed");
+            mpaVerifier.slashCommitment(roundId, consensus, ch.challenger, CHALLENGER_REWARD);
         }
     }
 

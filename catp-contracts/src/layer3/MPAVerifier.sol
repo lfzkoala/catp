@@ -5,10 +5,13 @@ pragma solidity ^0.8.26;
 /// @notice CATP Layer 3: multi-party attestor output verification with ≥2/3 consensus.
 contract MPAVerifier {
     address public owner;
+    address public challengeContract;
     uint256 public constant STAKE_AMOUNT = 0.1 ether;
 
     mapping(address => bool)    private _attestors;
+    mapping(address => bool)    private _knownAttestors;
     mapping(address => uint256) private _stakes;
+    address[] private _attestorList;
     uint256 private _attestorCount;
 
     struct OutputRound {
@@ -25,6 +28,8 @@ contract MPAVerifier {
     event AttestorRemoved(address indexed attestor);
     event OutputSubmitted(bytes32 indexed roundId, address indexed attestor, bytes32 commitment);
     event ConsensusReached(bytes32 indexed roundId, bytes32 commitment);
+    event ChallengeContractSet(address indexed challengeContract);
+    event StakeSlashed(bytes32 indexed roundId, address indexed attestor, uint256 amount);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "MPAVerifier: not owner");
@@ -36,6 +41,11 @@ contract MPAVerifier {
         _;
     }
 
+    modifier onlyChallengeContract() {
+        require(msg.sender == challengeContract, "MPAVerifier: not challenge contract");
+        _;
+    }
+
     constructor() {
         owner = msg.sender;
     }
@@ -44,8 +54,18 @@ contract MPAVerifier {
         require(attestor != address(0), "MPAVerifier: zero address");
         require(!_attestors[attestor], "MPAVerifier: already attestor");
         _attestors[attestor] = true;
+        if (!_knownAttestors[attestor]) {
+            _knownAttestors[attestor] = true;
+            _attestorList.push(attestor);
+        }
         _attestorCount++;
         emit AttestorAdded(attestor);
+    }
+
+    function setChallengeContract(address challengeContract_) external onlyOwner {
+        require(challengeContract_ != address(0), "MPAVerifier: zero address");
+        challengeContract = challengeContract_;
+        emit ChallengeContractSet(challengeContract_);
     }
 
     function removeAttestor(address attestor) external onlyOwner {
@@ -62,6 +82,7 @@ contract MPAVerifier {
 
     function submitOutput(bytes32 roundId, bytes32 commitment) external onlyAttestor {
         require(commitment != bytes32(0), "MPAVerifier: zero commitment");
+        require(_stakes[msg.sender] >= STAKE_AMOUNT, "MPAVerifier: attestor not staked");
         OutputRound storage round = _rounds[roundId];
         require(round.submissions[msg.sender] == bytes32(0), "MPAVerifier: already submitted");
         require(!round.finalized, "MPAVerifier: round finalized");
@@ -86,6 +107,39 @@ contract MPAVerifier {
 
     function attestorCount() external view returns (uint256) {
         return _attestorCount;
+    }
+
+    function stakeOf(address attestor) external view returns (uint256) {
+        return _stakes[attestor];
+    }
+
+    function slashCommitment(
+        bytes32 roundId,
+        bytes32 badCommitment,
+        address rewardRecipient,
+        uint256 rewardPercent
+    ) external onlyChallengeContract returns (uint256 totalSlashed, uint256 reward) {
+        require(rewardPercent <= 100, "MPAVerifier: bad reward percent");
+        require(rewardRecipient != address(0), "MPAVerifier: zero recipient");
+        OutputRound storage round = _rounds[roundId];
+        require(round.finalized, "MPAVerifier: round not finalized");
+
+        for (uint256 i = 0; i < _attestorList.length; i++) {
+            address attestor = _attestorList[i];
+            if (round.submissions[attestor] != badCommitment) continue;
+            uint256 stakeBalance = _stakes[attestor];
+            if (stakeBalance == 0) continue;
+            uint256 amount = stakeBalance < STAKE_AMOUNT ? stakeBalance : STAKE_AMOUNT;
+            _stakes[attestor] = stakeBalance - amount;
+            totalSlashed += amount;
+            emit StakeSlashed(roundId, attestor, amount);
+        }
+
+        reward = (totalSlashed * rewardPercent) / 100;
+        if (reward > 0) {
+            (bool sent,) = rewardRecipient.call{value: reward}("");
+            require(sent, "MPAVerifier: reward transfer failed");
+        }
     }
 
     function _tryFinalize(bytes32 roundId) internal {

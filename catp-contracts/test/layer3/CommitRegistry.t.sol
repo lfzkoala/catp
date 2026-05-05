@@ -74,4 +74,20 @@ contract CommitRegistryTest is Test {
         vm.expectRevert("CommitRegistry: no pre-commit found");
         cr.submitPostCommit(AGENT, POST);
     }
+
+    function test_postCommit_allowsLaterRound() public {
+        bytes32 pre2 = keccak256("pre-commit-2");
+        bytes32 post2 = keccak256("post-commit-2");
+        cr.submitPreCommit(AGENT, PRE);
+        vm.warp(block.timestamp + cr.MIN_COMMIT_DELAY());
+        cr.submitPostCommit(AGENT, POST);
+
+        cr.submitPreCommit(AGENT, pre2);
+        vm.warp(block.timestamp + cr.MIN_COMMIT_DELAY());
+        cr.submitPostCommit(AGENT, post2);
+
+        (bytes32 pre, bytes32 post,) = cr.getPostCommit(AGENT);
+        assertEq(pre, pre2);
+        assertEq(post, post2);
+    }
 }

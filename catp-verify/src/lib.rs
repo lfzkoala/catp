@@ -1,24 +1,49 @@
-use catp_layer2::AuthorizationProofSystem;
+use catp_layer2::{fr_from_be_bytes, AuthorizationProofSystem, AuthorizationPublicInputs};
+use catp_primitives::error::CatpError;
 use catp_primitives::{proof::Proof, CatpResult};
+
+const LAYER2_SRS: &[u8] = include_bytes!("../../catp-circuits/layer2/catp-layer2-k12.srs");
 
 /// Verify a ProveAuthorization proof.
 ///
 /// `proof_bytes` is the raw bytes produced by `AuthorizationProofSystem::prove_authorization`.
+/// `public_inputs` must match the values used to generate the proof.
 /// Returns `Ok(true)` if valid, `Err` if the proof is malformed or verification fails.
-pub fn verify(proof_bytes: &[u8]) -> CatpResult<bool> {
-    let ps = AuthorizationProofSystem::new(8);
-    ps.verify_authorization(&Proof(proof_bytes.to_vec()))
+pub fn verify(proof_bytes: &[u8], public_inputs: &AuthorizationPublicInputs) -> CatpResult<bool> {
+    let ps = AuthorizationProofSystem::from_bytes(LAYER2_SRS)?;
+    ps.verify_authorization(&Proof(proof_bytes.to_vec()), public_inputs)
+}
+
+/// Parse a 0x-prefixed or plain 32-byte big-endian BN254 Fr hex string.
+pub fn parse_policy_commitment(hex: &str) -> CatpResult<halo2curves::bn256::Fr> {
+    let clean = hex.strip_prefix("0x").unwrap_or(hex);
+    if clean.len() != 64 {
+        return Err(CatpError::Serialization(
+            "policy_commitment must be 32 bytes".to_string(),
+        ));
+    }
+
+    let mut bytes = [0u8; 32];
+    for (i, chunk) in clean.as_bytes().chunks(2).enumerate() {
+        let s = std::str::from_utf8(chunk).map_err(|e| CatpError::Serialization(e.to_string()))?;
+        bytes[i] =
+            u8::from_str_radix(s, 16).map_err(|e| CatpError::Serialization(e.to_string()))?;
+    }
+
+    fr_from_be_bytes(&bytes).ok_or_else(|| {
+        CatpError::Serialization("policy_commitment is not a valid BN254 Fr".to_string())
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use catp_layer2::{
-        circuit::AuthorizationPublicInputs,
+        action_public_fields, native_policy_commitment,
         types::{Action, ActionType, AuthorizationPolicy},
     };
 
-    fn proof_bytes() -> Vec<u8> {
+    fn proof_fixture() -> (Vec<u8>, AuthorizationPublicInputs) {
         let policy = AuthorizationPolicy {
             allowed_action: ActionType::Swap,
             allowed_protocol: [1u8; 32],
@@ -34,31 +59,41 @@ mod tests {
             token: [2u8; 32],
             value: 500,
         };
+        let (action_type, action_protocol, action_token, action_value) =
+            action_public_fields(&action);
         let public_inputs = AuthorizationPublicInputs {
-            policy_commitment: [0u8; 32],
+            policy_commitment: native_policy_commitment(&policy),
+            action_type,
+            action_protocol,
+            action_token,
+            action_value,
             current_timestamp: 5000,
             cumulative_spend: 2000,
         };
-        let ps = AuthorizationProofSystem::new(8);
-        ps.prove_authorization(policy, action, public_inputs)
+        let ps = AuthorizationProofSystem::from_bytes(LAYER2_SRS).unwrap();
+        let proof = ps
+            .prove_authorization(policy, action, public_inputs.clone())
             .unwrap()
-            .0
+            .0;
+        (proof, public_inputs)
     }
 
     #[test]
     fn valid_proof_returns_true() {
-        assert!(verify(&proof_bytes()).unwrap());
+        let (proof, public_inputs) = proof_fixture();
+        assert!(verify(&proof, &public_inputs).unwrap());
     }
 
     #[test]
     fn tampered_proof_returns_err() {
-        let mut bytes = proof_bytes();
+        let (mut bytes, public_inputs) = proof_fixture();
         bytes[0] ^= 0xFF;
-        assert!(verify(&bytes).is_err());
+        assert!(verify(&bytes, &public_inputs).is_err());
     }
 
     #[test]
     fn empty_proof_returns_err() {
-        assert!(verify(&[]).is_err());
+        let (_, public_inputs) = proof_fixture();
+        assert!(verify(&[], &public_inputs).is_err());
     }
 }

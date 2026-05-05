@@ -20,8 +20,9 @@ allow = true
 
 [[rules]]
 tool = "Write"
-allow = true
+allow = false
 path_allowlist = ["./src/**", "./tests/**", "./docs/**"]
+reason = "Writes outside the project allowlist are blocked"
 
 [[rules]]
 tool = "WebFetch"

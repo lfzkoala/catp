@@ -353,6 +353,7 @@ dependencies = [
  "base64",
  "catp-layer2",
  "catp-primitives",
+ "halo2curves",
  "serde",
  "serde_json",
  "tokio",

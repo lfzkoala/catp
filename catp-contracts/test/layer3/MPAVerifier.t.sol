@@ -66,11 +66,17 @@ contract MPAVerifierTest is Test {
     }
 
     function test_submitOutput_rejectsDuplicate() public {
-        mpa.addAttestor(attestor1);
-        vm.prank(attestor1);
-        mpa.submitOutput(ROUND, COMMIT_A);
+        _addAndStake(attestor1);
+        vm.prank(attestor1); mpa.submitOutput(ROUND, COMMIT_A);
         vm.prank(attestor1);
         vm.expectRevert("MPAVerifier: already submitted");
+        mpa.submitOutput(ROUND, COMMIT_A);
+    }
+
+    function test_submitOutput_rejectsUnstakedAttestor() public {
+        mpa.addAttestor(attestor1);
+        vm.prank(attestor1);
+        vm.expectRevert("MPAVerifier: attestor not staked");
         mpa.submitOutput(ROUND, COMMIT_A);
     }
 

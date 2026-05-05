@@ -5,9 +5,10 @@ import "./IVerifier.sol";
 
 /// @title Halo2AuthorizationVerifier
 /// @notice IVerifier wrapper around the auto-generated Halo2Verifier assembly contract.
-/// @dev The ProveAuthorization circuit exposes 3 public instance values:
-///        [0] policyCommitment (Poseidon/BN254 Fr), [1] current_timestamp, [2] cumulative_spend.
-///      The Halo2Verifier expects calldata: instance_0 || instance_1 || instance_2 || proof_bytes
+/// @dev The ProveAuthorization circuit exposes 13 public instance values:
+///        [0] policyCommitment, [1] actionType, [2..5] protocol limbs,
+///        [6..9] token limbs, [10] actionValue, [11] timestamp, [12] spend.
+///      The Halo2Verifier expects calldata: public inputs || proof_bytes
 ///      where each instance is a 32-byte big-endian Fr field element.
 ///
 ///      IMPORTANT: Halo2Verifier.sol is generated from a specific SRS. Both the on-chain
@@ -22,18 +23,27 @@ contract Halo2AuthorizationVerifier is IVerifier {
     }
 
     /// @inheritdoc IVerifier
-    /// @dev Prepends the 3 public inputs (32 bytes each) to the proof, then forwards
+    /// @dev Prepends the 13 public inputs (32 bytes each) to the proof, then forwards
     ///      the concatenated calldata to the Halo2Verifier via staticcall.
-    ///      publicInputs[0] = policyCommitment, [1] = timestamp, [2] = spend.
     function verify(
         bytes32[] calldata publicInputs,
         bytes calldata proof
     ) external view override returns (bool) {
-        require(publicInputs.length == 3, "Halo2AuthorizationVerifier: expected 3 public inputs");
+        require(publicInputs.length == 13, "Halo2AuthorizationVerifier: expected 13 public inputs");
         bytes memory callData = abi.encodePacked(
             publicInputs[0],
             publicInputs[1],
             publicInputs[2],
+            publicInputs[3],
+            publicInputs[4],
+            publicInputs[5],
+            publicInputs[6],
+            publicInputs[7],
+            publicInputs[8],
+            publicInputs[9],
+            publicInputs[10],
+            publicInputs[11],
+            publicInputs[12],
             proof
         );
         (bool ok,) = halo2Verifier.staticcall(callData);

@@ -29,6 +29,16 @@ const action = {
   value: 50n,
 };
 
+const publicInputs = {
+  policyCommitment: ZERO32,
+  actionType: 0n,
+  actionProtocol: [0n, 0n, 0n, 0n],
+  actionToken: [0n, 0n, 0n, 0n],
+  actionValue: 50n,
+  currentTimestamp: 123n,
+  cumulativeSpend: 0n,
+};
+
 describe("ProofClient", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -59,7 +69,7 @@ describe("ProofClient", () => {
       const client = new ProofClient(mockWasm);
       await client.prove(policy, action, 0n);
       const [, actionJson] = (mockWasm.prove_authorization as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string];
-      expect(JSON.parse(actionJson).value).toBe(50);
+      expect(JSON.parse(actionJson).value).toBe("50");
     });
 
     it("passes correct policy fields to WASM", async () => {
@@ -68,8 +78,8 @@ describe("ProofClient", () => {
       const [policyJson] = (mockWasm.prove_authorization as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
       const p = JSON.parse(policyJson);
       expect(p.allowed_action).toBe("Swap");
-      expect(p.max_value_per_tx).toBe(100);
-      expect(p.max_value_total).toBe(1000);
+      expect(p.max_value_per_tx).toBe("100");
+      expect(p.max_value_total).toBe("1000");
     });
 
     it("passes cumulative_spend as bigint to WASM", async () => {
@@ -89,6 +99,8 @@ describe("ProofClient", () => {
       const client = new ProofClient(mockWasm);
       const result = await client.prove(policy, action, 42n);
       expect(result.publicInputs.policyCommitment).toBe(ZERO32);
+      expect(result.publicInputs.actionType).toBe(0n);
+      expect(result.publicInputs.actionValue).toBe(50n);
       expect(result.publicInputs.cumulativeSpend).toBe(42n);
     });
   });
@@ -102,14 +114,25 @@ describe("ProofClient", () => {
       vi.stubGlobal("fetch", fetchMock);
 
       const client = new ProofClient(mockWasm, "http://localhost:3030");
-      const result = await client.verify("0x0102030405");
+      const result = await client.verify("0x0102030405", publicInputs);
 
       expect(result).toBe(true);
       expect(fetchMock).toHaveBeenCalledWith(
         "http://localhost:3030/verify",
         expect.objectContaining({
           method: "POST",
-          body: JSON.stringify({ proof: "AQIDBAU=" }),
+          body: JSON.stringify({
+            proof: "AQIDBAU=",
+            publicInputs: {
+              policyCommitment: ZERO32,
+              actionType: "0",
+              actionProtocol: ["0", "0", "0", "0"],
+              actionToken: ["0", "0", "0", "0"],
+              actionValue: "50",
+              currentTimestamp: "123",
+              cumulativeSpend: "0",
+            },
+          }),
         }),
       );
     });
@@ -123,13 +146,13 @@ describe("ProofClient", () => {
         }),
       );
       const client = new ProofClient(mockWasm);
-      expect(await client.verify("0x0102030405")).toBe(false);
+      expect(await client.verify("0x0102030405", publicInputs)).toBe(false);
     });
 
     it("throws when server returns a non-OK status", async () => {
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
       const client = new ProofClient(mockWasm);
-      await expect(client.verify("0x0102030405")).rejects.toThrow("catp-verify returned 500");
+      await expect(client.verify("0x0102030405", publicInputs)).rejects.toThrow("catp-verify returned 500");
     });
   });
 });
