@@ -81,6 +81,20 @@ and Sepolia deployment metadata agree:
 npm run groth16:check
 ```
 
+Build a witness, proof artifact, and offline execution calldata:
+
+```bash
+npm run groth16:prove -- \
+  --action action.json \
+  --current-timestamp 1778042846 \
+  --cumulative-spend 0 \
+  --out authorization_groth16_v1.json
+
+npm run groth16:encode-execute -- \
+  --artifact authorization_groth16_v1.json \
+  --out execute-authorized.calldata.json
+```
+
 Run the Solidity proof adapter tests:
 
 ```bash

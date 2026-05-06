@@ -194,6 +194,14 @@ npm run groth16:prove -- \
   --out authorization_groth16_v1.json
 ```
 
+Encode the policy-registration and execution calldata without broadcasting:
+
+```bash
+npm run groth16:encode-execute -- \
+  --artifact authorization_groth16_v1.json \
+  --out execute-authorized.calldata.json
+```
+
 ---
 
 ## Layer 2 Proof Path

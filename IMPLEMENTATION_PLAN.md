@@ -208,6 +208,9 @@ Work:
   recover that action to build the same witness.
 - One-command repo proof bridge added: `npm run groth16:prove -- ...` composes
   witness generation and Groth16 proof artifact generation.
+- Offline execution bridge added: `npm run groth16:encode-execute -- ...`
+  validates a Groth16 proof artifact and emits `registerPolicy` plus
+  `executeAuthorized` calldata without RPC or broadcast.
 - Decide which tool/action classes can produce Layer 2 witnesses in the MVP.
 - Add a proof manifest format that links:
   - audit log entry id
