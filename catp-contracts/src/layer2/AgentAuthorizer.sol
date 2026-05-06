@@ -8,7 +8,7 @@ import "./ActionData.sol";
 /// @title AgentAuthorizer
 /// @notice CATP Layer 2: policy registry and ZK proof verifier.
 /// @dev Accepts an IVerifier at construction time. Tests can use StubVerifier;
-///      deployments should inject Halo2AuthorizationVerifier.
+///      EVM deployments should inject the active versioned verifier wrapper.
 ///      Swapping the verifier requires no changes to authorization logic.
 contract AgentAuthorizer is IAgentAuthorizer {
     IVerifier public immutable verifier;

@@ -1,13 +1,16 @@
 import { describe, it, expect, afterEach, beforeEach } from "@jest/globals";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
+import { tmpdir } from "node:os";
 import { readCommitments, merkleRoot, cmdAnchor } from "../../src/commands/anchor.js";
 
 const TEST_AGENT = `__test_anchor__${Date.now()}`;
+const TEST_HOME = join(tmpdir(), `catp-plugin-anchor-test-${Date.now()}`);
+
+process.env.CATP_HOME = TEST_HOME;
 
 function auditDir(agentId: string, date = "2026-01-01"): string {
-  return join(homedir(), ".catp", "audit", agentId, date);
+  return join(TEST_HOME, "audit", agentId, date);
 }
 
 function writeEntries(agentId: string, date: string, commitments: string[]): void {
@@ -29,7 +32,7 @@ function writeEntries(agentId: string, date: string, commitments: string[]): voi
 }
 
 afterEach(() => {
-  const base = join(homedir(), ".catp", "audit", TEST_AGENT);
+  const base = join(TEST_HOME, "audit", TEST_AGENT);
   if (existsSync(base)) rmSync(base, { recursive: true, force: true });
 });
 

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
+import { auditRoot } from "../audit/paths.js";
 import { findPolicyFile, loadPolicy } from "../policy/loader.js";
 import type { AuditEntry } from "../policy/types.js";
 
@@ -31,7 +31,7 @@ function resolveAgentId(opts: { agent?: string }): string {
 }
 
 export function readCommitments(agentId: string): string[] {
-  const baseDir = join(homedir(), ".catp", "audit", agentId);
+  const baseDir = auditRoot(agentId);
   if (!existsSync(baseDir)) return [];
 
   const commitments: string[] = [];

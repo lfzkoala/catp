@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
+import { auditDirForDate } from "./paths.js";
 import type { AuditEntry, HookInput } from "../policy/types.js";
 
 // Phase 0: SHA-256 commitment placeholder.
@@ -28,7 +28,7 @@ export function summarizeInput(input: HookInput): string {
 
 export function auditDir(agentId: string): string {
   const date = new Date().toISOString().slice(0, 10);
-  return join(homedir(), ".catp", "audit", agentId, date);
+  return auditDirForDate(agentId, date);
 }
 
 export function getLastCommitment(agentId: string): string {

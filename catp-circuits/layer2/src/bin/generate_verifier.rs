@@ -77,7 +77,15 @@ fn main() {
     let num_instance = vec![13];
 
     println!("Generating Solidity verifier...");
-    let solidity = gen_solidity_verifier(&params, &vk, num_instance);
+    let solidity = gen_solidity_verifier(&params, &vk, num_instance)
+        // Foundry currently compiles the contracts with via-IR. The EVM loader
+        // emits a memory-layout guard that via-IR can constant-fold, erasing the
+        // generated fallback into an always-reverting runtime. Keep the guard
+        // semantics, but make the memory read opaque to the optimizer.
+        .replace(
+            "mload(0x40)",
+            "mload(add(0x40, mul(iszero(calldatasize()), calldatasize())))",
+        );
 
     let out_path = "Halo2SolidityVerifier.sol";
     std::fs::write(out_path, &solidity).expect("failed to write verifier");

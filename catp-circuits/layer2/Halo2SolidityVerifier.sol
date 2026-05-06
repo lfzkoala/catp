@@ -7,7 +7,7 @@ contract Halo2Verifier {
     fallback(bytes calldata) external returns (bytes memory) {
         assembly ("memory-safe") {
             // Enforce that Solidity memory layout is respected
-            let data := mload(0x40)
+            let data := mload(add(0x40, mul(iszero(calldatasize()), calldatasize())))
             if iszero(eq(data, 0x80)) {
                 revert(0, 0)
             }

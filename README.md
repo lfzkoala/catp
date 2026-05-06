@@ -5,9 +5,9 @@ CATP makes autonomous agent activity enforceable locally and provable externally
 Today, CATP ships two connected pieces:
 
 1. **Local enforcement**: a Claude Code hook plugin that blocks tool calls outside a project policy and writes a tamper-evident audit log.
-2. **Layer 2 authorization proofs**: a Halo2/KZG proof path that proves a structured action satisfies a committed private policy.
+2. **Layer 2 authorization proofs**: Halo2/KZG off-chain verification and a Groth16/BN254 EVM path that prove a structured action satisfies a committed private policy.
 
-The broader protocol roadmap adds encrypted agent communication, output verification, private reputation, and agent discovery. Those layers are part of the architecture, but the current MVP is the enforcement plugin plus `authorization_v1`.
+The broader protocol roadmap adds encrypted agent communication, output verification, private reputation, and agent discovery. Those layers are part of the architecture, but the current MVP is the enforcement plugin plus Layer 2 authorization proofs.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the current execution plan.
 
@@ -18,7 +18,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and [IMPLEMENTATION_P
 ```text
 Shipped
 Layer 0  Local enforcement plugin          Claude Code hooks + TOML policy + audit log
-Layer 2  ZK delegated authorization        authorization_v1 = Halo2/KZG/BN254 + 13 public inputs
+Layer 2  ZK delegated authorization        authorization_v1 = Halo2/KZG/BN254 off-chain; authorization_groth16_v1 passed Sepolia smoke
 
 Partial
 Layer 3  Output verification               commit registry + MPA/challenge contracts; attestor flow pending
@@ -126,9 +126,9 @@ catp log show
 catp log verify
 ```
 
-Logs are written to `~/.catp/audit/<agentId>/<YYYY-MM-DD>/actions.jsonl`. Each entry chains on the previous commitment hash, forming a tamper-evident sequence.
+Logs are written to `${CATP_HOME:-~/.catp}/audit/<agentId>/<YYYY-MM-DD>/actions.jsonl`. Each entry chains on the previous commitment hash, forming a tamper-evident sequence.
 
-`catp anchor` can submit a Merkle root of local audit commitments on-chain. Structured Layer 2 authorization proofs use a separate Poseidon policy commitment path verified by `catp-verify` or `Halo2AuthorizationVerifier.sol`.
+`catp anchor` can submit a Merkle root of local audit commitments on-chain. Structured Layer 2 authorization proofs use a separate Poseidon policy commitment path verified by `catp-verify` off-chain or by `authorization_groth16_v1` on EVM. Direct EVM verification for the current Halo2 verifier is blocked by verifier bytecode size.
 
 ---
 
@@ -152,19 +152,20 @@ Public inputs:
 - `currentTimestamp`
 - `cumulativeSpend`
 
-Backend:
+Current backend:
 
 - Halo2/KZG on BN254
 - `k=12`
 - GWC opening
 - EVM transcript
 - 13 public inputs
-- generated Solidity verifier
+- generated Solidity verifier exists but is not EVM-deployable for this circuit
 
 Verification paths:
 
 - Off-chain: `catp-verify` Rust library / REST endpoint
-- On-chain: `Halo2Verifier.sol` wrapped by `Halo2AuthorizationVerifier.sol`
+- On-chain: `authorization_groth16_v1` has a compact Groth16/BN254 verifier path that passed Sepolia smoke; current generated `Halo2Verifier.sol` exceeds the EVM runtime bytecode limit
+- SDK: `groth16ArtifactToAuthorizationCall` converts generated Groth16 proof artifacts into `AgentAuthorizer.executeAuthorized` calldata fields
 
 The committed `catp-layer2-k12.srs` is for development and testnet consistency. Mainnet deployment requires documented SRS provenance or replacement with an accepted ceremony output.
 
@@ -182,12 +183,13 @@ catp/
 │       ├── audit/          # Commitment chain logger and verifier
 │       ├── hook/           # pre.ts / post.ts hook handlers
 │       └── commands/       # init, validate, log CLI commands
-├── catp-circuits/          # Rust — Halo2 ZK circuits
+├── catp-circuits/          # Rust/Go — ZK circuits and verifier generators
 │   ├── primitives/         # Poseidon, SMT, encryption primitives, proof abstractions
 │   ├── layer2/             # ProveAuthorization circuit + SRS + e2e tests
+│   ├── groth16/            # gnark Groth16 authorization verifier path
 │   └── wasm/               # wasm-pack bindings
 ├── catp-contracts/         # Solidity — verifiers + protocol contracts
-│   ├── src/layer2/         # AgentAuthorizer, Halo2Verifier, Halo2AuthorizationVerifier
+│   ├── src/layer2/         # AgentAuthorizer, verifier wrappers, proof adapters
 │   └── src/layer3/         # CommitRegistry, MPAVerifier, OptimisticChallenge
 ├── catp-sdk/               # TypeScript — developer-facing SDK
 │   └── src/layer2/         # types, PolicyBuilder, AuthorizerClient, ProofClient
@@ -206,11 +208,12 @@ catp/
 | 2 | `ProveAuthorization` Halo2 circuit | Complete locally; formal review pending |
 | 2 | WASM prover bundle | Complete |
 | 2 | `AgentAuthorizer.sol` + `ActionData.sol` | Complete |
-| 2 | `Halo2Verifier.sol` | Complete for `authorization_v1` testnet/dev SRS |
-| 2 | `Halo2AuthorizationVerifier.sol` | Complete |
+| 2 | `Halo2Verifier.sol` | Generated, but blocked for EVM deployment: real runtime is ~319 KB versus the 24,576-byte EVM limit |
+| 2 | `Halo2AuthorizationVerifier.sol` | Complete wrapper, but not usable on EVM until paired with a deployable verifier |
 | 2 | `catp-verify` Rust endpoint | Complete |
 | 2 | TypeScript SDK Layer 2 | Complete locally |
-| 2 | Sepolia smoke test | Pending |
+| 2 | `authorization_groth16_v1` compact EVM verifier | Sepolia smoke passed: generated verifier runtime ~6.4 KB, wrapper ~1.1 KB, real proof execution passing |
+| 2 | Sepolia smoke test | Passed for compact Groth16 path |
 | 3 | `CommitRegistry.sol`, `MPAVerifier.sol`, `OptimisticChallenge.sol` | Partial |
 | 3 | attestor node + `boundary_v1` circuit | Pending |
 | 1, 4, 5 | messaging, reputation, registry | Scaffold/planned |

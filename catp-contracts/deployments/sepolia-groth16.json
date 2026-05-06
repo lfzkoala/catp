@@ -1,0 +1,51 @@
+{
+  "chainId": 11155111,
+  "network": "sepolia",
+  "status": "smoke_passed",
+  "deployedAt": "2026-05-06T04:19:37Z",
+  "deployer": "0x15c4caea87c3e76c4f7805b6abac99d9859dabe6",
+  "groth16Verifier": "0xb90ab689ac39c83271a3b630844cf71d77071d60",
+  "groth16AuthorizationVerifier": "0xeeebbf575556cd673209525573334934a4f1c3f1",
+  "agentAuthorizer": "0xb5290d2c376d84c15de4fbfde64a9a5499eee23e",
+  "authorizationProofVersion": "authorization_groth16_v1",
+  "constraintCount": 13284,
+  "groth16VerifierSourceSha256": "04dee515888e5aacc7e2250150019afac1c2a58e10780e698eb998ab0ca0a1eb",
+  "groth16AuthorizationVerifierSourceSha256": "a549a35af8368429acbd649668afd172ca58768cce9b68f61f7e83610c1586cc",
+  "provingKeySha256": "c0c4a7cc5d2c0366893a318c6b4eed319e34e609055f10b7aca06a07a53485fe",
+  "verifyingKeySha256": "72b85681f01fa064b495b8ac40085b98b32db951376d76340d7729fb2ee23557",
+  "groth16VerifierRuntimeBytes": "6365",
+  "groth16AuthorizationVerifierRuntimeBytes": "1063",
+  "deployedRuntimeCodeKeccak256": {
+    "groth16Verifier": "0x0360eb452e438bedf84a867436317d4afec043cc88a09889068581455c613eba",
+    "groth16AuthorizationVerifier": "0x07af9dd271d67158512fb78aee9f3889cebdf750dd23c4becfcc1cbf6503515f"
+  },
+  "blocks": {
+    "groth16Verifier": 10799072,
+    "groth16AuthorizationVerifier": 10799073,
+    "agentAuthorizer": 10799074
+  },
+  "transactions": {
+    "groth16Verifier": "0xd1eeab5a8a41a96216df1c6b3b93a9e25568c9d8d8b05974258c7defb5f82512",
+    "groth16AuthorizationVerifier": "0xa749d0feb61d912141e2374634998bb21478dd36b2de5b89d1dcaea04f19c4c2",
+    "agentAuthorizer": "0xc5ad7ffe4a2ce6dd3e54fa8c46c9b7d15af6ef66dfb2664a24c215774ae14058"
+  },
+  "gasUsed": {
+    "groth16VerifierDeploy": "1428983",
+    "groth16AuthorizationVerifierDeploy": "290207",
+    "agentAuthorizerDeploy": "668597",
+    "deploymentTotal": "2387787"
+  },
+  "smoke": {
+    "policyCommitment": "0x09614f2b65030d235ae175db954c9b50907337d28d7142475c1d9421b2ef8c21",
+    "proofTimestamp": "1778042846",
+    "registerPolicyTx": "0xb73b145ce90138fa14276fee271d8b938a56196fa52ae210121683802bc85905",
+    "executeAuthorizedTx": "0xb6743b8da276a8285e7f8ca1e57457005da6c4289404420dbe7e1554d547fb20",
+    "registerPolicyBlock": 10799195,
+    "executeAuthorizedBlock": 10799196,
+    "registerPolicyGasUsed": "67913",
+    "executeAuthorizedGasUsed": "349084",
+    "cumulativeSpendAfter": "500"
+  },
+  "foundryBroadcast": null,
+  "deploymentLog": "deployments/logs/sepolia-groth16-20260506T041937Z.log"
+}

@@ -9,10 +9,22 @@ The product ladder has two parts:
 1. **Enforcement Layer**: a plugin/hook that intercepts agent actions synchronously, checks them against a policy, blocks unauthorized actions, and writes a tamper-evident audit log.
 2. **Protocol Layer**: versioned ZK proofs and chain/web2 verifiers that let a third party verify compliance without seeing private policy details.
 
-The enforcement plugin is the adoption wedge. The proof layer is the trust primitive. The current proof-system decision is:
+The enforcement plugin is the adoption wedge. The proof layer is the trust primitive. The current implemented proof-system path is:
 
 ```text
-authorization_v1 = Halo2/KZG/BN254 + 13 public inputs + versioned verifier
+authorization_v1 = Halo2/KZG/BN254 + 13 public inputs + off-chain verifier
+```
+
+Direct EVM verification for the current generated Halo2 verifier is blocked: the corrected runtime bytecode is about 319 KB, far above the EVM 24,576-byte contract size limit. The active proof-system decision is to keep the authorization statement stable while productizing a compact EVM backend as a new versioned verifier.
+
+Current compact EVM result:
+
+```text
+authorization_groth16_v1 = Groth16/BN254 + MiMC commitment + 13 public inputs
+Groth16Verifier runtime: ~6.4 KB
+Groth16AuthorizationVerifier runtime: ~1.1 KB
+local AgentAuthorizer real-proof smoke: passing
+Sepolia AgentAuthorizer real-proof smoke: passing
 ```
 
 Nova/HyperNova/folding is a future R&D track for incremental audit logs, not a dependency for the current MVP.
@@ -27,7 +39,7 @@ catp-policy.toml
   -> local audit log
   -> structured Layer 2 authorization witness
   -> Halo2 authorization proof
-  -> catp-verify or Halo2AuthorizationVerifier
+  -> catp-verify off-chain or authorization_groth16_v1 on EVM
   -> shareable verification result
 ```
 
@@ -55,7 +67,7 @@ Phase 0 intentionally has no ZK and no blockchain dependency. It delivers immedi
 
 ### Layer 2: Authorization Proof
 
-Status: complete locally; testnet smoke test and formal review pending.
+Status: complete locally for Halo2/off-chain verification; direct Halo2 EVM verification is blocked by verifier bytecode size; compact Groth16 EVM verification has passed Sepolia smoke.
 
 Delivered:
 
@@ -66,8 +78,8 @@ Delivered:
 - u64 range checks for value, spend, timestamp, and inequality witnesses
 - protocol/token binding across all 32 bytes
 - shared KZG SRS file for testnet/dev consistency
-- generated `Halo2Verifier.sol`
-- `Halo2AuthorizationVerifier.sol` wrapper that forwards public inputs
+- generated `Halo2Verifier.sol` artifact; not deployable for this circuit under EVM runtime size limits
+- `Halo2AuthorizationVerifier.sol` wrapper that forwards public inputs; not usable for production EVM until paired with a deployable verifier
 - `AgentAuthorizer.sol` using `IVerifier`
 - WASM bundle with `compute_policy_commitment`, `prove_authorization`, `verify_authorization`
 - `catp-verify` Rust library and REST endpoint
@@ -75,7 +87,7 @@ Delivered:
 
 Important design constraints:
 
-- `authorization_v1` stays on Halo2/KZG/BN254.
+- `authorization_v1` stays on Halo2/KZG/BN254 for off-chain verification. `authorization_groth16_v1` is the compact EVM proof version because the proof backend and commitment encoding differ.
 - Any change to public inputs, policy encoding, hash layout, circuit constraints, SRS size, transcript, or proof backend creates a new proof version and verifier address.
 - `activePolicies` and `cumulativeSpend` remain in-contract until CATP has a canonical state-root, nonce, nullifier, or checkpoint design for proof-centric state.
 - The committed `catp-layer2-k12.srs` is acceptable for testnet/dev. Mainnet requires documented SRS provenance or replacement with an accepted ceremony output.
@@ -138,22 +150,42 @@ Exit criteria:
 - Critical/high findings are fixed or explicitly deferred with rationale.
 - New regression tests are added for each fixed issue.
 
+### P1: Compact EVM Verifier Spike
+
+Goal: prove the Layer 2 authorization statement can be verified by an EVM-deployable verifier.
+
+Work:
+
+- Implement the same minimal authorization statement in an EVM-friendly proof backend, starting with Groth16/BN254.
+- Generate a Solidity verifier.
+- Measure runtime bytecode size with Foundry.
+- Wrap the generated verifier behind `IVerifier`.
+- Run a local `AgentAuthorizer.executeAuthorized` path with a real proof.
+- Run negative tests for tampered public inputs/proof.
+
+Exit criteria:
+
+- Verifier runtime bytecode is below 24,576 bytes.
+- Local proof generation and Solidity verification pass.
+- `AgentAuthorizer` succeeds with a valid proof and rejects invalid proofs.
+- A new proof version is named if the backend or commitment encoding differs from `authorization_v1`.
+
 ### P1: Sepolia Smoke Test
 
 Goal: prove the local path survives a real testnet deployment.
 
 Work:
 
-- Deploy `Halo2Verifier.sol`, `Halo2AuthorizationVerifier.sol`, and `AgentAuthorizer.sol`.
+- Deploy the compact verifier, its `IVerifier` wrapper, and `AgentAuthorizer.sol`.
 - Register a policy commitment.
-- Generate an `authorization_v1` proof from the SDK/WASM path.
+- Generate an `authorization_groth16_v1` proof artifact from the Groth16 prover path.
 - Call `executeAuthorized` with matching public inputs.
 - Record gas, tx hashes, addresses, chain, and SRS/verifier build metadata.
 - Run a negative case with tampered public inputs if gas budget permits.
 
 Exit criteria:
 
-- One successful testnet proof verification.
+- One successful testnet proof verification using a deployable compact verifier.
 - One documented verification failure for tampered inputs, either on-chain or via local fork.
 - Gas numbers recorded in this plan or deployment notes.
 
@@ -313,14 +345,20 @@ Exit criteria:
 
 ### Current Decision
 
-Keep Halo2/KZG/BN254 for `authorization_v1`.
+Keep Halo2/KZG/BN254 for off-chain `authorization_v1`, but do not treat the generated Halo2 Solidity verifier as the EVM backend.
 
 Reasons:
 
-- Existing circuit and verifier path are implemented.
-- EVM verification is available through generated Solidity and BN254 precompiles.
-- Current Layer 2 statement is small enough for Halo2 to remain maintainable.
-- Migration now would delay the MVP without improving the immediate product surface.
+- Existing Halo2 circuit and off-chain verifier path are implemented.
+- The generated Halo2 Solidity verifier is not EVM-deployable for this circuit: the corrected runtime is about 319 KB versus the 24,576-byte EVM limit.
+- The Layer 2 statement is still small and should be portable to a compact EVM backend.
+- The protocol boundary is `IVerifier` plus the public input schema; the proof backend can change through a new proof version.
+
+Immediate EVM backend:
+
+- Primary: Groth16/BN254, because Ethereum has BN254 pairing precompiles and Groth16 verifiers are compact.
+- Secondary: Noir/Barretenberg or gnark Groth16 if Circom/snarkjs is unsuitable.
+- Do not continue patching the current Halo2 Solidity artifact unless a concrete verifier-size strategy exists.
 
 ### Versioning Rules
 
@@ -374,11 +412,12 @@ This should live in an experimental crate/branch until the state machine is stab
 | `AgentAuthorizer.sol` + `ActionData.sol` | Complete |
 | `catp-verify` REST verification endpoint | Complete |
 | TypeScript SDK Layer 2 | Complete locally |
-| `Halo2Verifier.sol` | Complete for `authorization_v1` testnet/dev SRS |
-| `Halo2AuthorizationVerifier.sol` | Complete |
+| `Halo2Verifier.sol` | Generated artifact; blocked for EVM deployment by runtime bytecode size |
+| `Halo2AuthorizationVerifier.sol` | Complete wrapper; blocked until paired with deployable verifier |
 | SRS persistence (`catp-layer2-k12.srs`) | Complete for testnet/dev |
 | E2E Rust Layer 2 tests | Complete |
-| `catp anchor` Sepolia smoke test | Pending |
+| Compact EVM verifier | Sepolia smoke passed with `authorization_groth16_v1` |
+| `catp anchor` Sepolia smoke test | Passed for compact Groth16 verifier path |
 | Layer 3 contracts | Partial |
 | Layer 3 attestor node | Pending |
 | `boundary_v1` circuit | Pending |
@@ -394,12 +433,13 @@ Current local test count: 214 passing across TypeScript/Jest, Vitest, Rust, and 
 |-----------|------------|
 | Phase 0 plugin | policy parser, hook runtime, local audit log |
 | `authorization_v1` proof | Halo2, Poseidon, MainGate, KZG SRS |
-| `Halo2Verifier.sol` | generated verifier matching circuit, SRS, transcript, and public input count |
-| `Halo2AuthorizationVerifier.sol` | generated verifier calldata format |
+| compact EVM verifier | proof backend, generated verifier, public input order, wrapper calldata format |
+| `Halo2AuthorizationVerifier.sol` | generated verifier calldata format; blocked by Halo2 verifier size |
+| `Groth16AuthorizationVerifier.sol` | compact verifier calldata format, gas cap, generated Groth16 verifier |
 | `AgentAuthorizer.sol` | `IVerifier`, policy commitment, action encoding |
 | SDK Layer 2 | WASM bundle, contract ABIs, public input schema |
 | `catp-verify` | Rust verifier path and matching SRS |
-| Sepolia smoke test | deploy scripts, funded account, RPC, ABI metadata |
+| Sepolia smoke test | Groth16 deploy scripts, funded account, RPC, ABI metadata |
 | Audit-log-to-proof bridge | Phase 0 audit format + Layer 2 witness format |
 | Layer 3 MPA | CommitRegistry, MPAVerifier, OptimisticChallenge, resolver trust model |
 | `boundary_v1` | Poseidon, range checks, Layer 3 commitment format |

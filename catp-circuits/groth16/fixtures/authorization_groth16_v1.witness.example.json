@@ -1,0 +1,15 @@
+{
+  "actionType": "0",
+  "protocol": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "token": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "value": "500",
+  "currentTimestamp": "1778042846",
+  "cumulativeSpend": "0",
+  "allowedAction": "0",
+  "allowedProtocol": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "allowedToken": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "maxValuePerTx": "1000",
+  "maxValueTotal": "10000",
+  "validFrom": "1778042786",
+  "validUntil": "1778129246"
+}

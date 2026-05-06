@@ -1,0 +1,52 @@
+{
+  "chainId": 11155111,
+  "network": "sepolia",
+  "status": "example",
+  "deployedAt": "2026-05-05T00:00:00Z",
+  "deployer": "0x0000000000000000000000000000000000000000",
+  "groth16Verifier": "0x0000000000000000000000000000000000000000",
+  "groth16AuthorizationVerifier": "0x0000000000000000000000000000000000000000",
+  "agentAuthorizer": "0x0000000000000000000000000000000000000000",
+  "authorizationProofVersion": "authorization_groth16_v1",
+  "constraintCount": 13284,
+  "groth16VerifierSourceSha256": "",
+  "groth16AuthorizationVerifierSourceSha256": "",
+  "provingKeySha256": "",
+  "verifyingKeySha256": "",
+  "groth16VerifierRuntimeBytes": "0",
+  "groth16AuthorizationVerifierRuntimeBytes": "0",
+  "deployedRuntimeCodeKeccak256": {
+    "groth16Verifier": "0x",
+    "groth16AuthorizationVerifier": "0x"
+  },
+  "blocks": {
+    "groth16Verifier": 0,
+    "groth16AuthorizationVerifier": 0,
+    "agentAuthorizer": 0
+  },
+  "transactions": {
+    "groth16Verifier": "0x",
+    "groth16AuthorizationVerifier": "0x",
+    "agentAuthorizer": "0x"
+  },
+  "gasUsed": {
+    "groth16VerifierDeploy": "0",
+    "groth16AuthorizationVerifierDeploy": "0",
+    "agentAuthorizerDeploy": "0",
+    "deploymentTotal": "0",
+    "executeAuthorized": "0"
+  },
+  "smoke": {
+    "policyCommitment": "0x",
+    "proofTimestamp": "0",
+    "registerPolicyTx": "0x",
+    "executeAuthorizedTx": "0x",
+    "registerPolicyBlock": 0,
+    "executeAuthorizedBlock": 0,
+    "registerPolicyGasUsed": "0",
+    "executeAuthorizedGasUsed": "0",
+    "cumulativeSpendAfter": "0"
+  },
+  "foundryBroadcast": null,
+  "deploymentLog": "deployments/logs/sepolia-groth16-YYYYMMDDTHHMMSSZ.log"
+}

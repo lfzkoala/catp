@@ -4,6 +4,7 @@ target/
 node_modules/
 dist/
 coverage/
+.cache/
 *.tsbuildinfo
 .env
 .env.*
@@ -13,4 +14,5 @@ coverage/
 *.srs
 !catp-circuits/layer2/catp-layer2-k12.srs
 catp-circuits/layer2/Halo2SolidityVerifier.sol
+catp-circuits/groth16/build/
 .claude/settings.local.json

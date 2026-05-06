@@ -1,6 +1,8 @@
 {
   "chainId": 11155111,
   "network": "sepolia",
+  "status": "historical_halo2_evm_blocked",
+  "statusNote": "Do not use this schema for active EVM authorization deployments. Use sepolia-groth16.example.json instead.",
   "deployedAt": "2026-05-05T00:00:00Z",
   "deployer": "0x0000000000000000000000000000000000000000",
   "halo2Verifier": "0x0000000000000000000000000000000000000000",
@@ -22,4 +24,3 @@
     "executeAuthorized": "0"
   }
 }
-

@@ -31,3 +31,38 @@ export interface AuthorizationPublicInputs {
   currentTimestamp: bigint;
   cumulativeSpend: bigint;
 }
+
+export interface Groth16AuthorizationProofArtifact {
+  proofVersion: "authorization_groth16_v1";
+  policyCommitment: `0x${string}`;
+  publicInputs: [
+    `0x${string}`,
+    `0x${string}`,
+    `0x${string}`,
+    `0x${string}`,
+    `0x${string}`,
+    `0x${string}`,
+    `0x${string}`,
+    `0x${string}`,
+    `0x${string}`,
+    `0x${string}`,
+    `0x${string}`,
+    `0x${string}`,
+    `0x${string}`,
+  ];
+  actionData: `0x${string}`;
+  currentTimestamp: number | bigint | string;
+  cumulativeSpend: number | bigint | string;
+  value: number | bigint | string;
+  proof: `0x${string}`;
+  constraintCount: number;
+}
+
+export interface Groth16AuthorizationCall {
+  proofVersion: "authorization_groth16_v1";
+  policyCommitment: `0x${string}`;
+  actionData: `0x${string}`;
+  currentTimestamp: bigint;
+  proof: `0x${string}`;
+  publicInputs: AuthorizationPublicInputs;
+}

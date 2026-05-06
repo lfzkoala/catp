@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from '@jest/globals';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
+import { tmpdir } from 'node:os';
 import {
   computeCommitment,
   summarizeInput,
@@ -13,9 +13,12 @@ import {
 import type { HookInput } from '../../src/policy/types.js';
 
 const TEST_AGENT = `__test__${Date.now()}`;
+const TEST_HOME = join(tmpdir(), `catp-plugin-test-${Date.now()}`);
+
+process.env.CATP_HOME = TEST_HOME;
 
 afterEach(() => {
-  const base = join(homedir(), '.catp', 'audit', TEST_AGENT);
+  const base = join(TEST_HOME, 'audit', TEST_AGENT);
   if (existsSync(base)) {
     rmSync(base, { recursive: true, force: true });
   }
@@ -84,11 +87,10 @@ describe('summarizeInput', () => {
 });
 
 describe('auditDir', () => {
-  it('returns path under ~/.catp/audit/<agentId>/<today>', () => {
+  it('returns path under CATP_HOME/audit/<agentId>/<today>', () => {
     const dir = auditDir('my-agent');
     const today = new Date().toISOString().slice(0, 10);
-    expect(dir).toContain(join('.catp', 'audit', 'my-agent', today));
-    expect(dir).toContain(homedir());
+    expect(dir).toBe(join(TEST_HOME, 'audit', 'my-agent', today));
   });
 });
 

@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { computePolicyCommitment, encodeActionData } from "../../src/layer2/AuthorizerClient.js";
+import {
+  computePolicyCommitment,
+  encodeActionData,
+  executeAuthorizedArgsFromGroth16Call,
+} from "../../src/layer2/AuthorizerClient.js";
 import { ActionType } from "../../src/layer2/types.js";
+import type { Groth16AuthorizationCall } from "../../src/layer2/types.js";
 
 const ZERO32 = `0x${"00".repeat(32)}` as `0x${string}`;
 
@@ -131,5 +136,78 @@ describe("computePolicyCommitment()", () => {
     expect(() => computePolicyCommitment({ ...policy, validUntil: -1n }, wasm)).toThrow(
       "validUntil must fit in u64",
     );
+  });
+});
+
+describe("executeAuthorizedArgsFromGroth16Call()", () => {
+  const call = {
+    proofVersion: "authorization_groth16_v1",
+    policyCommitment: ZERO32,
+    actionData: `0x${"aa".repeat(128)}`,
+    currentTimestamp: 123n,
+    proof: `0x${"11".repeat(256)}`,
+    publicInputs: {
+      policyCommitment: ZERO32,
+      actionType: 0n,
+      actionProtocol: [0n, 0n, 0n, 0n],
+      actionToken: [0n, 0n, 0n, 0n],
+      actionValue: 500n,
+      currentTimestamp: 123n,
+      cumulativeSpend: 0n,
+    },
+  } satisfies Groth16AuthorizationCall;
+
+  it("returns AgentAuthorizer.executeAuthorized args in contract order", () => {
+    expect(executeAuthorizedArgsFromGroth16Call(call)).toEqual([
+      call.policyCommitment,
+      call.actionData,
+      call.currentTimestamp,
+      call.proof,
+    ]);
+  });
+
+  it("rejects malformed calldata fields", () => {
+    expect(() =>
+      executeAuthorizedArgsFromGroth16Call({
+        ...call,
+        actionData: "aa" as `0x${string}`,
+      }),
+    ).toThrow("actionData must be 0x-prefixed hex");
+
+    expect(() =>
+      executeAuthorizedArgsFromGroth16Call({
+        ...call,
+        proof: "0x123" as `0x${string}`,
+      }),
+    ).toThrow("proof must be an even-length hex string");
+
+    expect(() =>
+      executeAuthorizedArgsFromGroth16Call({
+        ...call,
+        proof: `0x${"11".repeat(255)}`,
+      }),
+    ).toThrow("proof must be 256 bytes");
+  });
+
+  it("rejects mismatched public input mirrors", () => {
+    expect(() =>
+      executeAuthorizedArgsFromGroth16Call({
+        ...call,
+        publicInputs: {
+          ...call.publicInputs,
+          currentTimestamp: 124n,
+        },
+      }),
+    ).toThrow("publicInputs.currentTimestamp must equal currentTimestamp");
+
+    expect(() =>
+      executeAuthorizedArgsFromGroth16Call({
+        ...call,
+        publicInputs: {
+          ...call.publicInputs,
+          policyCommitment: `0x${"11".repeat(32)}`,
+        },
+      }),
+    ).toThrow("publicInputs.policyCommitment must equal policyCommitment");
   });
 });

@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
+import { auditRoot } from "../audit/paths.js";
 import { findPolicyFile, loadPolicy } from "../policy/loader.js";
 import { verifyChain } from "../audit/verifier.js";
 import type { AuditEntry } from "../policy/types.js";
@@ -16,7 +16,7 @@ function resolveAgentId(opts: { agent?: string }): string {
 }
 
 function latestLogFile(agentId: string): string | null {
-  const base = join(homedir(), ".catp", "audit", agentId);
+  const base = auditRoot(agentId);
   if (!existsSync(base)) return null;
   const dates = readdirSync(base).sort().reverse();
   if (dates.length === 0) return null;
@@ -24,7 +24,7 @@ function latestLogFile(agentId: string): string | null {
 }
 
 function allLogFiles(agentId: string): string[] {
-  const base = join(homedir(), ".catp", "audit", agentId);
+  const base = auditRoot(agentId);
   if (!existsSync(base)) return [];
   return readdirSync(base)
     .sort()

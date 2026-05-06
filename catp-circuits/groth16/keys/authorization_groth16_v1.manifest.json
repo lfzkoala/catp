@@ -1,0 +1,15 @@
+{
+  "proofVersion": "authorization_groth16_v1",
+  "backend": "groth16",
+  "curve": "bn254",
+  "commitmentHash": "mimc",
+  "commitmentVersion": 2,
+  "publicInputCount": 13,
+  "proofBytes": 256,
+  "constraintCount": 13284,
+  "provingKeySha256": "c0c4a7cc5d2c0366893a318c6b4eed319e34e609055f10b7aca06a07a53485fe",
+  "verifyingKeySha256": "72b85681f01fa064b495b8ac40085b98b32db951376d76340d7729fb2ee23557",
+  "verifierSourceSha256": "04dee515888e5aacc7e2250150019afac1c2a58e10780e698eb998ab0ca0a1eb",
+  "verifierContract": "Groth16Verifier",
+  "wrapperContract": "Groth16AuthorizationVerifier"
+}
