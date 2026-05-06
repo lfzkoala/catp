@@ -98,7 +98,7 @@ mod tests {
         // Pad inputs: append 1 then zeros to next RATE boundary
         let mut buf: Vec<_> = inputs.to_vec();
         buf.push(gate.assign_constant(ctx, F::ONE)?);
-        while buf.len() % RATE != 0 {
+        while !buf.len().is_multiple_of(RATE) {
             buf.push(gate.assign_constant(ctx, F::ZERO)?);
         }
 
@@ -110,19 +110,20 @@ mod tests {
                     gate.add_with_constant(ctx, &state[i + 1], inp, c_start[0][i + 1])?;
             }
             // first r_f-1 full rounds
-            for round in 1..r_f {
-                for j in 0..T {
-                    let t = gate.mul(ctx, &state[j], &state[j])?;
+            for constants in c_start.iter().take(r_f).skip(1) {
+                for (j, state_word) in state.iter_mut().enumerate().take(T) {
+                    let t = gate.mul(ctx, state_word, state_word)?;
                     let t = gate.mul(ctx, &t, &t)?;
-                    state[j] = gate.mul_add_constant(ctx, &t, &state[j], c_start[round][j])?;
+                    *state_word = gate.mul_add_constant(ctx, &t, state_word, constants[j])?;
                 }
                 state = apply_mds(ctx, gate, &state, &mds)?;
             }
             // transition to partial rounds
-            for j in 0..T {
-                let t = gate.mul(ctx, &state[j], &state[j])?;
+            for (j, state_word) in state.iter_mut().enumerate().take(T) {
+                let t = gate.mul(ctx, state_word, state_word)?;
                 let t = gate.mul(ctx, &t, &t)?;
-                state[j] = gate.mul_add_constant(ctx, &t, &state[j], c_start.last().unwrap()[j])?;
+                *state_word =
+                    gate.mul_add_constant(ctx, &t, state_word, c_start.last().unwrap()[j])?;
             }
             state = apply_mds(ctx, gate, &state, &pre_sparse)?;
             // partial rounds
@@ -133,19 +134,19 @@ mod tests {
                 state = apply_sparse_mds(ctx, gate, &state, sp)?;
             }
             // second half full rounds
-            for constants in c_end.iter() {
-                for j in 0..T {
-                    let t = gate.mul(ctx, &state[j], &state[j])?;
+            for constants in c_end {
+                for (j, state_word) in state.iter_mut().enumerate().take(T) {
+                    let t = gate.mul(ctx, state_word, state_word)?;
                     let t = gate.mul(ctx, &t, &t)?;
-                    state[j] = gate.mul_add_constant(ctx, &t, &state[j], constants[j])?;
+                    *state_word = gate.mul_add_constant(ctx, &t, state_word, constants[j])?;
                 }
                 state = apply_mds(ctx, gate, &state, &mds)?;
             }
             // final round (zero constants)
-            for j in 0..T {
-                let t = gate.mul(ctx, &state[j], &state[j])?;
+            for state_word in state.iter_mut().take(T) {
+                let t = gate.mul(ctx, state_word, state_word)?;
                 let t = gate.mul(ctx, &t, &t)?;
-                state[j] = gate.mul_add_constant(ctx, &t, &state[j], F::ZERO)?;
+                *state_word = gate.mul_add_constant(ctx, &t, state_word, F::ZERO)?;
             }
             state = apply_mds(ctx, gate, &state, &mds)?;
         }

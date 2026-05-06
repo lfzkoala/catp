@@ -11,5 +11,6 @@ coverage/
 *.key
 *.pem
 *.srs
+!catp-circuits/layer2/catp-layer2-k12.srs
 catp-circuits/layer2/Halo2SolidityVerifier.sol
 .claude/settings.local.json

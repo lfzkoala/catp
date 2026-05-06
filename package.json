@@ -1,5 +1,8 @@
 {
   "name": "catp",
   "private": true,
-  "workspaces": ["catp-sdk", "catp-plugin"]
+  "workspaces": ["catp-sdk", "catp-plugin"],
+  "scripts": {
+    "verifier:sync": "bash scripts/sync-halo2-verifier.sh"
+  }
 }
