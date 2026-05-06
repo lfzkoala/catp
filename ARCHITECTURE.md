@@ -13,6 +13,45 @@ The protocol boundary is the versioned authorization statement and its public in
 
 ---
 
+## Layer Model
+
+CATP is organized as six architectural layers. This repository currently implements the local enforcement surface and the Layer 2 authorization path.
+
+```text
+Layer 5  Agent Registry & Discovery
+         Capability metadata, discovery records, registry commitments
+
+Layer 4  Reputation Protocol
+         Privacy-preserving reputation claims and performance commitments
+
+Layer 3  Output Verification
+         Output commitments, MPA/challenge contracts, boundary verification
+
+Layer 2  Authorization Policy Engine
+         Delegated permissions, policy commitments, ZK authorization proofs
+
+Layer 1  Encrypted Communication
+         Encrypted agent-to-agent or principal-to-agent messages
+
+Layer 0  Identity
+         Principal identity, wallet/DID/account binding
+```
+
+Current repo coverage:
+
+| Layer | Repository status |
+|-------|-------------------|
+| Layer 0 | External identity boundary; not owned by the current repo |
+| Layer 1 | Not implemented in the current repo |
+| Layer 2 | Implemented for authorization proofs and EVM/testnet execution |
+| Layer 3 | Solidity contract sources exist under `catp-contracts/src/layer3` |
+| Layer 4 | Not implemented in the current repo |
+| Layer 5 | Not implemented in the current repo |
+
+The local enforcement plugin is the developer-facing product surface. It sits above the protocol layers and feeds Layer 2 witness/proof generation when structured authorization data is present.
+
+---
+
 ## Current Components
 
 ```text
