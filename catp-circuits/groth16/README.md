@@ -95,6 +95,14 @@ npm run groth16:encode-execute -- \
   --out execute-authorized.calldata.json
 ```
 
+Broadcast the same proof after loading `CATP_RPC_URL` and `CATP_PRIVATE_KEY`:
+
+```bash
+npm run groth16:execute -- \
+  --artifact authorization_groth16_v1.json \
+  --out execute-authorized.receipt.json
+```
+
 Run the Solidity proof adapter tests:
 
 ```bash

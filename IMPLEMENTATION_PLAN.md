@@ -211,6 +211,9 @@ Work:
 - Offline execution bridge added: `npm run groth16:encode-execute -- ...`
   validates a Groth16 proof artifact and emits `registerPolicy` plus
   `executeAuthorized` calldata without RPC or broadcast.
+- Broadcast execution bridge added: `npm run groth16:execute -- ...` reuses
+  the encoded proof artifact, registers inactive policies, checks cumulative
+  spend against chain state, and broadcasts `executeAuthorized`.
 - Decide which tool/action classes can produce Layer 2 witnesses in the MVP.
 - Add a proof manifest format that links:
   - audit log entry id

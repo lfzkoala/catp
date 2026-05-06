@@ -202,6 +202,18 @@ npm run groth16:encode-execute -- \
   --out execute-authorized.calldata.json
 ```
 
+Execute the proof on a deployed Groth16 `AgentAuthorizer`:
+
+```bash
+npm run groth16:execute -- \
+  --artifact authorization_groth16_v1.json \
+  --dry-run
+
+npm run groth16:execute -- \
+  --artifact authorization_groth16_v1.json \
+  --out execute-authorized.receipt.json
+```
+
 ---
 
 ## Layer 2 Proof Path
