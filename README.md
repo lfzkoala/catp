@@ -184,6 +184,16 @@ bash scripts/generate-groth16-verifier.sh \
   --out authorization_groth16_v1.json
 ```
 
+Or build the witness and proof artifact in one repo command:
+
+```bash
+npm run groth16:prove -- \
+  --action action.json \
+  --current-timestamp 1778042846 \
+  --cumulative-spend 0 \
+  --out authorization_groth16_v1.json
+```
+
 ---
 
 ## Layer 2 Proof Path

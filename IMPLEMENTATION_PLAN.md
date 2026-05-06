@@ -206,6 +206,8 @@ Work:
 - Audit-linked bridge added: audit entries may carry optional structured
   authorization action data, and `catp witness --audit-commitment <hash>` can
   recover that action to build the same witness.
+- One-command repo proof bridge added: `npm run groth16:prove -- ...` composes
+  witness generation and Groth16 proof artifact generation.
 - Decide which tool/action classes can produce Layer 2 witnesses in the MVP.
 - Add a proof manifest format that links:
   - audit log entry id
