@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "smol-toml";
-import type { CatpPolicy } from "./types.js";
+import type { AuthorizationConfig, CatpPolicy } from "./types.js";
 
 const POLICY_FILENAME = "catp-policy.toml";
 
@@ -64,11 +64,46 @@ function validate(raw: unknown, path: string): CatpPolicy {
     };
   });
 
-  return { agent: { id: agent.id as string, version: agent.version as string }, rules };
+  return {
+    agent: { id: agent.id as string, version: agent.version as string },
+    rules,
+    authorization: validateAuthorization(obj.authorization, path),
+  };
 }
 
 function toStringArray(v: unknown): string[] | undefined {
   if (v === undefined || v === null) return undefined;
   if (!Array.isArray(v)) return undefined;
   return v.filter((x): x is string => typeof x === "string");
+}
+
+function validateAuthorization(raw: unknown, path: string): AuthorizationConfig | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== "object") {
+    throw new Error(`${path}: [authorization] must be an object`);
+  }
+  const auth = raw as Record<string, unknown>;
+  const required = [
+    "allowed_action",
+    "allowed_protocol",
+    "allowed_token",
+    "max_value_per_tx",
+    "max_value_total",
+    "valid_from",
+    "valid_until",
+  ] as const;
+  for (const field of required) {
+    if (typeof auth[field] !== "string" || auth[field] === "") {
+      throw new Error(`${path}: authorization.${field} must be a non-empty string`);
+    }
+  }
+  return {
+    allowed_action: auth.allowed_action as string,
+    allowed_protocol: auth.allowed_protocol as string,
+    allowed_token: auth.allowed_token as string,
+    max_value_per_tx: auth.max_value_per_tx as string,
+    max_value_total: auth.max_value_total as string,
+    valid_from: auth.valid_from as string,
+    valid_until: auth.valid_until as string,
+  };
 }

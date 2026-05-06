@@ -6,6 +6,7 @@ import { cmdInit } from "./commands/init.js";
 import { cmdValidate } from "./commands/validate.js";
 import { cmdLogShow, cmdLogVerify } from "./commands/log.js";
 import { cmdAnchor } from "./commands/anchor.js";
+import { cmdWitness } from "./commands/witness.js";
 
 const program = new Command();
 
@@ -58,6 +59,18 @@ program
   .option("--agent <id>", "agent id (default: from policy file)")
   .option("--dry-run", "compute and print the Merkle root without submitting")
   .action(cmdAnchor);
+
+program
+  .command("witness")
+  .description("Build an authorization_groth16_v1 witness from policy and action JSON")
+  .option("--action <path>", "path to structured action JSON")
+  .option("--audit-commitment <hex>", "build from a logged audit entry commitment")
+  .option("--agent <id>", "agent id for --audit-commitment (default: from policy file)")
+  .option("-f, --file <path>", "path to catp-policy.toml (default: auto-discover)")
+  .option("--out <path>", "write witness JSON to file instead of stdout")
+  .option("--current-timestamp <u64>", "override action currentTimestamp")
+  .option("--cumulative-spend <u64>", "override action cumulativeSpend")
+  .action(cmdWitness);
 
 program.parseAsync(process.argv).catch((err) => {
   process.stderr.write(`catp: ${(err as Error).message}\n`);

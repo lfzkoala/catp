@@ -6,6 +6,7 @@ import {
   computeCommitment,
   summarizeInput,
   buildEntry,
+  extractAuthorizationAction,
   appendAuditEntry,
   getLastCommitment,
   auditDir,
@@ -158,5 +159,24 @@ describe('buildEntry', () => {
     const entry = buildEntry(makeInput('Bash', {}), 'deny', null);
     const expected = computeCommitment('Bash', 'deny', entry.ts, '0', null, '{}');
     expect(entry.commitment).toBe(expected);
+  });
+
+  it('attaches structured authorization action data when present', () => {
+    const authorization = {
+      actionType: 'Swap',
+      protocol: `0x${'aa'.repeat(32)}`,
+      token: `0x${'bb'.repeat(32)}`,
+      value: '500',
+      currentTimestamp: '150',
+      cumulativeSpend: '0',
+    };
+    const entry = buildEntry(makeInput('Bash', { catp_authorization: authorization }), 'allow', null);
+    expect(entry.authorization).toEqual(authorization);
+  });
+});
+
+describe('extractAuthorizationAction', () => {
+  it('returns undefined when authorization action data is incomplete', () => {
+    expect(extractAuthorizationAction(makeInput('Bash', { catp_authorization: { actionType: 'Swap' } }))).toBeUndefined();
   });
 });

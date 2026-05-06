@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { auditDirForDate } from "./paths.js";
-import type { AuditEntry, HookInput } from "../policy/types.js";
+import type { AuditEntry, AuthorizationAction, HookInput } from "../policy/types.js";
 
 // Phase 0: SHA-256 commitment placeholder.
 // Chains on fields stored in the log (tool, decision, ts, prev) so the chain
@@ -59,7 +59,7 @@ export function buildEntry(
 ): AuditEntry {
   const ts = new Date().toISOString();
   const inputSummary = summarizeInput(input);
-  return {
+  const entry: AuditEntry = {
     ts,
     tool: input.tool_name,
     decision,
@@ -67,4 +67,37 @@ export function buildEntry(
     commitment: computeCommitment(input.tool_name, decision, ts, prevCommitment, ruleMatched, inputSummary),
     input_summary: inputSummary,
   };
+  const authorization = extractAuthorizationAction(input);
+  if (authorization) {
+    entry.authorization = authorization;
+  }
+  return entry;
+}
+
+export function extractAuthorizationAction(input: HookInput): AuthorizationAction | undefined {
+  const candidate = input.tool_input.catp_authorization ?? input.tool_input.authorization;
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    return undefined;
+  }
+  const value = candidate as Record<string, unknown>;
+  if (
+    !isStringOrNumber(value.actionType) ||
+    typeof value.protocol !== "string" ||
+    typeof value.token !== "string" ||
+    !isStringOrNumber(value.value)
+  ) {
+    return undefined;
+  }
+  return {
+    actionType: value.actionType,
+    protocol: value.protocol,
+    token: value.token,
+    value: value.value,
+    ...(isStringOrNumber(value.currentTimestamp) ? { currentTimestamp: value.currentTimestamp } : {}),
+    ...(isStringOrNumber(value.cumulativeSpend) ? { cumulativeSpend: value.cumulativeSpend } : {}),
+  };
+}
+
+function isStringOrNumber(value: unknown): value is string | number {
+  return typeof value === "string" || typeof value === "number";
 }

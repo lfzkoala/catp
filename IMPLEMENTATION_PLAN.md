@@ -200,6 +200,12 @@ The plugin writes generic tool-call audit entries and a SHA-256 hash chain. Laye
 Work:
 
 - Define the mapping from audit entry to `AuthorizationPolicy` and `Action`.
+- First bridge shipped: `catp witness` reads `[authorization]` from
+  `catp-policy.toml` plus structured action JSON, and emits the
+  `authorization_groth16_v1` witness consumed by the Groth16 prover.
+- Audit-linked bridge added: audit entries may carry optional structured
+  authorization action data, and `catp witness --audit-commitment <hash>` can
+  recover that action to build the same witness.
 - Decide which tool/action classes can produce Layer 2 witnesses in the MVP.
 - Add a proof manifest format that links:
   - audit log entry id

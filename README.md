@@ -130,6 +130,60 @@ Logs are written to `${CATP_HOME:-~/.catp}/audit/<agentId>/<YYYY-MM-DD>/actions.
 
 `catp anchor` can submit a Merkle root of local audit commitments on-chain. Structured Layer 2 authorization proofs use a separate Poseidon policy commitment path verified by `catp-verify` off-chain or by `authorization_groth16_v1` on EVM. Direct EVM verification for the current Halo2 verifier is blocked by verifier bytecode size.
 
+### Build a Layer 2 Witness
+
+For the Groth16 EVM path, add a structured authorization section to
+`catp-policy.toml`:
+
+```toml
+[authorization]
+allowed_action = "Swap"
+allowed_protocol = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+allowed_token = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+max_value_per_tx = "1000"
+max_value_total = "10000"
+valid_from = "1778042786"
+valid_until = "1778129246"
+```
+
+Then create an action JSON:
+
+```json
+{
+  "actionType": "Swap",
+  "protocol": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "token": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "value": "500"
+}
+```
+
+Build the prover witness:
+
+```bash
+catp witness \
+  --action action.json \
+  --current-timestamp 1778042846 \
+  --cumulative-spend 0 \
+  --out witness.json
+```
+
+If an audit entry was recorded with `tool_input.catp_authorization` or
+`tool_input.authorization`, the same witness can be built from its commitment:
+
+```bash
+catp witness \
+  --audit-commitment <64-char-audit-commitment> \
+  --out witness.json
+```
+
+Generate the proof artifact:
+
+```bash
+bash scripts/generate-groth16-verifier.sh \
+  --witness witness.json \
+  --out authorization_groth16_v1.json
+```
+
 ---
 
 ## Layer 2 Proof Path

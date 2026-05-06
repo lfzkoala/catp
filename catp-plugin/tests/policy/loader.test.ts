@@ -89,6 +89,55 @@ reason = "custom"
     expect(rule.reason).toBe('custom');
   });
 
+  it('parses optional authorization proof config', () => {
+    const toml = `
+[agent]
+id = "a"
+version = "1"
+
+[authorization]
+allowed_action = "Swap"
+allowed_protocol = "0x${'aa'.repeat(32)}"
+allowed_token = "0x${'bb'.repeat(32)}"
+max_value_per_tx = "1000"
+max_value_total = "10000"
+valid_from = "100"
+valid_until = "200"
+
+[[rules]]
+tool = "Bash"
+allow = true
+`;
+    const path = join(tmpBase, 'authorization-fields.toml');
+    writeFileSync(path, toml, 'utf8');
+    expect(loadPolicy(path).authorization).toEqual({
+      allowed_action: 'Swap',
+      allowed_protocol: `0x${'aa'.repeat(32)}`,
+      allowed_token: `0x${'bb'.repeat(32)}`,
+      max_value_per_tx: '1000',
+      max_value_total: '10000',
+      valid_from: '100',
+      valid_until: '200',
+    });
+  });
+
+  it('throws when authorization config is incomplete', () => {
+    const path = join(tmpBase, 'bad-authorization.toml');
+    writeFileSync(path, `
+[agent]
+id = "a"
+version = "1"
+
+[authorization]
+allowed_action = "Swap"
+
+[[rules]]
+tool = "Bash"
+allow = true
+`, 'utf8');
+    expect(() => loadPolicy(path)).toThrow('authorization.allowed_protocol');
+  });
+
   it('throws when [agent] section is missing', () => {
     const path = join(tmpBase, 'no-agent.toml');
     writeFileSync(path, '[[rules]]\ntool = "Bash"\nallow = true\n', 'utf8');
