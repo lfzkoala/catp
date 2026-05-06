@@ -7,8 +7,6 @@ The current MVP has two connected surfaces:
 1. **Local enforcement**: a Claude Code hook plugin blocks tool calls outside a project policy and writes a tamper-evident audit log.
 2. **Verifiable authorization**: a Groth16/BN254 EVM proof path proves that a structured agent action satisfies a committed private policy.
 
-CATP originally used Halo2/KZG as the main Layer 2 proof backend. That path is still useful for off-chain verification and research, but the generated Halo2 Solidity verifier is not deployable for this circuit because its runtime bytecode is far above the EVM 24,576-byte limit. The EVM path has therefore pivoted to `authorization_groth16_v1`, a compact Groth16 verifier that has passed Sepolia deployment and real proof execution smoke tests.
-
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the execution plan.
 
 ---
@@ -34,14 +32,14 @@ The protocol boundary is the authorization proof statement and public input sche
 
 ---
 
-## Why Groth16
+## Layer 2 Proof Systems
 
-The project pivoted from "Halo2 on EVM" to "Groth16 on EVM" for one blunt reason: deployability.
+CATP currently contains two Layer 2 authorization proof paths.
 
 | Path | Role | Status |
 |------|------|--------|
 | `authorization_groth16_v1` | Current EVM verifier path | Works on Sepolia; compact verifier runtime is about 6.4 KB and wrapper runtime is about 1.1 KB |
-| `authorization_v1` Halo2 | Off-chain verifier / research path | Works locally, but generated Solidity verifier runtime is about 319 KB and cannot fit under the EVM runtime limit |
+| `authorization_v1` Halo2 | Off-chain verifier / research path | Works locally; generated Solidity verifier runtime is about 319 KB and does not fit under the EVM 24,576-byte runtime limit |
 
 Groth16 does require a circuit-specific trusted setup. The keys currently checked into `catp-circuits/groth16/keys/` are stable dev/testnet keys, not a mainnet ceremony. A mainnet release must either run and document a proper ceremony or explicitly choose a weaker trust model.
 
@@ -317,9 +315,9 @@ forge test --match-path test/layer2/Groth16AuthorizationVerifier.t.sol
 
 ---
 
-## Halo2 Status
+## Halo2 Path
 
-The original Layer 2 proof version is:
+The Halo2 Layer 2 proof version is:
 
 ```text
 authorization_v1
@@ -333,7 +331,7 @@ It uses:
 - EVM transcript
 - 13 public inputs
 
-This path remains valuable for off-chain verification and for future proof-system research. It is not the current EVM deployment path because the generated Solidity verifier exceeds the EVM runtime bytecode limit by a wide margin.
+This path is available for off-chain verification and proof-system research. It is not the current EVM deployment path because the generated Solidity verifier exceeds the EVM runtime bytecode limit.
 
 The committed `catp-layer2-k12.srs` is for development and testnet consistency. Mainnet Halo2 usage would require documented SRS provenance or replacement with accepted ceremony output.
 
