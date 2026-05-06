@@ -60,6 +60,49 @@ If challenged by any party (on demand)
 
 This is the same model as ZK rollups: execute optimistically, prove lazily, challenge when needed.
 
+### Current Implemented Architecture
+
+The current repository implements the local enforcement layer and the Layer 2 authorization proof path. The EVM/testnet verifier path is `authorization_groth16_v1`; the Halo2 `authorization_v1` path remains available for local and off-chain verification.
+
+```mermaid
+flowchart TD
+  User[Developer / Operator] --> Policy[catp-policy.toml]
+  Policy --> Hook[catp-plugin Claude Code hooks]
+  Agent[Agent tool call] --> Hook
+
+  Hook --> Decision{Policy check}
+  Decision -->|allow| Action[Tool executes]
+  Decision -->|deny| Block[Tool blocked]
+  Action --> Audit[SHA-256 audit log chain]
+  Block --> Audit
+
+  Policy --> AuthPolicy[authorization policy fields]
+  ActionInput[Structured action JSON<br/>or audit-linked authorization data] --> Witness[catp witness]
+  Audit -->|optional audit commitment| Witness
+  AuthPolicy --> Witness
+
+  Witness --> Groth16Prover[Groth16 prover<br/>authorization_groth16_v1]
+  Groth16Prover --> ProofArtifact[Proof artifact JSON]
+  ProofArtifact --> Encoder[calldata encoder]
+  Encoder --> Execute[execution broadcaster]
+
+  Execute --> AgentAuthorizer[AgentAuthorizer.sol]
+  AgentAuthorizer --> Wrapper[Groth16AuthorizationVerifier.sol]
+  Wrapper --> Verifier[Groth16Verifier.sol]
+  AgentAuthorizer --> State[(activePolicies<br/>cumulativeSpend)]
+
+  Witness --> Halo2Path[Halo2 authorization_v1<br/>local/off-chain path]
+  Halo2Path --> VerifyService[catp-verify / Rust verifier]
+```
+
+The same authorization statement is exposed through a small verifier boundary:
+
+```text
+verify(publicInputs: bytes32[], proof: bytes) -> bool
+```
+
+For the current EVM path, `AgentAuthorizer` builds the 13 public inputs from the submitted action, current policy commitment, proof timestamp, and current cumulative spend, then delegates proof verification to the Groth16 wrapper. For the off-chain path, `catp-verify` verifies the Halo2 artifact outside the EVM.
+
 ### Enforcement Layer — Integration Points
 
 The plugin integrates with agent frameworks via their native extension hooks:
