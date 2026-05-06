@@ -414,19 +414,6 @@ curl -L https://foundry.paradigm.xyz | bash
 
 ---
 
-## Mainnet Readiness
-
-The current Groth16 path is suitable for deterministic development and testnet validation. It is not yet a mainnet release.
-
-Before mainnet, the project should:
-
-- run and document a circuit-specific Groth16 ceremony, or explicitly publish a weaker trust model
-- complete an external review of the Groth16 circuit and Solidity verifier adapter
-- decide whether `authorization_groth16_v1` is the long-term proof version or a stepping stone to another EVM-friendly proof system
-- add operational tooling for deployment metadata, receipt updates, and proof artifact retention
-
----
-
 ## Contributing
 
 Contributions are welcome. Please open an issue before starting significant work so we can coordinate.
