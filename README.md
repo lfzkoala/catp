@@ -271,6 +271,31 @@ The script:
 - broadcasts `executeAuthorized`
 - writes receipt metadata when `--out` is provided
 
+### 7. Share a Proof Manifest
+
+After generating a proof artifact, create a portable manifest that links the
+proof, public inputs, verifier/deployment metadata, and optional audit
+commitment:
+
+```bash
+catp prove authorization \
+  --artifact authorization_groth16_v1.json \
+  --verifier 0xeeebbf575556cd673209525573334934a4f1c3f1 \
+  --agent-authorizer 0xb5290d2c376d84c15de4fbfde64a9a5499eee23e \
+  --chain-id 11155111 \
+  --out catp-proof-manifest.json
+
+catp verify authorization --manifest catp-proof-manifest.json
+```
+
+`catp verify authorization` currently performs structural manifest validation.
+Cryptographic proof verification is performed by the EVM verifier or the
+dedicated off-chain verifier path.
+
+See [docs/E2E_GROTH16_SEPOLIA.md](docs/E2E_GROTH16_SEPOLIA.md) for the full
+end-to-end flow and [docs/SECURITY_REVIEW_LAYER2.md](docs/SECURITY_REVIEW_LAYER2.md)
+for the Layer 2 review checklist.
+
 ---
 
 ## Deployment and Verification Commands

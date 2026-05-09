@@ -7,6 +7,7 @@ import { cmdValidate } from "./commands/validate.js";
 import { cmdLogShow, cmdLogVerify } from "./commands/log.js";
 import { cmdAnchor } from "./commands/anchor.js";
 import { cmdWitness } from "./commands/witness.js";
+import { cmdProveAuthorization, cmdVerifyAuthorization } from "./commands/authorization.js";
 
 const program = new Command();
 
@@ -71,6 +72,28 @@ program
   .option("--current-timestamp <u64>", "override action currentTimestamp")
   .option("--cumulative-spend <u64>", "override action cumulativeSpend")
   .action(cmdWitness);
+
+const prove = program.command("prove").description("Build shareable CATP proof manifests");
+
+prove
+  .command("authorization")
+  .description("Build an authorization proof manifest from a Groth16 artifact")
+  .requiredOption("--artifact <path>", "authorization_groth16_v1 proof artifact JSON")
+  .option("--audit-commitment <hex>", "audit log commitment linked to this proof")
+  .option("--verifier <address>", "Groth16 authorization verifier wrapper address")
+  .option("--agent-authorizer <address>", "AgentAuthorizer address")
+  .option("--chain-id <id>", "chain id for the verifier/deployment")
+  .option("--proof-url <url>", "external URL where proof bytes or artifact are stored")
+  .option("--out <path>", "write proof manifest JSON to file instead of stdout")
+  .action(cmdProveAuthorization);
+
+const verify = program.command("verify").description("Verify CATP proof manifests");
+
+verify
+  .command("authorization")
+  .description("Validate an authorization proof manifest")
+  .requiredOption("--manifest <path>", "authorization proof manifest JSON")
+  .action(cmdVerifyAuthorization);
 
 program.parseAsync(process.argv).catch((err) => {
   process.stderr.write(`catp: ${(err as Error).message}\n`);

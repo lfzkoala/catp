@@ -129,6 +129,8 @@ Exit criteria:
 
 ### P0: Layer 2 Circuit and Security Review
 
+Status: started. Initial living review is in `docs/SECURITY_REVIEW_LAYER2.md`.
+
 Goal: reduce the risk that the authorization proof accepts an invalid action.
 
 Review scope:
@@ -152,6 +154,9 @@ Exit criteria:
 
 ### P1: Compact EVM Verifier Spike
 
+Status: complete for the current MVP. `authorization_groth16_v1` is below the
+EVM runtime bytecode limit and has passed local and Sepolia smoke tests.
+
 Goal: prove the Layer 2 authorization statement can be verified by an EVM-deployable verifier.
 
 Work:
@@ -171,6 +176,10 @@ Exit criteria:
 - A new proof version is named if the backend or commitment encoding differs from `authorization_v1`.
 
 ### P1: Sepolia Smoke Test
+
+Status: complete for the active deployment recorded in
+`catp-contracts/deployments/sepolia-groth16.json`. Reproduction steps are in
+`docs/E2E_GROTH16_SEPOLIA.md`.
 
 Goal: prove the local path survives a real testnet deployment.
 
@@ -223,6 +232,11 @@ Work:
   - proof bytes or proof URL
 - Implement `catp prove authorization` or equivalent CLI flow.
 - Implement `catp verify authorization` for local/off-chain verification.
+- First manifest bridge shipped: `catp prove authorization` wraps a
+  `authorization_groth16_v1` artifact into `catp_authorization_proof_manifest_v1`.
+- First manifest verifier shipped: `catp verify authorization` validates manifest
+  and embedded artifact structure. Cryptographic local verification remains a
+  follow-up.
 
 Exit criteria:
 
