@@ -91,6 +91,20 @@ npm run groth16:prove -- \
 This command builds a witness through `catp witness`, then generates an
 `authorization_groth16_v1` Groth16 proof artifact.
 
+To generate the artifact and manifest together, use the CLI bridge:
+
+```bash
+node catp-plugin/dist/cli.js prove authorization \
+  --action action.json \
+  --current-timestamp 1778042846 \
+  --cumulative-spend 0 \
+  --artifact-out authorization_groth16_v1.json \
+  --verifier 0xeeebbf575556cd673209525573334934a4f1c3f1 \
+  --agent-authorizer 0xb5290d2c376d84c15de4fbfde64a9a5499eee23e \
+  --chain-id 11155111 \
+  --out catp-proof-manifest.json
+```
+
 ## 4. Encode Offline Calldata
 
 ```bash
@@ -128,9 +142,10 @@ npm run groth16:execute -- \
 The script registers the policy if inactive, checks on-chain cumulative spend,
 executes the authorization proof, and writes receipt metadata.
 
-## 6. Create A Proof Manifest
+## 6. Create A Proof Manifest From An Existing Artifact
 
-Build a shareable structural manifest:
+If you generated only the proof artifact earlier, build a shareable structural
+manifest:
 
 ```bash
 node catp-plugin/dist/cli.js prove authorization \

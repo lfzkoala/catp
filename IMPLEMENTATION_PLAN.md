@@ -232,8 +232,9 @@ Work:
   - proof bytes or proof URL
 - Implement `catp prove authorization` or equivalent CLI flow.
 - Implement `catp verify authorization` for local/off-chain verification.
-- First manifest bridge shipped: `catp prove authorization` wraps a
-  `authorization_groth16_v1` artifact into `catp_authorization_proof_manifest_v1`.
+- First manifest bridge shipped: `catp prove authorization` can wrap an existing
+  `authorization_groth16_v1` artifact or generate one from `--action` /
+  `--audit-commitment`, then emit `catp_authorization_proof_manifest_v1`.
 - First manifest verifier shipped: `catp verify authorization` validates manifest
   and embedded artifact structure. Cryptographic local verification remains a
   follow-up.

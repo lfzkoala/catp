@@ -222,6 +222,18 @@ catp witness \
   --out witness.json
 ```
 
+To generate a proof artifact and shareable manifest in one command from the
+repository checkout:
+
+```bash
+catp prove authorization \
+  --action action.json \
+  --current-timestamp 1778042846 \
+  --cumulative-spend 0 \
+  --artifact-out authorization_groth16_v1.json \
+  --out catp-proof-manifest.json
+```
+
 ### 4. Encode Calldata Without Broadcasting
 
 ```bash
@@ -273,7 +285,7 @@ The script:
 
 ### 7. Share a Proof Manifest
 
-After generating a proof artifact, create a portable manifest that links the
+If you already have a proof artifact, create a portable manifest that links the
 proof, public inputs, verifier/deployment metadata, and optional audit
 commitment:
 

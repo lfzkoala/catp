@@ -1,4 +1,8 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { buildGroth16WitnessFromSources } from "./witness.js";
 
 const PROOF_VERSION = "authorization_groth16_v1";
 
@@ -107,36 +111,60 @@ export function validateAuthorizationProofManifest(manifest: AuthorizationProofM
 
 export function cmdProveAuthorization(opts: {
   artifact?: string;
+  action?: string;
   auditCommitment?: string;
+  agent?: string;
+  file?: string;
+  currentTimestamp?: string;
+  cumulativeSpend?: string;
+  artifactOut?: string;
+  witnessOut?: string;
+  proverScript?: string;
   verifier?: string;
   agentAuthorizer?: string;
   chainId?: string;
   proofUrl?: string;
   out?: string;
 }): void {
-  if (!opts.artifact) {
-    throw new Error("missing --artifact <path>");
-  }
-  if (!existsSync(opts.artifact)) {
-    throw new Error(`artifact not found: ${opts.artifact}`);
+  if (opts.artifact && opts.action) {
+    throw new Error("use --artifact or --action, not both");
   }
 
-  const artifact = JSON.parse(readFileSync(opts.artifact, "utf8")) as AuthorizationProofArtifact;
-  const manifest = buildAuthorizationProofManifest(artifact, {
-    auditCommitment: opts.auditCommitment,
-    verifier: opts.verifier,
-    agentAuthorizer: opts.agentAuthorizer,
-    chainId: opts.chainId,
-    proofUrl: opts.proofUrl,
-    sourceArtifact: opts.artifact,
-  });
-  const encoded = `${JSON.stringify(manifest, null, 2)}\n`;
+  let artifactPath = opts.artifact;
+  let cleanupDir: string | null = null;
+  if (!artifactPath) {
+    const generated = generateGroth16Artifact(opts);
+    artifactPath = generated.artifactPath;
+    cleanupDir = generated.cleanupDir;
+  }
 
-  if (opts.out) {
-    writeFileSync(opts.out, encoded, "utf8");
-    process.stdout.write(`Wrote authorization proof manifest to ${opts.out}\n`);
-  } else {
-    process.stdout.write(encoded);
+  if (!existsSync(artifactPath)) {
+    if (cleanupDir) rmSync(cleanupDir, { recursive: true, force: true });
+    throw new Error(`artifact not found: ${artifactPath}`);
+  }
+
+  try {
+    const artifact = JSON.parse(readFileSync(artifactPath, "utf8")) as AuthorizationProofArtifact;
+    const manifest = buildAuthorizationProofManifest(artifact, {
+      auditCommitment: opts.auditCommitment,
+      verifier: opts.verifier,
+      agentAuthorizer: opts.agentAuthorizer,
+      chainId: opts.chainId,
+      proofUrl: opts.proofUrl,
+      sourceArtifact: opts.artifact ?? opts.artifactOut ?? undefined,
+    });
+    const encoded = `${JSON.stringify(manifest, null, 2)}\n`;
+
+    if (opts.out) {
+      writeFileSync(opts.out, encoded, "utf8");
+      process.stdout.write(`Wrote authorization proof manifest to ${opts.out}\n`);
+    } else {
+      process.stdout.write(encoded);
+    }
+  } finally {
+    if (cleanupDir) {
+      rmSync(cleanupDir, { recursive: true, force: true });
+    }
   }
 }
 
@@ -190,6 +218,54 @@ function validateGroth16Artifact(artifact: AuthorizationProofArtifact): void {
   if (normalizeU64(artifact.publicInputs[12], "publicInputs[12]") !== cumulativeSpend) {
     throw new Error("publicInputs[12] must equal cumulativeSpend");
   }
+}
+
+function generateGroth16Artifact(opts: {
+  action?: string;
+  auditCommitment?: string;
+  agent?: string;
+  file?: string;
+  currentTimestamp?: string;
+  cumulativeSpend?: string;
+  artifactOut?: string;
+  witnessOut?: string;
+  proverScript?: string;
+}): { artifactPath: string; cleanupDir: string | null } {
+  if (!opts.action && !opts.auditCommitment) {
+    throw new Error("missing --artifact <path>, --action <path>, or --audit-commitment <hex>");
+  }
+  if (opts.action && opts.auditCommitment) {
+    throw new Error("use only one of --action or --audit-commitment");
+  }
+
+  const cleanupDir = opts.artifactOut && opts.witnessOut ? null : mkdtempSync(join(tmpdir(), "catp-prove-"));
+  const witnessPath = opts.witnessOut ?? join(cleanupDir as string, "authorization_groth16_v1.witness.json");
+  const artifactPath = opts.artifactOut ?? join(cleanupDir as string, "authorization_groth16_v1.json");
+  const proverScript = opts.proverScript ?? join(process.cwd(), "scripts", "generate-groth16-verifier.sh");
+  if (!existsSync(proverScript)) {
+    if (cleanupDir) rmSync(cleanupDir, { recursive: true, force: true });
+    throw new Error(`prover script not found: ${proverScript}`);
+  }
+
+  const witness = buildGroth16WitnessFromSources({
+    action: opts.action,
+    auditCommitment: opts.auditCommitment,
+    agent: opts.agent,
+    file: opts.file,
+    currentTimestamp: opts.currentTimestamp,
+    cumulativeSpend: opts.cumulativeSpend,
+  });
+  writeFileSync(witnessPath, `${JSON.stringify(witness, null, 2)}\n`, "utf8");
+
+  execFileSync("bash", [
+    proverScript,
+    "--witness",
+    witnessPath,
+    "--out",
+    artifactPath,
+  ], { stdio: "inherit" });
+
+  return { artifactPath, cleanupDir };
 }
 
 function normalizeIntegerString(value: string | number, field: string): string {

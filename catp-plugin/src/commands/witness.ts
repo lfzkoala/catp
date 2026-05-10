@@ -87,6 +87,25 @@ export function cmdWitness(opts: {
   currentTimestamp?: string;
   cumulativeSpend?: string;
 }): void {
+  const witness = buildGroth16WitnessFromSources(opts);
+  const encoded = `${JSON.stringify(witness, null, 2)}\n`;
+
+  if (opts.out) {
+    writeFileSync(opts.out, encoded, "utf8");
+    process.stdout.write(`Wrote Groth16 witness to ${opts.out}\n`);
+  } else {
+    process.stdout.write(encoded);
+  }
+}
+
+export function buildGroth16WitnessFromSources(opts: {
+  action?: string;
+  auditCommitment?: string;
+  agent?: string;
+  file?: string;
+  currentTimestamp?: string;
+  cumulativeSpend?: string;
+}): Groth16Witness {
   if (!opts.action && !opts.auditCommitment) {
     throw new Error("missing --action <path> or --audit-commitment <hex>");
   }
@@ -103,18 +122,11 @@ export function cmdWitness(opts: {
   const action = opts.action
     ? (JSON.parse(readFileSync(opts.action, "utf8")) as WitnessActionInput)
     : readAuthorizationActionFromAudit(resolveAgentId(policy, opts.agent), opts.auditCommitment as string);
-  const witness = buildGroth16Witness(policy, action, {
+
+  return buildGroth16Witness(policy, action, {
     currentTimestamp: opts.currentTimestamp,
     cumulativeSpend: opts.cumulativeSpend,
   });
-  const encoded = `${JSON.stringify(witness, null, 2)}\n`;
-
-  if (opts.out) {
-    writeFileSync(opts.out, encoded, "utf8");
-    process.stdout.write(`Wrote Groth16 witness to ${opts.out}\n`);
-  } else {
-    process.stdout.write(encoded);
-  }
 }
 
 function resolveAgentId(policy: CatpPolicy, agent?: string): string {
