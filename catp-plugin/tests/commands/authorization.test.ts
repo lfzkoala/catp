@@ -8,9 +8,11 @@ import {
   validateAuthorizationProofManifest,
   type AuthorizationProofArtifact,
 } from "../../src/commands/authorization.js";
+import { appendAuditEntry, computeCommitment } from "../../src/audit/logger.js";
 
 const tmpBase = join(tmpdir(), `catp-authorization-test-${Date.now()}`);
 mkdirSync(tmpBase, { recursive: true });
+process.env.CATP_HOME = join(tmpBase, "catp-home");
 
 afterAll(() => {
   rmSync(tmpBase, { recursive: true, force: true });
@@ -100,6 +102,96 @@ describe("authorization proof manifest", () => {
       manifestVersion: "catp_authorization_proof_manifest_v1",
       auditCommitment: "ef".repeat(32),
       sourceArtifact: artifactPath,
+    });
+  });
+
+  it("builds a manifest from an audit commitment through the prover bridge", () => {
+    const policyPath = join(tmpBase, "audit-policy.toml");
+    const manifestPath = join(tmpBase, "audit-manifest.json");
+    const fakeProverPath = join(tmpBase, "fake-groth16-prover.sh");
+    const commitment = computeCommitment("Bash", "allow", "2026-01-01T00:00:00.000Z", "0", null, "{}");
+
+    writeFileSync(policyPath, `
+[agent]
+id = "manifest-agent"
+version = "1"
+
+[authorization]
+allowed_action = "Swap"
+allowed_protocol = "${bytes32("aa")}"
+allowed_token = "${bytes32("bb")}"
+max_value_per_tx = "1000"
+max_value_total = "10000"
+valid_from = "100"
+valid_until = "200"
+
+[[rules]]
+tool = "Bash"
+allow = true
+`, "utf8");
+
+    appendAuditEntry("manifest-agent", {
+      ts: "2026-01-01T00:00:00.000Z",
+      tool: "Bash",
+      decision: "allow",
+      rule_matched: null,
+      commitment,
+      input_summary: "{}",
+      authorization: {
+        actionType: "Swap",
+        protocol: bytes32("aa"),
+        token: bytes32("bb"),
+        value: "500",
+        currentTimestamp: "150",
+        cumulativeSpend: "0",
+      },
+    });
+
+    writeFileSync(fakeProverPath, `#!/usr/bin/env bash
+set -euo pipefail
+out=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --out) out="$2"; shift 2 ;;
+    *) shift 2 ;;
+  esac
+done
+cat > "$out" <<'JSON'
+${JSON.stringify({
+  ...artifact,
+  currentTimestamp: "150",
+  cumulativeSpend: "0",
+  value: "500",
+  publicInputs: artifact.publicInputs.map((input, index) => {
+    if (index === 10) return u64Input(500);
+    if (index === 11) return u64Input(150);
+    if (index === 12) return u64Input(0);
+    return input;
+  }),
+})}
+JSON
+`, "utf8");
+
+    const originalWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    try {
+      cmdProveAuthorization({
+        auditCommitment: commitment,
+        file: policyPath,
+        proverScript: fakeProverPath,
+        out: manifestPath,
+      });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    expect(JSON.parse(readFileSync(manifestPath, "utf8"))).toMatchObject({
+      manifestVersion: "catp_authorization_proof_manifest_v1",
+      auditCommitment: commitment,
+      currentTimestamp: "150",
+      cumulativeSpend: "0",
+      value: "500",
+      sourceArtifact: null,
     });
   });
 });
