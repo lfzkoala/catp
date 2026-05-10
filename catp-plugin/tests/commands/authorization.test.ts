@@ -82,6 +82,37 @@ describe("authorization proof manifest", () => {
     ).toThrow("publicInputs[10] must equal value");
   });
 
+  it("rejects invalid manifest and artifact metadata", () => {
+    expect(() =>
+      validateAuthorizationProofManifest({
+        ...buildAuthorizationProofManifest(artifact),
+        manifestVersion: "bad" as "catp_authorization_proof_manifest_v1",
+      }),
+    ).toThrow("manifestVersion must be");
+
+    expect(() =>
+      buildAuthorizationProofManifest({
+        ...artifact,
+        proofVersion: "wrong",
+      }),
+    ).toThrow("proofVersion must be authorization_groth16_v1");
+
+    expect(() =>
+      buildAuthorizationProofManifest({
+        ...artifact,
+        proof: "0x1234",
+      }),
+    ).toThrow("proof must be 256 bytes");
+
+    expect(() =>
+      buildAuthorizationProofManifest(artifact, { chainId: "sepolia" }),
+    ).toThrow("chainId must be a decimal integer string");
+
+    expect(() =>
+      buildAuthorizationProofManifest(artifact, { verifier: "0x1234" }),
+    ).toThrow("verifier must be an EVM address");
+  });
+
   it("writes a manifest file from the command", () => {
     const artifactPath = join(tmpBase, "artifact.json");
     const outPath = join(tmpBase, "manifest.json");
@@ -121,6 +152,56 @@ describe("authorization proof manifest", () => {
       verifier: `0x${"12".repeat(20)}`,
       agentAuthorizer: `0x${"34".repeat(20)}`,
     });
+  });
+
+  it("rejects invalid deployment metadata", () => {
+    const missingPath = join(tmpBase, "missing-deployment.json");
+    expect(() => readDeploymentMetadata(missingPath)).toThrow("deployment not found");
+
+    const invalidAddressPath = join(tmpBase, "invalid-address-deployment.json");
+    writeFileSync(invalidAddressPath, JSON.stringify({
+      groth16AuthorizationVerifier: "0x1234",
+    }), "utf8");
+    expect(() => readDeploymentMetadata(invalidAddressPath)).toThrow("deployment.groth16AuthorizationVerifier");
+
+    const invalidChainPath = join(tmpBase, "invalid-chain-deployment.json");
+    writeFileSync(invalidChainPath, JSON.stringify({
+      chainId: "sepolia",
+    }), "utf8");
+    expect(() => readDeploymentMetadata(invalidChainPath)).toThrow("deployment.chainId must be a decimal integer");
+  });
+
+  it("rejects invalid prove and verify command inputs", () => {
+    const artifactPath = join(tmpBase, "command-input-artifact.json");
+    const manifestPath = join(tmpBase, "command-input-manifest.json");
+    writeFileSync(artifactPath, JSON.stringify(artifact), "utf8");
+    writeFileSync(manifestPath, JSON.stringify(buildAuthorizationProofManifest(artifact)), "utf8");
+
+    expect(() =>
+      cmdProveAuthorization({
+        artifact: artifactPath,
+        action: join(tmpBase, "action.json"),
+      }),
+    ).toThrow("use --artifact or --action");
+
+    expect(() =>
+      cmdProveAuthorization({
+        artifact: join(tmpBase, "missing-artifact.json"),
+      }),
+    ).toThrow("artifact not found");
+
+    expect(() =>
+      cmdVerifyAuthorization({
+        manifest: manifestPath,
+        checkAudit: true,
+      }),
+    ).toThrow("manifest has no auditCommitment");
+
+    expect(() =>
+      cmdVerifyAuthorization({
+        manifest: join(tmpBase, "missing-manifest.json"),
+      }),
+    ).toThrow("manifest not found");
   });
 
   it("uses deployment metadata when writing a manifest", () => {
