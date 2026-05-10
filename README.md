@@ -61,6 +61,11 @@ Option A - npm:
 npm install -g @catp-protocol/cli
 ```
 
+The npm package covers local enforcement, audit logs, witness generation, and
+proof manifest validation. Full Groth16 proof generation requires cloning the
+repository because the prover scripts and circuit assets are not bundled into
+the CLI package.
+
 Option B - clone and build:
 
 ```bash
