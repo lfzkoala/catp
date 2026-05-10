@@ -101,6 +101,8 @@ verify
   .command("authorization")
   .description("Validate an authorization proof manifest")
   .requiredOption("--manifest <path>", "authorization proof manifest JSON")
+  .option("--check-audit", "check that auditCommitment exists in the local audit log")
+  .option("--audit-agent <id>", "agent id to use for --check-audit")
   .action(cmdVerifyAuthorization);
 
 program.parseAsync(process.argv).catch((err) => {

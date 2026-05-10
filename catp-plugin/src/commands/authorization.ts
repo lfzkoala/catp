@@ -1,8 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildGroth16WitnessFromSources } from "./witness.js";
+import { auditRoot } from "../audit/paths.js";
+import { findPolicyFile, loadPolicy } from "../policy/loader.js";
+import type { AuditEntry } from "../policy/types.js";
 
 const PROOF_VERSION = "authorization_groth16_v1";
 
@@ -22,6 +25,7 @@ export interface AuthorizationProofManifest {
   manifestVersion: "catp_authorization_proof_manifest_v1";
   proofVersion: "authorization_groth16_v1";
   auditCommitment: string | null;
+  auditAgent: string | null;
   policyCommitment: string;
   publicInputs: string[];
   actionData: string;
@@ -40,6 +44,7 @@ export function buildAuthorizationProofManifest(
   artifact: AuthorizationProofArtifact,
   opts: {
     auditCommitment?: string;
+    auditAgent?: string;
     verifier?: string;
     agentAuthorizer?: string;
     chainId?: string;
@@ -51,6 +56,9 @@ export function buildAuthorizationProofManifest(
 
   if (opts.auditCommitment !== undefined) {
     assertCommitment(opts.auditCommitment, "auditCommitment");
+  }
+  if (opts.auditAgent !== undefined) {
+    assertNonEmptyString(opts.auditAgent, "auditAgent");
   }
   if (opts.verifier !== undefined) {
     assertAddress(opts.verifier, "verifier");
@@ -66,6 +74,7 @@ export function buildAuthorizationProofManifest(
     manifestVersion: "catp_authorization_proof_manifest_v1",
     proofVersion: PROOF_VERSION,
     auditCommitment: opts.auditCommitment ?? null,
+    auditAgent: opts.auditAgent ?? null,
     policyCommitment: artifact.policyCommitment,
     publicInputs: artifact.publicInputs,
     actionData: artifact.actionData,
@@ -97,6 +106,9 @@ export function validateAuthorizationProofManifest(manifest: AuthorizationProofM
   });
   if (manifest.auditCommitment !== null) {
     assertCommitment(manifest.auditCommitment, "auditCommitment");
+  }
+  if (manifest.auditAgent !== null) {
+    assertNonEmptyString(manifest.auditAgent, "auditAgent");
   }
   if (manifest.verifier !== null) {
     assertAddress(manifest.verifier, "verifier");
@@ -147,6 +159,7 @@ export function cmdProveAuthorization(opts: {
     const artifact = JSON.parse(readFileSync(artifactPath, "utf8")) as AuthorizationProofArtifact;
     const manifest = buildAuthorizationProofManifest(artifact, {
       auditCommitment: opts.auditCommitment,
+      auditAgent: resolveAuditAgent(opts),
       verifier: opts.verifier,
       agentAuthorizer: opts.agentAuthorizer,
       chainId: opts.chainId,
@@ -168,7 +181,7 @@ export function cmdProveAuthorization(opts: {
   }
 }
 
-export function cmdVerifyAuthorization(opts: { manifest?: string }): void {
+export function cmdVerifyAuthorization(opts: { manifest?: string; checkAudit?: boolean; auditAgent?: string }): void {
   if (!opts.manifest) {
     throw new Error("missing --manifest <path>");
   }
@@ -178,12 +191,26 @@ export function cmdVerifyAuthorization(opts: { manifest?: string }): void {
 
   const manifest = JSON.parse(readFileSync(opts.manifest, "utf8")) as AuthorizationProofManifest;
   validateAuthorizationProofManifest(manifest);
-  process.stdout.write([
+  const lines = [
     "Authorization proof manifest is structurally valid.",
     `proofVersion=${manifest.proofVersion}`,
     `policyCommitment=${manifest.policyCommitment}`,
     `auditCommitment=${manifest.auditCommitment ?? "none"}`,
-  ].join("\n") + "\n");
+  ];
+  if (opts.checkAudit) {
+    const auditAgent = opts.auditAgent ?? manifest.auditAgent;
+    if (!manifest.auditCommitment) {
+      throw new Error("manifest has no auditCommitment to check");
+    }
+    if (!auditAgent) {
+      throw new Error("missing --audit-agent <id>; manifest does not include auditAgent");
+    }
+    if (!findAuditEntry(auditAgent, manifest.auditCommitment)) {
+      throw new Error(`No audit entry found for commitment ${manifest.auditCommitment}`);
+    }
+    lines.push(`auditEntry=found:${auditAgent}`);
+  }
+  process.stdout.write(`${lines.join("\n")}\n`);
 }
 
 function validateGroth16Artifact(artifact: AuthorizationProofArtifact): void {
@@ -268,6 +295,35 @@ function generateGroth16Artifact(opts: {
   return { artifactPath, cleanupDir };
 }
 
+function resolveAuditAgent(opts: { auditCommitment?: string; agent?: string; file?: string }): string | undefined {
+  if (!opts.auditCommitment) return undefined;
+  if (opts.agent) return opts.agent;
+  const policyPath = opts.file ?? findPolicyFile();
+  if (!policyPath) return undefined;
+  return loadPolicy(policyPath).agent.id;
+}
+
+function findAuditEntry(agentId: string, commitment: string): AuditEntry | null {
+  const root = auditRoot(agentId);
+  if (!existsSync(root)) return null;
+  for (const date of readdirSync(root).sort()) {
+    const file = join(root, date, "actions.jsonl");
+    if (!existsSync(file)) continue;
+    const lines = readFileSync(file, "utf8").trimEnd().split("\n").filter(Boolean);
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line) as AuditEntry;
+        if (entry.commitment.toLowerCase() === commitment.toLowerCase()) {
+          return entry;
+        }
+      } catch {
+        // skip malformed audit lines
+      }
+    }
+  }
+  return null;
+}
+
 function normalizeIntegerString(value: string | number, field: string): string {
   return normalizeU64(value, field);
 }
@@ -316,6 +372,12 @@ function assertBytes32(value: string, field: string): void {
 function assertCommitment(value: string, field: string): void {
   if (!/^[0-9a-fA-F]{64}$/.test(value)) {
     throw new Error(`${field} must be a 64-character hex commitment`);
+  }
+}
+
+function assertNonEmptyString(value: string, field: string): void {
+  if (value.length === 0) {
+    throw new Error(`${field} must be a non-empty string`);
   }
 }
 

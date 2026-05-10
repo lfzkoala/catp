@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import {
   buildAuthorizationProofManifest,
   cmdProveAuthorization,
+  cmdVerifyAuthorization,
   validateAuthorizationProofManifest,
   type AuthorizationProofArtifact,
 } from "../../src/commands/authorization.js";
@@ -61,6 +62,7 @@ describe("authorization proof manifest", () => {
       manifestVersion: "catp_authorization_proof_manifest_v1",
       proofVersion: "authorization_groth16_v1",
       auditCommitment: "cd".repeat(32),
+      auditAgent: null,
       policyCommitment: artifact.policyCommitment,
       currentTimestamp: "1778042846",
       cumulativeSpend: "25",
@@ -188,10 +190,28 @@ JSON
     expect(JSON.parse(readFileSync(manifestPath, "utf8"))).toMatchObject({
       manifestVersion: "catp_authorization_proof_manifest_v1",
       auditCommitment: commitment,
+      auditAgent: "manifest-agent",
       currentTimestamp: "150",
       cumulativeSpend: "0",
       value: "500",
       sourceArtifact: null,
     });
+
+    const originalWriteVerify = process.stdout.write.bind(process.stdout);
+    let output = "";
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      output += chunk.toString();
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      cmdVerifyAuthorization({
+        manifest: manifestPath,
+        checkAudit: true,
+      });
+    } finally {
+      process.stdout.write = originalWriteVerify;
+    }
+
+    expect(output).toContain("auditEntry=found:manifest-agent");
   });
 });

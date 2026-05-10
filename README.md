@@ -300,9 +300,19 @@ catp prove authorization \
 catp verify authorization --manifest catp-proof-manifest.json
 ```
 
+For audit-linked manifests, verify that the audit commitment exists in the local
+audit log:
+
+```bash
+catp verify authorization \
+  --manifest catp-proof-manifest.json \
+  --check-audit
+```
+
 `catp verify authorization` currently performs structural manifest validation.
-Cryptographic proof verification is performed by the EVM verifier or the
-dedicated off-chain verifier path.
+With `--check-audit`, it also checks that the manifest's audit commitment exists
+for the recorded audit agent. Cryptographic proof verification is performed by
+the EVM verifier or the dedicated off-chain verifier path.
 
 See [docs/E2E_GROTH16_SEPOLIA.md](docs/E2E_GROTH16_SEPOLIA.md) for the full
 end-to-end flow and [docs/SECURITY_REVIEW_LAYER2.md](docs/SECURITY_REVIEW_LAYER2.md)

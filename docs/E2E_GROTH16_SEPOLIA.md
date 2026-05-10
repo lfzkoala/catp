@@ -169,9 +169,20 @@ node catp-plugin/dist/cli.js verify authorization \
   --manifest catp-proof-manifest.json
 ```
 
+For an audit-linked manifest, also check that the commitment exists in the local
+audit log:
+
+```bash
+node catp-plugin/dist/cli.js verify authorization \
+  --manifest catp-proof-manifest.json \
+  --check-audit
+```
+
 Current `verify authorization` checks manifest and artifact consistency. It does
-not perform cryptographic proof verification locally; cryptographic verification
-is performed by the EVM verifier or a dedicated off-chain verifier.
+not perform cryptographic proof verification locally. With `--check-audit`, it
+also checks local audit log presence for the manifest's `auditCommitment` and
+`auditAgent`; cryptographic verification is performed by the EVM verifier or a
+dedicated off-chain verifier.
 
 ## Known Limits
 
