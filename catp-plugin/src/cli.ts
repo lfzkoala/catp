@@ -88,6 +88,7 @@ prove
   .option("--artifact-out <path>", "keep generated proof artifact at this path")
   .option("--witness-out <path>", "keep generated witness JSON at this path")
   .option("--prover-script <path>", "Groth16 proof generation script")
+  .option("--deployment <path>", "deployment metadata JSON for verifier, authorizer, and chain id")
   .option("--verifier <address>", "Groth16 authorization verifier wrapper address")
   .option("--agent-authorizer <address>", "AgentAuthorizer address")
   .option("--chain-id <id>", "chain id for the verifier/deployment")

@@ -6,6 +6,7 @@ import {
   buildAuthorizationProofManifest,
   cmdProveAuthorization,
   cmdVerifyAuthorization,
+  readDeploymentMetadata,
   validateAuthorizationProofManifest,
   type AuthorizationProofArtifact,
 } from "../../src/commands/authorization.js";
@@ -104,6 +105,51 @@ describe("authorization proof manifest", () => {
       manifestVersion: "catp_authorization_proof_manifest_v1",
       auditCommitment: "ef".repeat(32),
       sourceArtifact: artifactPath,
+    });
+  });
+
+  it("reads verifier metadata from deployment JSON", () => {
+    const deploymentPath = join(tmpBase, "deployment.json");
+    writeFileSync(deploymentPath, JSON.stringify({
+      chainId: 11155111,
+      groth16AuthorizationVerifier: `0x${"12".repeat(20)}`,
+      agentAuthorizer: `0x${"34".repeat(20)}`,
+    }), "utf8");
+
+    expect(readDeploymentMetadata(deploymentPath)).toEqual({
+      chainId: "11155111",
+      verifier: `0x${"12".repeat(20)}`,
+      agentAuthorizer: `0x${"34".repeat(20)}`,
+    });
+  });
+
+  it("uses deployment metadata when writing a manifest", () => {
+    const artifactPath = join(tmpBase, "artifact-with-deployment.json");
+    const deploymentPath = join(tmpBase, "manifest-deployment.json");
+    const outPath = join(tmpBase, "manifest-with-deployment.json");
+    writeFileSync(artifactPath, JSON.stringify(artifact), "utf8");
+    writeFileSync(deploymentPath, JSON.stringify({
+      chainId: "11155111",
+      groth16AuthorizationVerifier: `0x${"12".repeat(20)}`,
+      agentAuthorizer: `0x${"34".repeat(20)}`,
+    }), "utf8");
+
+    const originalWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    try {
+      cmdProveAuthorization({
+        artifact: artifactPath,
+        deployment: deploymentPath,
+        out: outPath,
+      });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    expect(JSON.parse(readFileSync(outPath, "utf8"))).toMatchObject({
+      verifier: `0x${"12".repeat(20)}`,
+      agentAuthorizer: `0x${"34".repeat(20)}`,
+      chainId: "11155111",
     });
   });
 

@@ -99,9 +99,7 @@ node catp-plugin/dist/cli.js prove authorization \
   --current-timestamp 1778042846 \
   --cumulative-spend 0 \
   --artifact-out authorization_groth16_v1.json \
-  --verifier 0xeeebbf575556cd673209525573334934a4f1c3f1 \
-  --agent-authorizer 0xb5290d2c376d84c15de4fbfde64a9a5499eee23e \
-  --chain-id 11155111 \
+  --deployment catp-contracts/deployments/sepolia-groth16.json \
   --out catp-proof-manifest.json
 ```
 
@@ -150,11 +148,13 @@ manifest:
 ```bash
 node catp-plugin/dist/cli.js prove authorization \
   --artifact authorization_groth16_v1.json \
-  --verifier 0xeeebbf575556cd673209525573334934a4f1c3f1 \
-  --agent-authorizer 0xb5290d2c376d84c15de4fbfde64a9a5499eee23e \
-  --chain-id 11155111 \
+  --deployment catp-contracts/deployments/sepolia-groth16.json \
   --out catp-proof-manifest.json
 ```
+
+`--deployment` reads `chainId`, `groth16AuthorizationVerifier`, and
+`agentAuthorizer` from the deployment metadata. You can still pass
+`--verifier`, `--agent-authorizer`, or `--chain-id` to override those values.
 
 If the proof came from an audit-linked action, include:
 

@@ -231,6 +231,7 @@ catp prove authorization \
   --current-timestamp 1778042846 \
   --cumulative-spend 0 \
   --artifact-out authorization_groth16_v1.json \
+  --deployment catp-contracts/deployments/sepolia-groth16.json \
   --out catp-proof-manifest.json
 ```
 
@@ -292,9 +293,7 @@ commitment:
 ```bash
 catp prove authorization \
   --artifact authorization_groth16_v1.json \
-  --verifier 0xeeebbf575556cd673209525573334934a4f1c3f1 \
-  --agent-authorizer 0xb5290d2c376d84c15de4fbfde64a9a5499eee23e \
-  --chain-id 11155111 \
+  --deployment catp-contracts/deployments/sepolia-groth16.json \
   --out catp-proof-manifest.json
 
 catp verify authorization --manifest catp-proof-manifest.json

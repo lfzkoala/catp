@@ -132,6 +132,7 @@ export function cmdProveAuthorization(opts: {
   artifactOut?: string;
   witnessOut?: string;
   proverScript?: string;
+  deployment?: string;
   verifier?: string;
   agentAuthorizer?: string;
   chainId?: string;
@@ -157,12 +158,13 @@ export function cmdProveAuthorization(opts: {
 
   try {
     const artifact = JSON.parse(readFileSync(artifactPath, "utf8")) as AuthorizationProofArtifact;
+    const deployment = opts.deployment ? readDeploymentMetadata(opts.deployment) : {};
     const manifest = buildAuthorizationProofManifest(artifact, {
       auditCommitment: opts.auditCommitment,
       auditAgent: resolveAuditAgent(opts),
-      verifier: opts.verifier,
-      agentAuthorizer: opts.agentAuthorizer,
-      chainId: opts.chainId,
+      verifier: opts.verifier ?? deployment.verifier,
+      agentAuthorizer: opts.agentAuthorizer ?? deployment.agentAuthorizer,
+      chainId: opts.chainId ?? deployment.chainId,
       proofUrl: opts.proofUrl,
       sourceArtifact: opts.artifact ?? opts.artifactOut ?? undefined,
     });
@@ -179,6 +181,23 @@ export function cmdProveAuthorization(opts: {
       rmSync(cleanupDir, { recursive: true, force: true });
     }
   }
+}
+
+export function readDeploymentMetadata(path: string): {
+  verifier?: string;
+  agentAuthorizer?: string;
+  chainId?: string;
+} {
+  if (!existsSync(path)) {
+    throw new Error(`deployment not found: ${path}`);
+  }
+  const parsed = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+  const verifier = optionalString(parsed.groth16AuthorizationVerifier, "deployment.groth16AuthorizationVerifier");
+  const agentAuthorizer = optionalString(parsed.agentAuthorizer, "deployment.agentAuthorizer");
+  const chainId = optionalIntegerString(parsed.chainId, "deployment.chainId");
+  if (verifier !== undefined) assertAddress(verifier, "deployment.groth16AuthorizationVerifier");
+  if (agentAuthorizer !== undefined) assertAddress(agentAuthorizer, "deployment.agentAuthorizer");
+  return { verifier, agentAuthorizer, chainId };
 }
 
 export function cmdVerifyAuthorization(opts: { manifest?: string; checkAudit?: boolean; auditAgent?: string }): void {
@@ -355,6 +374,28 @@ function parseInteger(value: string | number, field: string): bigint {
   if (/^0x[0-9a-fA-F]+$/.test(value)) return BigInt(value);
   if (/^[0-9]+$/.test(value)) return BigInt(value);
   throw new Error(`${field} must be an integer string`);
+}
+
+function optionalString(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string") {
+    throw new Error(`${field} must be a string`);
+  }
+  return value;
+}
+
+function optionalIntegerString(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error(`${field} must be a non-negative safe integer`);
+    }
+    return value.toString();
+  }
+  if (typeof value === "string" && /^[0-9]+$/.test(value)) {
+    return value;
+  }
+  throw new Error(`${field} must be a decimal integer`);
 }
 
 function assertHex(value: string, field: string): void {
