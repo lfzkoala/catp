@@ -55,6 +55,8 @@ No blockchain or ZK setup is required for local enforcement.
 
 ### Install
 
+For a fuller installation guide, see [docs/INSTALL.md](docs/INSTALL.md).
+
 Option A - npm:
 
 ```bash
