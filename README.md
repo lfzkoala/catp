@@ -32,6 +32,47 @@ The protocol boundary is the authorization proof statement and public input sche
 
 ---
 
+## Current MVP Flow
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor User
+  participant Agent as Claude Code Agent
+  participant CATP as CATP CLI / Hooks
+  participant Policy as catp-policy.toml
+  participant Audit as Local Audit Log
+  participant Prover as Groth16 Prover
+  participant Manifest as Proof Manifest
+  participant EVM as Sepolia Verifier
+
+  User->>CATP: catp init / validate
+  CATP->>Policy: load local policy rules
+  Agent->>CATP: PreToolUse(tool call)
+  CATP->>Policy: evaluate allow / deny
+  CATP-->>Agent: allow or block
+  Agent->>CATP: PostToolUse(result)
+  CATP->>Audit: append SHA-256 commitment chain entry
+
+  opt Structured authorization action
+    CATP->>Policy: read private authorization fields
+    CATP->>Audit: optionally load action by auditCommitment
+    CATP->>Prover: build witness for authorization_groth16_v1
+    Prover-->>CATP: Groth16 proof artifact
+    CATP->>Manifest: write catp_authorization_proof_manifest_v1
+    CATP-->>User: catp verify authorization
+    CATP->>EVM: optional executeAuthorized proof check
+    EVM-->>User: verified authorization / updated spend
+  end
+```
+
+The npm CLI covers local enforcement, audit logs, witness generation, and proof
+manifest tooling. Full Groth16 proof generation and Sepolia execution require a
+repository checkout because the prover scripts, circuit assets, and contract
+deployment metadata live in this repo.
+
+---
+
 ## Layer 2 Proof Systems
 
 CATP currently contains two Layer 2 authorization proof paths.
