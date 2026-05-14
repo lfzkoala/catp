@@ -89,6 +89,7 @@ Use a temporary directory:
 ```bash
 mkdir -p /tmp/catp-user-test
 cd /tmp/catp-user-test
+export CATP_HOME="$PWD/.catp-home"
 catp init
 catp validate
 catp log verify
@@ -97,7 +98,8 @@ catp verify authorization --help
 ```
 
 This confirms the installed CLI is available and the local policy/audit surface
-works without a repository checkout.
+works without a repository checkout. `CATP_HOME` keeps the smoke test isolated
+from any existing audit logs under `~/.catp`.
 
 ## Option B: Repository Checkout
 
