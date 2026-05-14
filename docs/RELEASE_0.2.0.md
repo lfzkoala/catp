@@ -1,10 +1,12 @@
-# CATP CLI 0.2.0 Release Notes
+# CATP CLI 0.2.x Release Notes
 
 Package:
 
 ```text
-@catp-protocol/cli@0.2.0
+@catp-protocol/cli@0.2.1
 ```
+
+`0.2.1` is a patch release for `0.2.0` that fixes CLI version reporting.
 
 ## Why This Release
 
@@ -74,6 +76,6 @@ After publishing:
 
 ```bash
 npm view @catp-protocol/cli version
-npm install -g @catp-protocol/cli@0.2.0
+npm install -g @catp-protocol/cli@0.2.1
 catp --version
 ```
