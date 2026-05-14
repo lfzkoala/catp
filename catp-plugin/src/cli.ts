@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
 import { Command } from "commander";
 import { runPreHook } from "./hook/pre.js";
 import { runPostHook } from "./hook/post.js";
@@ -9,12 +10,15 @@ import { cmdAnchor } from "./commands/anchor.js";
 import { cmdWitness } from "./commands/witness.js";
 import { cmdProveAuthorization, cmdVerifyAuthorization } from "./commands/authorization.js";
 
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json") as { version: string };
+
 const program = new Command();
 
 program
   .name("catp")
   .description("CATP enforcement plugin — policy enforcement and audit for AI agents")
-  .version("0.1.0");
+  .version(version);
 
 program
   .command("init")
