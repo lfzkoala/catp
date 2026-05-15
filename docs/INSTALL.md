@@ -75,6 +75,13 @@ catp init
 catp validate
 ```
 
+For a starter policy that also includes Layer 2 authorization fields:
+
+```bash
+catp init --authorization
+catp validate
+```
+
 Check audit logs:
 
 ```bash

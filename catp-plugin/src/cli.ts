@@ -23,6 +23,7 @@ program
 program
   .command("init")
   .description("Scaffold a catp-policy.toml in the current directory")
+  .option("--authorization", "include example authorization_groth16_v1 policy fields")
   .action(cmdInit);
 
 program

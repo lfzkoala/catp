@@ -30,17 +30,36 @@ allow = false
 reason = "External network calls require explicit approval"
 `;
 
-export function cmdInit(): void {
+const AUTHORIZATION_TEMPLATE = `
+[authorization]
+allowed_action = "Swap"
+allowed_protocol = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+allowed_token = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+max_value_per_tx = "1000"
+max_value_total = "10000"
+valid_from = "1778042786"
+valid_until = "1778129246"
+`;
+
+export function policyTemplate(opts: { authorization?: boolean } = {}): string {
+  return opts.authorization ? `${TEMPLATE}${AUTHORIZATION_TEMPLATE}` : TEMPLATE;
+}
+
+export function cmdInit(opts: { authorization?: boolean } = {}): void {
   const dest = join(process.cwd(), "catp-policy.toml");
   if (existsSync(dest)) {
     process.stdout.write("catp-policy.toml already exists — skipping.\n");
     return;
   }
-  writeFileSync(dest, TEMPLATE, "utf8");
+  writeFileSync(dest, policyTemplate(opts), "utf8");
+  const authorizationStep = opts.authorization
+    ? "  3. Run: catp witness --action <action.json> --out <witness.json>\n" +
+      "  4. Add CATP hooks to ~/.claude/settings.json (see README)\n"
+    : "  3. Add CATP hooks to ~/.claude/settings.json (see README)\n";
   process.stdout.write(
     "Created catp-policy.toml\n\nNext steps:\n" +
     "  1. Edit catp-policy.toml to match your agent's requirements\n" +
     "  2. Run: catp validate\n" +
-    "  3. Add CATP hooks to ~/.claude/settings.json (see README)\n"
+    authorizationStep
   );
 }
