@@ -1,13 +1,18 @@
 import { findPolicyFile, loadPolicy } from "../policy/loader.js";
-import { buildEntry, appendAuditEntry, getLastCommitment } from "../audit/logger.js";
-import type { HookInput } from "../policy/types.js";
+import { appendAuditEntry, getLastCommitment } from "../audit/logger.js";
+import { claudeCodeAdapter } from "../adapters/claude-code.js";
+import { recordPostAction } from "../enforcement/core.js";
 
 export async function runPostHook(): Promise<void> {
   const raw = await readStdin();
-  let input: HookInput;
+  let parsed: unknown;
   try {
-    input = JSON.parse(raw) as HookInput;
+    parsed = JSON.parse(raw);
   } catch {
+    process.exit(0);
+  }
+  const action = claudeCodeAdapter.fromPostToolUse(parsed);
+  if (!action) {
     process.exit(0);
   }
 
@@ -23,9 +28,9 @@ export async function runPostHook(): Promise<void> {
 
   // PostToolUse always records allow — the action already executed
   const prev = getLastCommitment(policy.agent.id);
-  const entry = buildEntry(input, "allow", null, prev);
+  const result = recordPostAction(action, prev);
   try {
-    appendAuditEntry(policy.agent.id, entry);
+    appendAuditEntry(policy.agent.id, result.auditEntry);
   } catch {
     // Audit log failure must not block the agent
   }

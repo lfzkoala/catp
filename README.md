@@ -6,7 +6,7 @@ proofs.
 
 The active project has two connected surfaces:
 
-1. **Local enforcement**: a Claude Code hook plugin blocks tool calls outside a project policy and writes a tamper-evident audit log.
+1. **Local enforcement**: a runtime-neutral policy core blocks tool calls outside a project policy and writes a tamper-evident audit log; Claude Code is the first supported adapter.
 2. **Verifiable authorization**: a Groth16/BN254 EVM proof path proves that a structured agent action satisfies a committed private policy.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the current system shape and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the active roadmap.
@@ -17,7 +17,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the current system shape and [IMPLEME
 
 ```text
 In scope
-Local enforcement plugin          Claude Code hooks + TOML policy + SHA-256 audit log
+Local enforcement core            runtime adapters + TOML policy + SHA-256 audit log
 EVM delegated authorization       authorization_groth16_v1 = Groth16/BN254, Sepolia smoke passed
 Off-chain authorization path      authorization_v1 = Halo2/KZG/BN254, not EVM-deployable
 
@@ -41,8 +41,9 @@ current reference deployment target.
 sequenceDiagram
   autonumber
   actor User
-  participant Agent as Claude Code Agent
-  participant CATP as CATP CLI / Hooks
+  participant Agent as Agent Runtime
+  participant Adapter as Runtime Adapter
+  participant CATP as CATP CLI / Core
   participant Policy as catp-policy.toml
   participant Audit as Local Audit Log
   participant Prover as Groth16 Prover
@@ -51,10 +52,12 @@ sequenceDiagram
 
   User->>CATP: catp init / validate
   CATP->>Policy: load local policy rules
-  Agent->>CATP: PreToolUse(tool call)
+  Agent->>Adapter: tool call event
+  Adapter->>CATP: CATP ToolAction
   CATP->>Policy: evaluate allow / deny
   CATP-->>Agent: allow or block
-  Agent->>CATP: PostToolUse(result)
+  Agent->>Adapter: tool result event
+  Adapter->>CATP: CATP ToolAction
   CATP->>Audit: append SHA-256 commitment chain entry
 
   opt Structured authorization action

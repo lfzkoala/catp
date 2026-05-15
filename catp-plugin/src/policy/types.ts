@@ -18,12 +18,6 @@ export interface CatpPolicy {
   authorization?: AuthorizationConfig;
 }
 
-export interface HookInput {
-  session_id?: string;
-  tool_name: string;
-  tool_input: Record<string, unknown>;
-}
-
 export interface AuditEntry {
   ts: string;
   tool: string;

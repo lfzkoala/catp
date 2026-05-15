@@ -2,7 +2,7 @@
 
 CATP is a proof-centric agent authorization system. The current repository contains:
 
-- a local enforcement plugin for Claude Code
+- a runtime-neutral local enforcement core with a Claude Code adapter
 - a tamper-evident audit log
 - an authorization proof statement
 - a Groth16/BN254 EVM verifier path for testnet execution
@@ -21,15 +21,17 @@ surfaces:
 
 ```text
 Local enforcement
-  Claude Code hooks, TOML policy checks, tamper-evident audit log
+  runtime adapters, TOML policy checks, tamper-evident audit log
 
 Verifiable authorization
   private policy commitment, structured action witness, proof manifest,
   Groth16 EVM verifier path, Halo2 off-chain verifier path
 ```
 
-The local enforcement plugin is the developer-facing product surface. When a
-tool call or action has structured authorization data, it can feed the
+The local enforcement core is runtime-neutral. Claude Code is the first
+supported adapter: it maps `PreToolUse` and `PostToolUse` hook payloads into
+CATP's common `ToolAction` shape before policy evaluation or audit logging.
+When a tool call or action has structured authorization data, it can feed the
 authorization witness/proof flow.
 
 Future protocol areas such as encrypted messaging, output verification,
@@ -43,7 +45,7 @@ integration plan, and test strategy.
 
 ```text
 catp-plugin
-  Claude Code hooks, TOML policy engine, audit log, witness command
+  runtime adapters, TOML policy engine, audit log, witness command
 
 catp-circuits/authorization
   Halo2 authorization_v1 circuit and off-chain proof path
@@ -73,7 +75,9 @@ scripts
 ```mermaid
 flowchart TD
   Policy[catp-policy.toml] --> Hook[catp-plugin hooks]
-  Agent[Agent tool call] --> Hook
+  Agent[Agent runtime tool call] --> Adapter[Runtime adapter]
+  Adapter --> ToolAction[CATP ToolAction]
+  ToolAction --> Hook
 
   Hook --> Decision{Policy check}
   Decision -->|allow| ExecuteLocal[Tool executes]
@@ -109,8 +113,9 @@ The local enforcement surface is implemented by `catp-plugin`.
 Inputs:
 
 - `catp-policy.toml`
-- Claude Code `PreToolUse` hook event
-- Claude Code `PostToolUse` hook event
+- CATP `ToolAction` event
+- runtime adapter output, currently from Claude Code `PreToolUse` and
+  `PostToolUse` hook events
 
 Outputs:
 

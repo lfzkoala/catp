@@ -1,15 +1,18 @@
 import { describe, it, expect } from '@jest/globals';
 import { evaluate } from '../../src/policy/engine.js';
-import type { CatpPolicy, HookInput } from '../../src/policy/types.js';
+import type { CatpPolicy } from '../../src/policy/types.js';
+import type { ToolAction } from '../../src/runtime/types.js';
 
 const policy = (rules: CatpPolicy['rules']): CatpPolicy => ({
   agent: { id: 'test', version: '1' },
   rules,
 });
 
-const input = (tool: string, toolInput: Record<string, unknown> = {}): HookInput => ({
-  tool_name: tool,
-  tool_input: toolInput,
+const input = (tool: string, toolInput: Record<string, unknown> = {}): ToolAction => ({
+  runtime: 'test-runtime',
+  phase: 'pre',
+  toolName: tool,
+  toolInput,
 });
 
 describe('evaluate — default behavior', () => {

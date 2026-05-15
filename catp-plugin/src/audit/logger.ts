@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { auditDirForDate } from "./paths.js";
-import type { AuditEntry, AuthorizationAction, HookInput } from "../policy/types.js";
+import type { AuditEntry, AuthorizationAction } from "../policy/types.js";
+import type { ToolAction } from "../runtime/types.js";
 
 // Phase 0: SHA-256 audit commitment.
 // Chains on fields stored in the log (tool, decision, ts, prev) so the chain
@@ -21,8 +22,8 @@ export function computeCommitment(
     .digest("hex");
 }
 
-export function summarizeInput(input: HookInput): string {
-  const raw = JSON.stringify(input.tool_input);
+export function summarizeInput(input: ToolAction): string {
+  const raw = JSON.stringify(input.toolInput);
   return raw.length > 200 ? raw.slice(0, 200) + "…" : raw;
 }
 
@@ -52,7 +53,7 @@ export function appendAuditEntry(agentId: string, entry: AuditEntry): void {
 }
 
 export function buildEntry(
-  input: HookInput,
+  input: ToolAction,
   decision: "allow" | "deny",
   ruleMatched: string | null,
   prevCommitment: string = "0"
@@ -61,10 +62,10 @@ export function buildEntry(
   const inputSummary = summarizeInput(input);
   const entry: AuditEntry = {
     ts,
-    tool: input.tool_name,
+    tool: input.toolName,
     decision,
     rule_matched: ruleMatched,
-    commitment: computeCommitment(input.tool_name, decision, ts, prevCommitment, ruleMatched, inputSummary),
+    commitment: computeCommitment(input.toolName, decision, ts, prevCommitment, ruleMatched, inputSummary),
     input_summary: inputSummary,
   };
   const authorization = extractAuthorizationAction(input);
@@ -74,8 +75,8 @@ export function buildEntry(
   return entry;
 }
 
-export function extractAuthorizationAction(input: HookInput): AuthorizationAction | undefined {
-  const candidate = input.tool_input.catp_authorization ?? input.tool_input.authorization;
+export function extractAuthorizationAction(input: ToolAction): AuthorizationAction | undefined {
+  const candidate = input.toolInput.catp_authorization ?? input.toolInput.authorization;
   if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
     return undefined;
   }

@@ -1,5 +1,6 @@
 import micromatch from "micromatch";
-import type { CatpPolicy, Rule, HookInput } from "./types.js";
+import type { CatpPolicy, Rule } from "./types.js";
+import type { ToolAction } from "../runtime/types.js";
 
 export interface Decision {
   allow: boolean;
@@ -7,9 +8,9 @@ export interface Decision {
   reason: string;
 }
 
-export function evaluate(policy: CatpPolicy, input: HookInput): Decision {
+export function evaluate(policy: CatpPolicy, input: ToolAction): Decision {
   const toolRules = policy.rules.filter(
-    (r) => r.tool === "*" || r.tool === input.tool_name
+    (r) => r.tool === "*" || r.tool === input.toolName
   );
 
   for (const rule of toolRules) {
@@ -26,7 +27,7 @@ export function evaluate(policy: CatpPolicy, input: HookInput): Decision {
   return { allow: true, rule: null, reason: "no matching rule — default allow" };
 }
 
-function matchesRule(rule: Rule, input: HookInput): boolean {
+function matchesRule(rule: Rule, input: ToolAction): boolean {
   if (rule.pattern && rule.pattern.length > 0) {
     const command = extractCommand(input);
     if (command === null) return false;
@@ -51,14 +52,14 @@ function matchesRule(rule: Rule, input: HookInput): boolean {
   return true;
 }
 
-function extractCommand(input: HookInput): string | null {
-  const cmd = input.tool_input["command"];
+function extractCommand(input: ToolAction): string | null {
+  const cmd = input.toolInput["command"];
   return typeof cmd === "string" ? cmd : null;
 }
 
-function extractPath(input: HookInput): string | null {
+function extractPath(input: ToolAction): string | null {
   for (const key of ["file_path", "path", "filePath"]) {
-    const v = input.tool_input[key];
+    const v = input.toolInput[key];
     if (typeof v === "string") return v;
   }
   return null;

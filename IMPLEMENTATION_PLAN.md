@@ -49,6 +49,7 @@ research.
 ### Local Enforcement
 
 - `catp-policy.toml` schema and parser
+- Runtime-neutral `ToolAction` enforcement core with a Claude Code adapter
 - `PreToolUse` / `PostToolUse` hook handlers
 - Local audit log with commitment-chain verification
 - CLI commands: `init`, `validate`, `hook`, `log`, `anchor`

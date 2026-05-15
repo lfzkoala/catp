@@ -11,7 +11,7 @@ import {
   getLastCommitment,
   auditDir,
 } from '../../src/audit/logger.js';
-import type { HookInput } from '../../src/policy/types.js';
+import type { ToolAction } from '../../src/runtime/types.js';
 
 const TEST_AGENT = `__test__${Date.now()}`;
 const TEST_HOME = join(tmpdir(), `catp-plugin-test-${Date.now()}`);
@@ -25,9 +25,11 @@ afterEach(() => {
   }
 });
 
-const makeInput = (tool: string, toolInput: Record<string, unknown> = {}): HookInput => ({
-  tool_name: tool,
-  tool_input: toolInput,
+const makeInput = (tool: string, toolInput: Record<string, unknown> = {}): ToolAction => ({
+  runtime: 'test-runtime',
+  phase: 'pre',
+  toolName: tool,
+  toolInput,
 });
 
 describe('computeCommitment', () => {
