@@ -4,51 +4,38 @@ CATP is a proof-centric agent authorization system. The current repository conta
 
 - a local enforcement plugin for Claude Code
 - a tamper-evident audit log
-- a Layer 2 authorization proof statement
+- an authorization proof statement
 - a Groth16/BN254 EVM verifier path for testnet execution
 - a Halo2/KZG off-chain verifier path
-- Solidity contracts and TypeScript SDK adapters for Layer 2 authorization
+- Solidity contracts and TypeScript SDK adapters for verifiable authorization
 
 The protocol boundary is the versioned authorization statement and its public input schema. The current EVM implementation is a reference deployment, not the protocol boundary.
 
 ---
 
-## Layer Model
+## Current Architecture
 
-CATP is organized as six architectural layers. This repository currently implements the local enforcement surface and the Layer 2 authorization path.
+CATP is currently an enforcement + authorization system, not a full agent
+network stack. The repository is intentionally scoped to two production
+surfaces:
 
 ```text
-Layer 5  Agent Registry & Discovery
-         Capability metadata, discovery records, registry commitments
+Local enforcement
+  Claude Code hooks, TOML policy checks, tamper-evident audit log
 
-Layer 4  Reputation Protocol
-         Privacy-preserving reputation claims and performance commitments
-
-Layer 3  Output Verification
-         Output commitments, MPA/challenge contracts, boundary verification
-
-Layer 2  Authorization Policy Engine
-         Delegated permissions, policy commitments, ZK authorization proofs
-
-Layer 1  Encrypted Communication
-         Encrypted agent-to-agent or principal-to-agent messages
-
-Layer 0  Identity
-         Principal identity, wallet/DID/account binding
+Verifiable authorization
+  private policy commitment, structured action witness, proof manifest,
+  Groth16 EVM verifier path, Halo2 off-chain verifier path
 ```
 
-Current repo coverage:
+The local enforcement plugin is the developer-facing product surface. When a
+tool call or action has structured authorization data, it can feed the
+authorization witness/proof flow.
 
-| Layer | Repository status |
-|-------|-------------------|
-| Layer 0 | External identity boundary; not owned by the current repo |
-| Layer 1 | Not implemented in the current repo |
-| Layer 2 | Implemented for authorization proofs and EVM/testnet execution |
-| Layer 3 | Not implemented in the current repo |
-| Layer 4 | Not implemented in the current repo |
-| Layer 5 | Not implemented in the current repo |
-
-The local enforcement plugin is the developer-facing product surface. It sits above the protocol layers and feeds Layer 2 witness/proof generation when structured authorization data is present.
+Future protocol areas such as encrypted messaging, output verification,
+reputation, and registry/discovery are extension spaces. They should not
+re-enter the active architecture until they have a concrete proof statement,
+integration plan, and test strategy.
 
 ---
 
@@ -115,9 +102,9 @@ flowchart TD
 
 ---
 
-## Local Enforcement Layer
+## Local Enforcement Surface
 
-The local enforcement layer is implemented by `catp-plugin`.
+The local enforcement surface is implemented by `catp-plugin`.
 
 Inputs:
 
@@ -212,7 +199,7 @@ The public input layout has 13 values:
 
 ## Proof Systems
 
-CATP currently contains two Layer 2 authorization proof paths.
+CATP currently contains two authorization proof paths.
 
 | Proof version | Backend | Role | Status |
 |---------------|---------|------|--------|
@@ -289,7 +276,7 @@ Groth16Verifier.verifyProof(uint256[8] proof, uint256[13] input)
 
 ## TypeScript SDK Architecture
 
-The SDK exposes Layer 2 helpers for proof artifact consumption.
+The SDK exposes authorization proof helpers for proof artifact consumption.
 
 Key files:
 
@@ -313,7 +300,7 @@ The SDK validates proof artifact shape before converting it into EVM call fields
 
 ## Script Architecture
 
-Layer 2 operational scripts live in `scripts/`.
+Authorization operational scripts live in `scripts/`.
 
 | Script | Purpose |
 |--------|---------|

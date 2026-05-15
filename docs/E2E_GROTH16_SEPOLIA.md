@@ -1,6 +1,6 @@
 # E2E Groth16 Sepolia Flow
 
-This guide reproduces the current CATP Layer 0/2 slice:
+This guide reproduces the current CATP enforcement + authorization slice:
 
 ```text
 catp-policy.toml

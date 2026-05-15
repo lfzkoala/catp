@@ -1,8 +1,10 @@
 # CATP - Cryptographic Agent Trust Protocol
 
-CATP makes autonomous agent activity enforceable locally and provable externally.
+CATP is an authorization protocol for AI agents: it enforces local policy
+decisions and turns structured agent actions into verifiable authorization
+proofs.
 
-The current MVP has two connected surfaces:
+The active project has two connected surfaces:
 
 1. **Local enforcement**: a Claude Code hook plugin blocks tool calls outside a project policy and writes a tamper-evident audit log.
 2. **Verifiable authorization**: a Groth16/BN254 EVM proof path proves that a structured agent action satisfies a committed private policy.
@@ -11,22 +13,25 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the current system shape and [IMPLEME
 
 ---
 
-## What Works Today
+## Current Scope
 
 ```text
-Shipped
-Layer 0  Local enforcement plugin          Claude Code hooks + TOML policy + SHA-256 audit log
-Layer 2  EVM delegated authorization       authorization_groth16_v1 = Groth16/BN254, Sepolia smoke passed
-Layer 2  Off-chain authorization path      authorization_v1 = Halo2/KZG/BN254, not EVM-deployable
+In scope
+Local enforcement plugin          Claude Code hooks + TOML policy + SHA-256 audit log
+EVM delegated authorization       authorization_groth16_v1 = Groth16/BN254, Sepolia smoke passed
+Off-chain authorization path      authorization_v1 = Halo2/KZG/BN254, not EVM-deployable
 
-Out of active repo surface
-Layer 3  Output verification               output commitments + attestor/challenge design
-Layer 1  Encrypted agent communication     X25519 + AES-256-GCM + forward secrecy
-Layer 4  Privacy-preserving reputation     ZK-proven performance properties
-Layer 5  Verifiable agent registry         capability proofs + discovery
+Future extension space
+Output verification               output commitments + attestor/challenge design
+Encrypted communication           agent-to-agent or principal-to-agent encrypted messages
+Reputation                        privacy-preserving performance properties
+Registry and discovery            capability proofs + discovery records
 ```
 
-The protocol boundary is the authorization proof statement and public input schema, not Ethereum itself. Ethereum/Sepolia is the current reference deployment target.
+The current product is complete enough to stand alone as an enforcement +
+authorization protocol. The protocol boundary is the authorization proof
+statement and public input schema, not Ethereum itself. Ethereum/Sepolia is the
+current reference deployment target.
 
 ---
 
@@ -71,9 +76,9 @@ deployment metadata live in this repo.
 
 ---
 
-## Layer 2 Proof Systems
+## Authorization Proof Systems
 
-CATP currently contains two Layer 2 authorization proof paths.
+CATP currently contains two authorization proof paths.
 
 | Path | Role | Status |
 |------|------|--------|
@@ -188,7 +193,9 @@ catp log verify
 
 Logs are written to `${CATP_HOME:-~/.catp}/audit/<agentId>/<YYYY-MM-DD>/actions.jsonl`. Each entry chains on the previous commitment hash, forming a tamper-evident sequence.
 
-`catp anchor` can submit a Merkle root of local audit commitments on-chain. Structured Layer 2 authorization proofs use a separate private policy commitment path verified by `authorization_groth16_v1` on EVM or by the off-chain verifier path.
+`catp anchor` can submit a Merkle root of local audit commitments on-chain.
+Structured authorization proofs use a separate private policy commitment path
+verified by `authorization_groth16_v1` on EVM or by the off-chain verifier path.
 
 ---
 
@@ -361,7 +368,7 @@ the EVM verifier or the dedicated off-chain verifier path.
 
 See [docs/E2E_GROTH16_SEPOLIA.md](docs/E2E_GROTH16_SEPOLIA.md) for the full
 end-to-end flow and [docs/SECURITY_REVIEW_LAYER2.md](docs/SECURITY_REVIEW_LAYER2.md)
-for the Layer 2 review checklist.
+for the authorization proof review checklist.
 
 For a minimal runnable policy/action fixture, see
 [examples/authorization-basic](examples/authorization-basic).
@@ -412,7 +419,7 @@ forge test --match-path test/layer2/Groth16AuthorizationVerifier.t.sol
 
 ## Halo2 Path
 
-The Halo2 Layer 2 proof version is:
+The Halo2 authorization proof version is:
 
 ```text
 authorization_v1
@@ -436,7 +443,7 @@ The committed `catp-layer2-k12.srs` is for development and testnet consistency. 
 
 ```text
 catp/
-├── catp-plugin/            # TypeScript — Layer 0 enforcement plugin
+├── catp-plugin/            # TypeScript — local enforcement plugin
 │   └── src/
 │       ├── policy/         # TOML loader, rule engine
 │       ├── audit/          # Commitment chain logger and verifier
@@ -457,19 +464,18 @@ catp/
 
 ## Current Status
 
-| Layer | Component | Status |
-|-------|-----------|--------|
-| 0 | `catp-plugin` - Claude Code enforcement + audit log | Complete; published as `@catp-protocol/cli` |
-| 2 | `authorization_groth16_v1` compact EVM verifier | Sepolia smoke passed; real proof execution passing |
-| 2 | `Groth16Verifier.sol` | Generated verifier runtime about 6.4 KB |
-| 2 | `Groth16AuthorizationVerifier.sol` | Wrapper runtime about 1.1 KB |
-| 2 | `AgentAuthorizer.sol` + `ActionData.sol` | Complete |
-| 2 | Groth16 proof/execution scripts | Complete for testnet flow: prove, encode, dry-run, execute |
-| 2 | TypeScript SDK Layer 2 | Complete locally |
-| 2 | `authorization_v1` Halo2 circuit | Complete locally; EVM verifier blocked by bytecode size |
-| 2 | `catp-verify` Rust endpoint | Complete |
-| 3 | output verification contracts, attestor node, `boundary_v1` circuit | Planned; not in active repo surface |
-| 1, 4, 5 | messaging, reputation, registry | Planned |
+| Area | Component | Status |
+|------|-----------|--------|
+| Local enforcement | `catp-plugin` - Claude Code enforcement + audit log | Complete; published as `@catp-protocol/cli` |
+| Authorization | `authorization_groth16_v1` compact EVM verifier | Sepolia smoke passed; real proof execution passing |
+| Authorization | `Groth16Verifier.sol` | Generated verifier runtime about 6.4 KB |
+| Authorization | `Groth16AuthorizationVerifier.sol` | Wrapper runtime about 1.1 KB |
+| Authorization | `AgentAuthorizer.sol` + `ActionData.sol` | Complete |
+| Authorization | Groth16 proof/execution scripts | Complete for testnet flow: prove, encode, dry-run, execute |
+| Authorization | TypeScript SDK proof helpers | Complete locally |
+| Authorization | `authorization_v1` Halo2 circuit | Complete locally; EVM verifier blocked by bytecode size |
+| Authorization | `catp-verify` Rust endpoint | Complete |
+| Future extensions | output verification, messaging, reputation, registry/discovery | Not active repo surface |
 
 Run the checks in [CONTRIBUTING.md](CONTRIBUTING.md) before changing protocol or verifier code.
 
@@ -477,7 +483,7 @@ Run the checks in [CONTRIBUTING.md](CONTRIBUTING.md) before changing protocol or
 
 ## Prerequisites
 
-Layer 0 only:
+Local enforcement only:
 
 | Tool | Version |
 |------|---------|

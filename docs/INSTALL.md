@@ -75,7 +75,7 @@ catp init
 catp validate
 ```
 
-For a starter policy that also includes Layer 2 authorization fields:
+For a starter policy that also includes authorization proof fields:
 
 ```bash
 catp init --authorization
@@ -121,7 +121,7 @@ catp verify authorization --help
 
 ## Option B: Repository Checkout
 
-Use this path if you want the full Layer 2 proof flow or you are developing
+Use this path if you want the full authorization proof flow or you are developing
 CATP itself.
 
 ```bash

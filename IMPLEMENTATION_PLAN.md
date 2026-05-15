@@ -8,12 +8,13 @@ The current repository is intentionally scoped to two connected surfaces:
 
 1. **Local enforcement**: Claude Code hooks evaluate tool calls against
    `catp-policy.toml` and write a tamper-evident SHA-256 audit log.
-2. **Layer 2 authorization proofs**: a structured action is proven against a
+2. **Authorization proofs**: a structured action is proven against a
    committed private policy, then verified either off-chain or by the compact
    Groth16 EVM path.
 
-Everything outside Layer 0 and Layer 2 is planned protocol work, not active repo
-surface.
+This is now treated as a standalone project scope. Messaging, output
+verification, reputation, and registry/discovery are future extensions, not
+required layers.
 
 ---
 
@@ -45,7 +46,7 @@ research.
 
 ## Completed
 
-### Layer 0 Enforcement
+### Local Enforcement
 
 - `catp-policy.toml` schema and parser
 - `PreToolUse` / `PostToolUse` hook handlers
@@ -54,14 +55,14 @@ research.
 - npm package: `@catp-protocol/cli`
 - install documentation and smoke-test flow
 
-### Layer 2 Authorization
+### Authorization Proofs
 
 - Halo2 `ProveAuthorization` circuit at `k=12`
 - Groth16 `authorization_groth16_v1` circuit and gnark prover
 - Generated Groth16 Solidity verifier and CATP wrapper
 - `AgentAuthorizer.sol` policy registry and proof execution flow
 - Sepolia Groth16 deployment metadata and smoke-test record
-- TypeScript SDK Layer 2 proof artifact adapters
+- TypeScript SDK proof artifact adapters
 - `catp witness`
 - `catp prove authorization`
 - `catp verify authorization`
@@ -73,7 +74,7 @@ research.
 - Removed blocked Halo2 EVM adapter code.
 - Removed committed WASM build output.
 - Moved test-only Solidity stubs out of production sources.
-- Removed unused primitives crate and inactive Layer 3 contracts.
+- Removed unused primitives crate and inactive output-verification contracts.
 
 ---
 
@@ -86,7 +87,7 @@ Goal: make the current 0.2.x surface boring to install, test, and explain.
 Work:
 
 - Keep README, INSTALL, ARCHITECTURE, and release notes aligned with the current
-  Layer 0/2 scope.
+  enforcement + authorization scope.
 - Document npm package limits clearly: local enforcement and manifest tooling are
   in npm; full Groth16 proof generation requires a repo checkout.
 - Keep `examples/authorization-basic` working as the first user-facing proof
@@ -100,7 +101,7 @@ Exit criteria:
 - A developer can reproduce the Groth16 proof artifact and verify/deploy path
   from documented commands.
 
-### P0: Layer 2 Security Hardening
+### P0: Authorization Proof Security Hardening
 
 Goal: reduce the chance that `authorization_groth16_v1` verifies an invalid
 action or drifts from its documented public input schema.
@@ -182,10 +183,10 @@ get new verifier addresses, metadata, and SDK/CLI gates.
 - Production mainnet trusted setup ceremony
 - Fully proof-centric policy/spend state
 - Nova/HyperNova/folding production integration
-- Layer 1 encrypted messaging
-- Layer 3 output verification and attestor/challenge contracts
-- Layer 4 reputation proofs
-- Layer 5 registry/discovery
+- Encrypted agent communication
+- Output verification and attestor/challenge contracts
+- Reputation proofs
+- Registry/discovery
 - Cross-chain verifier deployments
 
 These are valid protocol directions, but they should re-enter the repository

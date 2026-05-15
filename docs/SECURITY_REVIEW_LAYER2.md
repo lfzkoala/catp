@@ -1,8 +1,8 @@
-# CATP Layer 2 Security Review
+# CATP Authorization Security Review
 
 Status: initial living review for `authorization_groth16_v1`.
 
-This document records the current security posture of the CATP Layer 2
+This document records the current security posture of the CATP authorization
 authorization path. It is not a third-party audit. It is the repository-owned
 checklist that must stay current whenever public inputs, circuit constraints,
 policy encoding, verifier generation, or contract state transitions change.
@@ -25,7 +25,7 @@ Reviewed components:
 Out of scope for this review:
 
 - Mainnet trusted setup ceremony.
-- Layer 3 attestation/challenge security.
+- Future output attestation/challenge security.
 - Agent identity, key custody, and wallet operational security.
 - Economic security of any future open attestor or reputation network.
 
@@ -127,7 +127,7 @@ Follow-up:
 
 ## Required Regression Tests
 
-Keep these checks green before changing Layer 2:
+Keep these checks green before changing authorization proof code:
 
 ```bash
 npm run typecheck --workspace catp-plugin
@@ -146,7 +146,7 @@ scripts/execute-groth16-authorization.sh --dry-run
 
 ## Release Gate
 
-A Layer 2 release candidate must include:
+An authorization release candidate must include:
 
 - Updated proof version and verifier address if any proof boundary changed.
 - Updated setup manifest and deployment metadata.
