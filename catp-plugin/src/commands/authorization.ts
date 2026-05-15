@@ -173,6 +173,7 @@ export function cmdProveAuthorization(opts: {
     if (opts.out) {
       writeFileSync(opts.out, encoded, "utf8");
       process.stdout.write(`Wrote authorization proof manifest to ${opts.out}\n`);
+      process.stdout.write(formatAuthorizationManifestSummary(manifest, { includeStatus: false }));
     } else {
       process.stdout.write(encoded);
     }
@@ -210,12 +211,7 @@ export function cmdVerifyAuthorization(opts: { manifest?: string; checkAudit?: b
 
   const manifest = JSON.parse(readFileSync(opts.manifest, "utf8")) as AuthorizationProofManifest;
   validateAuthorizationProofManifest(manifest);
-  const lines = [
-    "Authorization proof manifest is structurally valid.",
-    `proofVersion=${manifest.proofVersion}`,
-    `policyCommitment=${manifest.policyCommitment}`,
-    `auditCommitment=${manifest.auditCommitment ?? "none"}`,
-  ];
+  const extraLines: string[] = [];
   if (opts.checkAudit) {
     const auditAgent = opts.auditAgent ?? manifest.auditAgent;
     if (!manifest.auditCommitment) {
@@ -227,9 +223,41 @@ export function cmdVerifyAuthorization(opts: { manifest?: string; checkAudit?: b
     if (!findAuditEntry(auditAgent, manifest.auditCommitment)) {
       throw new Error(`No audit entry found for commitment ${manifest.auditCommitment}`);
     }
-    lines.push(`auditEntry=found:${auditAgent}`);
+    extraLines.push(`auditEntry=found:${auditAgent}`);
   }
-  process.stdout.write(`${lines.join("\n")}\n`);
+  process.stdout.write(formatAuthorizationManifestSummary(manifest, {
+    extraLines,
+    includeStatus: true,
+  }));
+}
+
+export function formatAuthorizationManifestSummary(
+  manifest: AuthorizationProofManifest,
+  opts: { extraLines?: string[]; includeStatus?: boolean } = {},
+): string {
+  const lines = [
+    ...(opts.includeStatus === false ? [] : ["Authorization proof manifest is structurally valid."]),
+    `proofVersion=${manifest.proofVersion}`,
+    `policyCommitment=${manifest.policyCommitment}`,
+    `value=${manifest.value}`,
+    `currentTimestamp=${manifest.currentTimestamp}`,
+    `cumulativeSpend=${manifest.cumulativeSpend}`,
+    `chainId=${manifest.chainId ?? "none"}`,
+    `verifier=${manifest.verifier ?? "none"}`,
+    `agentAuthorizer=${manifest.agentAuthorizer ?? "none"}`,
+    `auditCommitment=${manifest.auditCommitment ?? "none"}`,
+    `auditAgent=${manifest.auditAgent ?? "none"}`,
+    `sourceArtifact=${manifest.sourceArtifact ?? "none"}`,
+    `proofUrl=${manifest.proofUrl ?? "none"}`,
+    ...(opts.extraLines ?? []),
+    "cryptographicVerification=external:EVM-or-offchain-verifier",
+  ];
+  if (manifest.agentAuthorizer) {
+    lines.push("next=Use the proof artifact with AgentAuthorizer.executeAuthorized or npm run groth16:execute.");
+  } else {
+    lines.push("next=Attach deployment metadata to execute this proof on-chain.");
+  }
+  return `${lines.join("\n")}\n`;
 }
 
 function validateGroth16Artifact(artifact: AuthorizationProofArtifact): void {

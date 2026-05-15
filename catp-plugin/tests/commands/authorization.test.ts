@@ -6,6 +6,7 @@ import {
   buildAuthorizationProofManifest,
   cmdProveAuthorization,
   cmdVerifyAuthorization,
+  formatAuthorizationManifestSummary,
   readDeploymentMetadata,
   validateAuthorizationProofManifest,
   type AuthorizationProofArtifact,
@@ -119,7 +120,11 @@ describe("authorization proof manifest", () => {
     writeFileSync(artifactPath, JSON.stringify(artifact), "utf8");
 
     const originalWrite = process.stdout.write.bind(process.stdout);
-    process.stdout.write = (() => true) as typeof process.stdout.write;
+    let output = "";
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      output += chunk.toString();
+      return true;
+    }) as typeof process.stdout.write;
     try {
       cmdProveAuthorization({
         artifact: artifactPath,
@@ -137,6 +142,11 @@ describe("authorization proof manifest", () => {
       auditCommitment: "ef".repeat(32),
       sourceArtifact: artifactPath,
     });
+    expect(output).toContain(`Wrote authorization proof manifest to ${outPath}`);
+    expect(output).toContain("proofVersion=authorization_groth16_v1");
+    expect(output).toContain("chainId=11155111");
+    expect(output).toContain(`sourceArtifact=${artifactPath}`);
+    expect(output).toContain("cryptographicVerification=external:EVM-or-offchain-verifier");
   });
 
   it("reads verifier metadata from deployment JSON", () => {
@@ -341,5 +351,30 @@ JSON
     }
 
     expect(output).toContain("auditEntry=found:manifest-agent");
+    expect(output).toContain("currentTimestamp=150");
+    expect(output).toContain("cumulativeSpend=0");
+    expect(output).toContain("cryptographicVerification=external:EVM-or-offchain-verifier");
+  });
+
+  it("formats a useful manifest summary", () => {
+    const manifest = buildAuthorizationProofManifest(artifact, {
+      auditCommitment: "cd".repeat(32),
+      auditAgent: "summary-agent",
+      verifier: `0x${"12".repeat(20)}`,
+      agentAuthorizer: `0x${"34".repeat(20)}`,
+      chainId: "11155111",
+      sourceArtifact: "proof.json",
+    });
+
+    const summary = formatAuthorizationManifestSummary(manifest);
+
+    expect(summary).toContain("Authorization proof manifest is structurally valid.");
+    expect(summary).toContain("proofVersion=authorization_groth16_v1");
+    expect(summary).toContain(`policyCommitment=${artifact.policyCommitment}`);
+    expect(summary).toContain("value=500");
+    expect(summary).toContain("auditAgent=summary-agent");
+    expect(summary).toContain(`verifier=0x${"12".repeat(20)}`);
+    expect(summary).toContain(`agentAuthorizer=0x${"34".repeat(20)}`);
+    expect(summary).toContain("next=Use the proof artifact with AgentAuthorizer.executeAuthorized");
   });
 });

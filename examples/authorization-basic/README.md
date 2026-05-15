@@ -45,7 +45,7 @@ catp witness \
   --out /tmp/catp-authorization-basic.witness.json
 ```
 
-The generated witness should match the current Groth16 fixture shape:
+The generated witness should contain:
 
 ```text
 actionType
@@ -63,7 +63,7 @@ validFrom
 validUntil
 ```
 
-## Generate A Proof Manifest
+## Generate And Validate A Proof Manifest
 
 Full Groth16 proof generation requires a repository checkout because it uses the
 Go/Gnark prover and circuit assets under `catp-circuits/groth16`.
@@ -82,7 +82,19 @@ catp prove authorization \
 ```
 
 This command writes the proof artifact and manifest only; it should not modify
-the repository worktree.
+the repository worktree. The summary should include:
+
+```text
+proofVersion=authorization_groth16_v1
+value=500
+currentTimestamp=1778042846
+cumulativeSpend=0
+chainId=11155111
+verifier=0xeeebbf575556cd673209525573334934a4f1c3f1
+agentAuthorizer=0xb5290d2c376d84c15de4fbfde64a9a5499eee23e
+sourceArtifact=/tmp/catp-authorization-basic.proof.json
+cryptographicVerification=external:EVM-or-offchain-verifier
+```
 
 Validate the manifest:
 
@@ -91,5 +103,26 @@ catp verify authorization \
   --manifest /tmp/catp-authorization-basic.manifest.json
 ```
 
+The validation summary should repeat the same proof version, policy commitment,
+deployment metadata, value, timestamp, and cumulative spend.
+
 This manifest validation is structural. Cryptographic verification is performed
 by the EVM verifier or a dedicated off-chain verifier path.
+
+## Optional: Prepare On-Chain Execution
+
+To build calldata without broadcasting:
+
+```bash
+npm run groth16:encode-execute -- \
+  --artifact /tmp/catp-authorization-basic.proof.json \
+  --out /tmp/catp-authorization-basic.calldata.json
+```
+
+To dry-run or broadcast with the checked-in Sepolia deployment metadata, use:
+
+```bash
+npm run groth16:execute -- \
+  --artifact /tmp/catp-authorization-basic.proof.json \
+  --dry-run
+```
