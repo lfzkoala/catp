@@ -1,7 +1,0 @@
-[package]
-name = "catp-layer5"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-catp-primitives = { path = "../primitives" }

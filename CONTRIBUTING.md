@@ -10,8 +10,7 @@ catp/
 ├── catp-circuits/   # Rust      — Halo2 ZK circuits (cargo)
 ├── catp-contracts/  # Solidity  — on-chain verifiers (Foundry)
 ├── catp-sdk/        # TypeScript — developer SDK (pnpm)
-├── catp-node/       # Rust      — MPA attestor node (cargo)
-└── catp-tests/      # Integration tests (scaffold)
+└── catp-verify/     # Rust      — off-chain verifier service (cargo)
 ```
 
 ## Component Dev Setup
@@ -93,7 +92,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 feat: add Poseidon hash commitment to audit log
 fix: correct path_allowlist match semantics in engine
 test: add verifier chain-tamper tests
-docs: update CONTRIBUTING with catp-node setup
+docs: update installation guide
 ```
 
 Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`

@@ -260,7 +260,7 @@ Exit criteria:
 
 - Layer 3 trust model documented.
 - Contract roles and operational keys are listed.
-- Integration-test scenarios are specified before `catp-node` implementation.
+- Integration-test scenarios are specified before an attestor service implementation.
 
 ---
 
@@ -272,7 +272,7 @@ Goal: prove that a committed output lies inside a permitted numeric range withou
 
 Build:
 
-- Implement `catp-circuits/layer3` beyond scaffold.
+- Add a dedicated Layer 3 circuit crate when the `boundary_v1` proof statement is finalized.
 - Public inputs: `outputCommitment`, `boundarySpecCommitment` or explicit min/max fields.
 - Private inputs: output value and salt.
 - Constraints:
@@ -292,7 +292,7 @@ Goal: run the non-ZK part of Layer 3 end-to-end.
 
 Build:
 
-- `catp-node` attestor service
+- Attestor service
 - staking and registration flow
 - output commitment submission
 - consensus finalization

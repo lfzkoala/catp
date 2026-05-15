@@ -454,9 +454,7 @@ catp/
 │   └── src/layer3/         # CommitRegistry, MPAVerifier, OptimisticChallenge
 ├── catp-sdk/               # TypeScript — developer-facing SDK
 │   └── src/layer2/         # types, PolicyBuilder, AuthorizerClient, ProofClient
-├── catp-verify/            # Rust — off-chain proof verification endpoint
-├── catp-node/              # Rust — MPA attestor node scaffold
-└── catp-tests/             # Integration test scaffold
+└── catp-verify/            # Rust — off-chain proof verification endpoint
 ```
 
 ---
@@ -476,7 +474,7 @@ catp/
 | 2 | `catp-verify` Rust endpoint | Complete |
 | 3 | `CommitRegistry.sol`, `MPAVerifier.sol`, `OptimisticChallenge.sol` | Partial |
 | 3 | attestor node + `boundary_v1` circuit | Pending |
-| 1, 4, 5 | messaging, reputation, registry | Scaffold/planned |
+| 1, 4, 5 | messaging, reputation, registry | Planned |
 
 Last recorded full-stack baseline: 214 passing tests across TypeScript/Jest, Vitest, Rust, and Solidity/Forge.
 
@@ -498,7 +496,7 @@ Full stack:
 | Node.js | >= 20 | catp-plugin, catp-sdk |
 | npm | >= 10 | root scripts, catp-plugin |
 | pnpm | >= 9 | catp-sdk |
-| Rust | stable via `rust-toolchain.toml` | catp-circuits, catp-verify, catp-node |
+| Rust | stable via `rust-toolchain.toml` | catp-circuits, catp-verify |
 | Go | >= 1.23 | gnark Groth16 prover |
 | Foundry | latest | catp-contracts, deploy/smoke scripts |
 | jq | any modern version | shell scripts |

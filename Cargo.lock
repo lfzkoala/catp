@@ -303,31 +303,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "catp-layer3"
-version = "0.1.0"
-dependencies = [
- "catp-primitives",
-]
-
-[[package]]
-name = "catp-layer4"
-version = "0.1.0"
-dependencies = [
- "catp-primitives",
-]
-
-[[package]]
-name = "catp-layer5"
-version = "0.1.0"
-dependencies = [
- "catp-primitives",
-]
-
-[[package]]
-name = "catp-node"
-version = "0.1.0"
-
-[[package]]
 name = "catp-primitives"
 version = "0.1.0"
 dependencies = [

@@ -3,11 +3,7 @@ resolver = "2"
 members = [
     "catp-circuits/primitives",
     "catp-circuits/layer2",
-    "catp-circuits/layer3",
-    "catp-circuits/layer4",
-    "catp-circuits/layer5",
     "catp-circuits/wasm",
-    "catp-node",
     "catp-verify",
 ]
 
@@ -20,4 +16,3 @@ opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 3
-
