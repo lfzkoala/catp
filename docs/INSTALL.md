@@ -180,6 +180,9 @@ catp verify authorization \
 For the complete Sepolia flow, see
 [`docs/E2E_GROTH16_SEPOLIA.md`](E2E_GROTH16_SEPOLIA.md).
 
+For a minimal policy/action fixture, see
+[`examples/authorization-basic`](../examples/authorization-basic).
+
 ## Troubleshooting
 
 If `npm pack` or `npm publish` fails with local cache permissions, use a

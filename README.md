@@ -365,6 +365,9 @@ See [docs/E2E_GROTH16_SEPOLIA.md](docs/E2E_GROTH16_SEPOLIA.md) for the full
 end-to-end flow and [docs/SECURITY_REVIEW_LAYER2.md](docs/SECURITY_REVIEW_LAYER2.md)
 for the Layer 2 review checklist.
 
+For a minimal runnable policy/action fixture, see
+[examples/authorization-basic](examples/authorization-basic).
+
 ---
 
 ## Deployment and Verification Commands
