@@ -37,6 +37,21 @@ The action spends `500`, so it satisfies the policy when
 From the repository root:
 
 ```bash
+catp validate --file examples/authorization-basic/catp-policy.toml
+```
+
+The validation summary should include:
+
+```text
+authorization: authorization_groth16_v1-ready
+allowedAction: Swap
+maxValuePerTx: 1000
+maxValueTotal: 10000
+```
+
+Then generate the witness:
+
+```bash
 catp witness \
   --file examples/authorization-basic/catp-policy.toml \
   --action examples/authorization-basic/action.json \
