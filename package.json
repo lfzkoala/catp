@@ -8,6 +8,7 @@
     "groth16:encode-execute": "bash scripts/encode-groth16-execute.sh",
     "groth16:execute": "bash scripts/execute-groth16-authorization.sh",
     "groth16:size": "bash scripts/check-groth16-verifier-size.sh",
-    "groth16:check": "bash scripts/check-groth16-setup.sh"
+    "groth16:check": "bash scripts/check-groth16-setup.sh",
+    "wasm:build": "wasm-pack build catp-circuits/wasm --target nodejs --out-dir pkg"
   }
 }

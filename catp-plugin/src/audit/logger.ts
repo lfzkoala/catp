@@ -4,10 +4,10 @@ import { join } from "node:path";
 import { auditDirForDate } from "./paths.js";
 import type { AuditEntry, AuthorizationAction, HookInput } from "../policy/types.js";
 
-// Phase 0: SHA-256 commitment placeholder.
+// Phase 0: SHA-256 audit commitment.
 // Chains on fields stored in the log (tool, decision, ts, prev) so the chain
 // is verifiable from the JSONL file alone without replaying tool_input.
-// Phase 1 replaces this with a Poseidon hash over the full action witness via WASM.
+// A future proof bridge can add Poseidon commitments over the full action witness.
 export function computeCommitment(
   tool: string,
   decision: "allow" | "deny",

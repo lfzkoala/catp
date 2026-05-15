@@ -448,7 +448,7 @@ catp/
 │   ├── primitives/         # Poseidon, SMT, encryption primitives, proof abstractions
 │   ├── layer2/             # Halo2 ProveAuthorization circuit + SRS + e2e tests
 │   ├── groth16/            # gnark Groth16 authorization verifier path
-│   └── wasm/               # wasm-pack bindings
+│   └── wasm/               # wasm-pack source bindings; pkg/ is generated
 ├── catp-contracts/         # Solidity — verifiers + protocol contracts
 │   ├── src/layer2/         # AgentAuthorizer, verifier wrappers, proof adapters
 │   └── src/layer3/         # CommitRegistry, MPAVerifier, OptimisticChallenge

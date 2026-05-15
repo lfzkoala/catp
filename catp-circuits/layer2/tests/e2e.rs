@@ -50,8 +50,7 @@ fn e2e_trustless_verification() {
     let policy = test_policy();
     let commitment = native_policy_commitment(&policy);
 
-    let ps = AuthorizationProofSystem::from_file(srs_path())
-        .expect("failed to load SRS — run `cargo run --bin generate_verifier` first");
+    let ps = AuthorizationProofSystem::from_file(srs_path()).expect("failed to load committed SRS");
 
     let public_inputs = test_public_inputs(commitment);
 

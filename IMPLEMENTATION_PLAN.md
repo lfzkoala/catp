@@ -80,7 +80,7 @@ Delivered:
 - shared KZG SRS file for testnet/dev consistency
 - historical generated Halo2 Solidity verifier path removed after it exceeded EVM runtime size limits
 - `AgentAuthorizer.sol` using `IVerifier`
-- WASM bundle with `compute_policy_commitment`, `prove_authorization`, `verify_authorization`
+- WASM source bindings with `compute_policy_commitment`, `prove_authorization`, `verify_authorization`
 - `catp-verify` Rust library and REST endpoint
 - TypeScript SDK Layer 2 clients and tests
 
@@ -114,7 +114,7 @@ Goal: make the current Layer 0/2 slice reproducible for outside users.
 Work:
 
 - Audit npm package contents and install flow.
-- Decide whether WASM `pkg/` is committed, generated in CI, or published as a package artifact.
+- Keep WASM source in git; generate `catp-circuits/wasm/pkg/` only as a build or package artifact.
 - Document contract build/deploy commands.
 - Document SRS generation/loading behavior for dev, testnet, and future mainnet.
 - Add a "known limits" section for Halo2/KZG, testnet SRS, and proof versioning.
@@ -436,7 +436,7 @@ This should live in an experimental crate/branch until the state machine is stab
 |-----------|--------|
 | Enforcement plugin (`catp-plugin/`) | Complete; published as `@catp-protocol/cli` |
 | `ProveAuthorization` Halo2 circuit | Complete locally; formal review pending |
-| WASM prover bundle (`catp-circuits/wasm`) | Complete |
+| WASM source bindings (`catp-circuits/wasm`) | Complete; generated `pkg/` excluded from git |
 | `AgentAuthorizer.sol` + `ActionData.sol` | Complete |
 | `catp-verify` REST verification endpoint | Complete |
 | TypeScript SDK Layer 2 | Complete locally |
@@ -448,7 +448,7 @@ This should live in an experimental crate/branch until the state machine is stab
 | Layer 3 contracts | Partial |
 | Layer 3 attestor node | Pending |
 | `boundary_v1` circuit | Pending |
-| Layers 1, 4, 5 | Scaffold only |
+| Layers 1, 4, 5 | Not in active repository surface |
 
 Current local test count: 214 passing across TypeScript/Jest, Vitest, Rust, and Solidity/Forge.
 
@@ -464,7 +464,7 @@ Current local test count: 214 passing across TypeScript/Jest, Vitest, Rust, and 
 | Halo2 EVM adapter | removed; off-chain Halo2 verifier path remains |
 | `Groth16AuthorizationVerifier.sol` | compact verifier calldata format, gas cap, generated Groth16 verifier |
 | `AgentAuthorizer.sol` | `IVerifier`, policy commitment, action encoding |
-| SDK Layer 2 | WASM bundle, contract ABIs, public input schema |
+| SDK Layer 2 | WASM interface, contract ABIs, public input schema |
 | `catp-verify` | Rust verifier path and matching SRS |
 | Sepolia smoke test | Groth16 deploy scripts, funded account, RPC, ABI metadata |
 | Audit-log-to-proof bridge | Phase 0 audit format + Layer 2 witness format |
