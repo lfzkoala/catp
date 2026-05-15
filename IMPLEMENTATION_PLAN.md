@@ -50,6 +50,7 @@ research.
 
 - `catp-policy.toml` schema and parser
 - Runtime-neutral `ToolAction` enforcement core with a Claude Code adapter
+- `catp event validate` for checking canonical events and adapter payloads
 - `PreToolUse` / `PostToolUse` hook handlers
 - Local audit log with commitment-chain verification
 - CLI commands: `init`, `validate`, `hook`, `log`, `anchor`

@@ -8,6 +8,7 @@ import { cmdValidate } from "./commands/validate.js";
 import { cmdLogShow, cmdLogVerify } from "./commands/log.js";
 import { cmdAnchor } from "./commands/anchor.js";
 import { cmdWitness } from "./commands/witness.js";
+import { cmdValidateEvent } from "./commands/event.js";
 import { cmdProveAuthorization, cmdVerifyAuthorization } from "./commands/authorization.js";
 
 const require = createRequire(import.meta.url);
@@ -43,6 +44,19 @@ hook
   .command("post")
   .description("PostToolUse handler — reads stdin JSON, records to audit log")
   .action(() => { runPostHook().catch(() => process.exit(0)); });
+
+const event = program.command("event").description("Runtime-neutral event utilities");
+
+event
+  .command("validate")
+  .description("Validate a CATP ToolAction event or adapter payload")
+  .option("--file <path>", "read event JSON from file instead of stdin")
+  .option("--adapter <name>", "adapter payload to normalize first: claude-code")
+  .option("--phase <phase>", "adapter phase: pre or post", "pre")
+  .action((opts) => { cmdValidateEvent(opts).catch((err) => {
+    process.stderr.write(`catp: ${(err as Error).message}\n`);
+    process.exit(1);
+  }); });
 
 const log = program.command("log").description("Audit log commands");
 
