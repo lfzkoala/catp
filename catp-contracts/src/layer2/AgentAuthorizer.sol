@@ -7,9 +7,9 @@ import "./ActionData.sol";
 
 /// @title AgentAuthorizer
 /// @notice CATP Layer 2: policy registry and ZK proof verifier.
-/// @dev Accepts an IVerifier at construction time. Tests can use StubVerifier;
-///      EVM deployments should inject the active versioned verifier wrapper.
-///      Swapping the verifier requires no changes to authorization logic.
+/// @dev Accepts an IVerifier at construction time. EVM deployments should inject
+///      the active versioned verifier wrapper. Swapping the verifier requires no
+///      changes to authorization logic.
 contract AgentAuthorizer is IAgentAuthorizer {
     IVerifier public immutable verifier;
     uint256 public constant PROOF_MAX_AGE = 5 minutes;

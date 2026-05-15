@@ -3,8 +3,8 @@ pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
 import "../../src/layer2/AgentAuthorizer.sol";
-import "../../src/layer2/StubVerifier.sol";
 import "../../src/layer2/ActionData.sol";
+import "./StubVerifier.sol";
 
 contract AgentAuthorizerTest is Test {
     AgentAuthorizer public authorizer;

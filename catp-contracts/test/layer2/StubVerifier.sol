@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import "./IVerifier.sol";
+import "../../src/layer2/IVerifier.sol";
 
 /// @title StubVerifier
 /// @notice Test verifier — accepts any non-empty proof.
