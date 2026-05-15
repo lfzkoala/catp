@@ -23,7 +23,7 @@ catp/
 cd catp-plugin
 NODE_ENV=development npm install   # installs devDependencies
 npm run typecheck                  # tsc --noEmit
-npm test                           # jest (56 tests)
+npm test                           # jest
 npm run test:coverage              # jest with coverage report
 npm run build                      # compiles src/ → dist/
 ```
@@ -37,7 +37,8 @@ Tests live in `catp-plugin/tests/`. Coverage targets: 80% lines/functions/statem
 ```bash
 cd catp-sdk
 NODE_ENV=development pnpm install
-pnpm tsc --noEmit                  # type-check only (no runtime tests yet)
+pnpm run typecheck
+pnpm test
 ```
 
 ### catp-circuits (Halo2 ZK circuits)
@@ -45,7 +46,7 @@ pnpm tsc --noEmit                  # type-check only (no runtime tests yet)
 **Toolchain:** Rust stable (see `rust-toolchain.toml`)
 
 ```bash
-cargo test --workspace             # runs MockProver tests (9 tests)
+cargo test --workspace
 cargo clippy --workspace -- -D warnings
 cargo fmt --check
 ```
@@ -57,7 +58,7 @@ cargo fmt --check
 ```bash
 cd catp-contracts
 forge build
-forge test                         # 34 tests across Layer 2 + Layer 3
+forge test                         # Layer 2 contract tests
 ```
 
 ## Pre-Push Checks

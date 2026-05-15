@@ -7,7 +7,7 @@ The current MVP has two connected surfaces:
 1. **Local enforcement**: a Claude Code hook plugin blocks tool calls outside a project policy and writes a tamper-evident audit log.
 2. **Verifiable authorization**: a Groth16/BN254 EVM proof path proves that a structured agent action satisfies a committed private policy.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the execution plan.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the current system shape and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the active roadmap.
 
 ---
 
@@ -19,7 +19,7 @@ Layer 0  Local enforcement plugin          Claude Code hooks + TOML policy + SHA
 Layer 2  EVM delegated authorization       authorization_groth16_v1 = Groth16/BN254, Sepolia smoke passed
 Layer 2  Off-chain authorization path      authorization_v1 = Halo2/KZG/BN254, not EVM-deployable
 
-Planned
+Out of active repo surface
 Layer 3  Output verification               output commitments + attestor/challenge design
 Layer 1  Encrypted agent communication     X25519 + AES-256-GCM + forward secrecy
 Layer 4  Privacy-preserving reputation     ZK-proven performance properties
@@ -471,7 +471,7 @@ catp/
 | 3 | output verification contracts, attestor node, `boundary_v1` circuit | Planned; not in active repo surface |
 | 1, 4, 5 | messaging, reputation, registry | Planned |
 
-Last recorded full-stack baseline: 214 passing tests across TypeScript/Jest, Vitest, Rust, and Solidity/Forge.
+Run the checks in [CONTRIBUTING.md](CONTRIBUTING.md) before changing protocol or verifier code.
 
 ---
 
