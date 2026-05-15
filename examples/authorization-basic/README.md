@@ -81,6 +81,9 @@ catp prove authorization \
   --out /tmp/catp-authorization-basic.manifest.json
 ```
 
+This command writes the proof artifact and manifest only; it should not modify
+the repository worktree.
+
 Validate the manifest:
 
 ```bash
@@ -90,4 +93,3 @@ catp verify authorization \
 
 This manifest validation is structural. Cryptographic verification is performed
 by the EVM verifier or a dedicated off-chain verifier path.
-

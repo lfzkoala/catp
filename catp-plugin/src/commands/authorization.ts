@@ -309,6 +309,7 @@ function generateGroth16Artifact(opts: {
     witnessPath,
     "--out",
     artifactPath,
+    "--proof-only",
   ], { stdio: "inherit" });
 
   return { artifactPath, cleanupDir };

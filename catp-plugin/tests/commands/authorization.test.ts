@@ -282,6 +282,7 @@ out=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --out) out="$2"; shift 2 ;;
+    --proof-only) shift ;;
     *) shift 2 ;;
   esac
 done

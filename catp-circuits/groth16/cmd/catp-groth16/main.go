@@ -155,6 +155,7 @@ func writeLimbs(out []byte, limbs [4]uint64) {
 func main() {
 	witnessPath := flag.String("witness", "", "optional JSON witness file; defaults to a built-in smoke witness")
 	outputPath := flag.String("out", "", "optional proof artifact output path")
+	proofOnly := flag.Bool("proof-only", false, "only write the proof artifact; do not rewrite Solidity verifier, setup manifest, or smoke fixture")
 	flag.Parse()
 
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -256,8 +257,10 @@ func main() {
 	var verifierSource bytes.Buffer
 	must(vk.ExportSolidity(&verifierSource))
 	source := strings.Replace(verifierSource.String(), "contract Verifier {", "contract Groth16Verifier {", 1)
-	must(os.WriteFile(contractOut, []byte(source), 0o644))
 	verifierSourceSha256 := sha256HexBytes([]byte(source))
+	if !*proofOnly {
+		must(os.WriteFile(contractOut, []byte(source), 0o644))
+	}
 
 	var proofBuf bytes.Buffer
 	_, err = proof.WriteRawTo(&proofBuf)
@@ -320,38 +323,41 @@ library Groth16SmokeFixture {
 		strings.TrimPrefix(output.ActionData, "0x"),
 		strings.TrimPrefix(output.Proof, "0x"),
 	)
-	must(os.WriteFile(fixtureOut, []byte(fixture), 0o644))
+	if !*proofOnly {
+		must(os.WriteFile(fixtureOut, []byte(fixture), 0o644))
+	}
 
 	provingKeySha256, err := sha256HexFile(pkPath)
 	must(err)
 	verifyingKeySha256, err := sha256HexFile(vkPath)
 	must(err)
-	manifest := setupManifest{
-		ProofVersion:         proofVersion,
-		Backend:              "groth16",
-		Curve:                "bn254",
-		CommitmentHash:       "mimc",
-		CommitmentVersion:    2,
-		PublicInputCount:     13,
-		ProofBytes:           256,
-		ConstraintCount:      ccs.GetNbConstraints(),
-		ProvingKeySha256:     provingKeySha256,
-		VerifyingKeySha256:   verifyingKeySha256,
-		VerifierSourceSha256: verifierSourceSha256,
-		VerifierContract:     "Groth16Verifier",
-		WrapperContract:      "Groth16AuthorizationVerifier",
+	if !*proofOnly {
+		manifest := setupManifest{
+			ProofVersion:         proofVersion,
+			Backend:              "groth16",
+			Curve:                "bn254",
+			CommitmentHash:       "mimc",
+			CommitmentVersion:    2,
+			PublicInputCount:     13,
+			ProofBytes:           256,
+			ConstraintCount:      ccs.GetNbConstraints(),
+			ProvingKeySha256:     provingKeySha256,
+			VerifyingKeySha256:   verifyingKeySha256,
+			VerifierSourceSha256: verifierSourceSha256,
+			VerifierContract:     "Groth16Verifier",
+			WrapperContract:      "Groth16AuthorizationVerifier",
+		}
+		manifestJSON, err := json.MarshalIndent(manifest, "", "  ")
+		must(err)
+		must(os.WriteFile(manifestPath, append(manifestJSON, '\n'), 0o644))
+		fmt.Printf("Groth16 verifier written to %s\n", contractOut)
+		fmt.Printf("Groth16 setup manifest written to %s\n", manifestPath)
+		fmt.Printf("Solidity smoke fixture written to %s\n", fixtureOut)
 	}
-	manifestJSON, err := json.MarshalIndent(manifest, "", "  ")
-	must(err)
-	must(os.WriteFile(manifestPath, append(manifestJSON, '\n'), 0o644))
-
-	fmt.Printf("Groth16 verifier written to %s\n", contractOut)
 	fmt.Printf("Groth16 setup keys loaded from %s\n", keyDir)
-	fmt.Printf("Groth16 setup manifest written to %s\n", manifestPath)
 	fmt.Printf("Proving key SHA-256: %s\n", provingKeySha256)
 	fmt.Printf("Verifying key SHA-256: %s\n", verifyingKeySha256)
 	fmt.Printf("Verifier source SHA-256: %s\n", verifierSourceSha256)
-	fmt.Printf("Solidity smoke fixture written to %s\n", fixtureOut)
 	fmt.Printf("Proof artifact written to %s\n", proofOut)
 	fmt.Printf("Constraints: %d\n", ccs.GetNbConstraints())
 }

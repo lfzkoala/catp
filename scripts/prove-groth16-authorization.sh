@@ -80,15 +80,15 @@ if [[ ! -f "$CATP_CLI" ]]; then
   (cd "$ROOT_DIR/catp-plugin" && npm run build)
 fi
 
-TMP_WITNESS=""
+TMP_DIR=""
 if [[ -z "$WITNESS_OUT" ]]; then
-  TMP_WITNESS="$(mktemp "${TMPDIR:-/tmp}/catp-groth16-witness.XXXXXX.json")"
-  WITNESS_OUT="$TMP_WITNESS"
+  TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/catp-groth16-witness.XXXXXX")"
+  WITNESS_OUT="$TMP_DIR/witness.json"
 fi
 
 cleanup() {
-  if [[ "$KEEP_WITNESS" -eq 0 && -n "$TMP_WITNESS" ]]; then
-    rm -f "$TMP_WITNESS"
+  if [[ "$KEEP_WITNESS" -eq 0 && -n "$TMP_DIR" ]]; then
+    rm -rf "$TMP_DIR"
   fi
 }
 trap cleanup EXIT
@@ -99,6 +99,7 @@ node "$CATP_CLI" witness "${WITNESS_ARGS[@]}" --out "$WITNESS_OUT"
 echo "==> Generating Groth16 proof artifact"
 bash "$ROOT_DIR/scripts/generate-groth16-verifier.sh" \
   --witness "$WITNESS_OUT" \
-  --out "$PROOF_OUT"
+  --out "$PROOF_OUT" \
+  --proof-only
 
 echo "Groth16 proof artifact written to $PROOF_OUT"
