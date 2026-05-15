@@ -91,20 +91,6 @@ Important design constraints:
 - `activePolicies` and `cumulativeSpend` remain in-contract until CATP has a canonical state-root, nonce, nullifier, or checkpoint design for proof-centric state.
 - The committed `catp-layer2-k12.srs` is acceptable for testnet/dev. Mainnet requires documented SRS provenance or replacement with an accepted ceremony output.
 
-### Layer 3 Contract Skeleton
-
-Status: partial.
-
-Delivered:
-
-- `CommitRegistry.sol`
-- `MPAVerifier.sol`
-- `OptimisticChallenge.sol`
-
-Remaining Layer 3 work is mostly operational and integration-heavy: attestor node, resolver trust model, end-to-end flow, and the `boundary_v1` circuit.
-
----
-
 ## Immediate Execution Plan
 
 ### P0: Release Packaging
@@ -283,7 +269,7 @@ Exit criteria:
 
 - `boundary_v1` proof verifies locally.
 - Public input schema is versioned.
-- Integration path with `CommitRegistry.sol` is documented.
+- Integration path with the future Layer 3 contract surface is documented.
 
 ### Track B: MPA Attestor Flow
 
@@ -445,9 +431,9 @@ This should live in an experimental crate/branch until the state machine is stab
 | E2E Rust Layer 2 tests | Complete |
 | Compact EVM verifier | Sepolia smoke passed with `authorization_groth16_v1` |
 | `catp anchor` Sepolia smoke test | Passed for compact Groth16 verifier path |
-| Layer 3 contracts | Partial |
-| Layer 3 attestor node | Pending |
-| `boundary_v1` circuit | Pending |
+| Layer 3 contracts | Not in active repository surface |
+| Layer 3 attestor node | Planned |
+| `boundary_v1` circuit | Planned |
 | Layers 1, 4, 5 | Not in active repository surface |
 
 Current local test count: 214 passing across TypeScript/Jest, Vitest, Rust, and Solidity/Forge.
@@ -468,7 +454,7 @@ Current local test count: 214 passing across TypeScript/Jest, Vitest, Rust, and 
 | `catp-verify` | Rust verifier path and matching SRS |
 | Sepolia smoke test | Groth16 deploy scripts, funded account, RPC, ABI metadata |
 | Audit-log-to-proof bridge | Phase 0 audit format + Layer 2 witness format |
-| Layer 3 MPA | CommitRegistry, MPAVerifier, OptimisticChallenge, resolver trust model |
+| Layer 3 MPA | output commitment schema, attestor set, challenge model, resolver trust model |
 | `boundary_v1` | Poseidon, range checks, Layer 3 commitment format |
 | `reputation_v1` | stable Layer 2/3 event semantics |
 | Layer 5 registry | stable reputation and capability proof statements |

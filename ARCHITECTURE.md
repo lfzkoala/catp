@@ -44,7 +44,7 @@ Current repo coverage:
 | Layer 0 | External identity boundary; not owned by the current repo |
 | Layer 1 | Not implemented in the current repo |
 | Layer 2 | Implemented for authorization proofs and EVM/testnet execution |
-| Layer 3 | Solidity contract sources exist under `catp-contracts/src/layer3` |
+| Layer 3 | Not implemented in the current repo |
 | Layer 4 | Not implemented in the current repo |
 | Layer 5 | Not implemented in the current repo |
 

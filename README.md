@@ -19,10 +19,8 @@ Layer 0  Local enforcement plugin          Claude Code hooks + TOML policy + SHA
 Layer 2  EVM delegated authorization       authorization_groth16_v1 = Groth16/BN254, Sepolia smoke passed
 Layer 2  Off-chain authorization path      authorization_v1 = Halo2/KZG/BN254, not EVM-deployable
 
-Partial
-Layer 3  Output verification               commit registry + MPA/challenge contracts; attestor flow pending
-
 Planned
+Layer 3  Output verification               output commitments + attestor/challenge design
 Layer 1  Encrypted agent communication     X25519 + AES-256-GCM + forward secrecy
 Layer 4  Privacy-preserving reputation     ZK-proven performance properties
 Layer 5  Verifiable agent registry         capability proofs + discovery
@@ -449,8 +447,7 @@ catp/
 │   ├── groth16/            # gnark Groth16 authorization verifier path
 │   └── wasm/               # wasm-pack source bindings; pkg/ is generated
 ├── catp-contracts/         # Solidity — verifiers + protocol contracts
-│   ├── src/layer2/         # AgentAuthorizer, verifier wrappers, proof adapters
-│   └── src/layer3/         # CommitRegistry, MPAVerifier, OptimisticChallenge
+│   └── src/layer2/         # AgentAuthorizer, verifier wrappers, proof adapters
 ├── catp-sdk/               # TypeScript — developer-facing SDK
 │   └── src/layer2/         # types, PolicyBuilder, AuthorizerClient, ProofClient
 └── catp-verify/            # Rust — off-chain proof verification endpoint
@@ -471,8 +468,7 @@ catp/
 | 2 | TypeScript SDK Layer 2 | Complete locally |
 | 2 | `authorization_v1` Halo2 circuit | Complete locally; EVM verifier blocked by bytecode size |
 | 2 | `catp-verify` Rust endpoint | Complete |
-| 3 | `CommitRegistry.sol`, `MPAVerifier.sol`, `OptimisticChallenge.sol` | Partial |
-| 3 | attestor node + `boundary_v1` circuit | Pending |
+| 3 | output verification contracts, attestor node, `boundary_v1` circuit | Planned; not in active repo surface |
 | 1, 4, 5 | messaging, reputation, registry | Planned |
 
 Last recorded full-stack baseline: 214 passing tests across TypeScript/Jest, Vitest, Rust, and Solidity/Forge.
