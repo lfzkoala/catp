@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { groth16ArtifactToAuthorizationCall } from "../../src/layer2/Groth16ProofArtifact.js";
-import type { Groth16AuthorizationProofArtifact } from "../../src/layer2/types.js";
+import { groth16ArtifactToAuthorizationCall } from "../../src/authorization/Groth16ProofArtifact.js";
+import type { Groth16AuthorizationProofArtifact } from "../../src/authorization/types.js";
 
 const ZERO32 = `0x${"00".repeat(32)}` as `0x${string}`;
 const ONE32 = `0x${"00".repeat(31)}01` as `0x${string}`;

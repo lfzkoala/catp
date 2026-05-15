@@ -13,10 +13,10 @@ Reviewed components:
 
 - `catp-circuits/groth16`: `authorization_groth16_v1` Groth16/BN254 circuit,
   persisted dev/testnet proving and verifying keys, proof artifact generation.
-- `catp-contracts/src/layer2`: `AgentAuthorizer`,
+- `catp-contracts/src/authorization`: `AgentAuthorizer`,
   `Groth16AuthorizationVerifier`, generated `Groth16Verifier`, and action data
   ABI decoding.
-- `catp-sdk/src/layer2`: proof artifact validation and calldata helper shape.
+- `catp-sdk/src/authorization`: proof artifact validation and calldata helper shape.
 - `catp-plugin`: authorization witness generation from policy/action data and
   proof manifest structural validation.
 - `scripts`: setup checks, proof generation, calldata encoding, broadcast
@@ -106,8 +106,8 @@ verifier deployment, and proof-version decision.
 Regression/guard:
 
 - `catp-plugin/tests/commands/witness.test.ts`
-- `catp-sdk/tests/layer2/Groth16ProofArtifact.test.ts`
-- Solidity action-data decoding tests under `catp-contracts/test/layer2`
+- `catp-sdk/tests/authorization/Groth16ProofArtifact.test.ts`
+- Solidity action-data decoding tests under `catp-contracts/test/authorization`
 
 ### Low: Proof Manifest Validation Is Structural
 
@@ -134,7 +134,7 @@ npm run typecheck --workspace catp-plugin
 npm test --workspace catp-plugin
 npm run test --workspace catp-sdk
 npm run groth16:check
-cd catp-contracts && forge test --match-path 'test/layer2/*.t.sol'
+cd catp-contracts && forge test --match-path 'test/authorization/*.t.sol'
 ```
 
 For deployment-affecting changes, also run:

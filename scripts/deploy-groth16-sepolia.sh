@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONTRACTS_DIR="$ROOT_DIR/catp-contracts"
-VERIFIER_FILE="$CONTRACTS_DIR/src/layer2/Groth16Verifier.sol"
-WRAPPER_FILE="$CONTRACTS_DIR/src/layer2/Groth16AuthorizationVerifier.sol"
+VERIFIER_FILE="$CONTRACTS_DIR/src/authorization/Groth16Verifier.sol"
+WRAPPER_FILE="$CONTRACTS_DIR/src/authorization/Groth16AuthorizationVerifier.sol"
 SETUP_MANIFEST="$ROOT_DIR/catp-circuits/groth16/keys/authorization_groth16_v1.manifest.json"
 DEPLOY_LOG_DIR="$CONTRACTS_DIR/deployments/logs"
 MAX_EVM_RUNTIME_BYTES=24576
@@ -60,9 +60,9 @@ echo "==> Building Groth16 deployment targets"
 (
   cd "$CONTRACTS_DIR"
   forge build \
-    src/layer2/Groth16Verifier.sol \
-    src/layer2/Groth16AuthorizationVerifier.sol \
-    src/layer2/AgentAuthorizer.sol
+    src/authorization/Groth16Verifier.sol \
+    src/authorization/Groth16AuthorizationVerifier.sol \
+    src/authorization/AgentAuthorizer.sol
 )
 
 echo "==> Checking Groth16 verifier sizes"

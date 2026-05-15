@@ -108,7 +108,7 @@ action or drifts from its documented public input schema.
 
 Work:
 
-- Keep `docs/SECURITY_REVIEW_LAYER2.md` current.
+- Keep `docs/SECURITY_REVIEW_AUTHORIZATION.md` current.
 - Add regression tests for any issue found in policy encoding, witness
   generation, proof artifact validation, calldata encoding, or contract state
   checks.

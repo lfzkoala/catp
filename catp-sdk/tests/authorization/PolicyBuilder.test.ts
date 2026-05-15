@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { PolicyBuilder } from "../../src/layer2/PolicyBuilder.js";
-import { ActionType } from "../../src/layer2/types.js";
+import { PolicyBuilder } from "../../src/authorization/PolicyBuilder.js";
+import { ActionType } from "../../src/authorization/types.js";
 
 const ZERO32 = `0x${"00".repeat(32)}` as `0x${string}`;
 

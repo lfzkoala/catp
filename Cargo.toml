@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "catp-circuits/layer2",
+    "catp-circuits/authorization",
     "catp-circuits/wasm",
     "catp-verify",
 ]

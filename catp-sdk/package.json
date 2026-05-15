@@ -8,9 +8,9 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./layer2": {
-      "import": "./dist/layer2/index.js",
-      "types": "./dist/layer2/index.d.ts"
+    "./authorization": {
+      "import": "./dist/authorization/index.js",
+      "types": "./dist/authorization/index.d.ts"
     }
   },
   "files": ["dist"],

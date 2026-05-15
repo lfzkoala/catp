@@ -1,4 +1,4 @@
-use catp_layer2::{
+use catp_authorization::{
     action_public_fields, fr_from_be_bytes, fr_to_be_bytes, native_policy_commitment, Action,
     ActionType, AuthorizationPolicy, AuthorizationProofSystem, AuthorizationPublicInputs,
 };
@@ -6,7 +6,10 @@ use halo2curves::bn256::Fr;
 use std::path::Path;
 
 fn srs_path() -> &'static Path {
-    Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/catp-layer2-k12.srs"))
+    Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/catp-authorization-k12.srs"
+    ))
 }
 
 fn test_policy() -> AuthorizationPolicy {

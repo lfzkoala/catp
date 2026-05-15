@@ -1,6 +1,6 @@
-//! catp-layer2: ProveAuthorization Halo2 ZK circuit.
+//! catp-authorization: ProveAuthorization Halo2 ZK circuit.
 //!
-//! Implements the CATP Layer 2 authorization proof system, allowing an AI agent
+//! Implements the CATP authorization proof system, allowing an AI agent
 //! to prove it is authorized to perform an action without revealing its full
 //! authorization policy on-chain.
 

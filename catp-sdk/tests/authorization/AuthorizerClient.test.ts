@@ -3,9 +3,9 @@ import {
   computePolicyCommitment,
   encodeActionData,
   executeAuthorizedArgsFromGroth16Call,
-} from "../../src/layer2/AuthorizerClient.js";
-import { ActionType } from "../../src/layer2/types.js";
-import type { Groth16AuthorizationCall } from "../../src/layer2/types.js";
+} from "../../src/authorization/AuthorizerClient.js";
+import { ActionType } from "../../src/authorization/types.js";
+import type { Groth16AuthorizationCall } from "../../src/authorization/types.js";
 
 const ZERO32 = `0x${"00".repeat(32)}` as `0x${string}`;
 

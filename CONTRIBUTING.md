@@ -6,7 +6,7 @@ Contributions are welcome. Open an issue before starting significant work so we 
 
 ```
 catp/
-├── catp-plugin/     # TypeScript — Layer 0 enforcement plugin (npm)
+├── catp-plugin/     # TypeScript — local enforcement plugin (npm)
 ├── catp-circuits/   # Rust      — Halo2 ZK circuits (cargo)
 ├── catp-contracts/  # Solidity  — on-chain verifiers (Foundry)
 ├── catp-sdk/        # TypeScript — developer SDK (pnpm)
@@ -15,7 +15,7 @@ catp/
 
 ## Component Dev Setup
 
-### catp-plugin (Layer 0 enforcement)
+### catp-plugin (local enforcement)
 
 **Toolchain:** Node.js ≥ 20, npm ≥ 10
 
@@ -30,7 +30,7 @@ npm run build                      # compiles src/ → dist/
 
 Tests live in `catp-plugin/tests/`. Coverage targets: 80% lines/functions/statements, 75% branches.
 
-### catp-sdk (Layer 2 TypeScript SDK)
+### catp-sdk (authorization TypeScript SDK)
 
 **Toolchain:** Node.js ≥ 20, pnpm ≥ 9
 
@@ -58,7 +58,7 @@ cargo fmt --check
 ```bash
 cd catp-contracts
 forge build
-forge test                         # Layer 2 contract tests
+forge test                         # authorization contract tests
 ```
 
 ## Pre-Push Checks

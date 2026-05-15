@@ -1,6 +1,6 @@
 use axum::{extract::Json, http::StatusCode, routing::post, Router};
 use base64::{engine::general_purpose::STANDARD, Engine};
-use catp_layer2::AuthorizationPublicInputs;
+use catp_authorization::AuthorizationPublicInputs;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]

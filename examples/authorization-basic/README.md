@@ -1,6 +1,6 @@
 # Authorization Basic Example
 
-This example is the smallest CATP Layer 2 authorization flow:
+This example is the smallest CATP authorization flow:
 
 ```text
 catp-policy.toml + action.json

@@ -13,6 +13,6 @@ a local package artifact when needed:
 npm run wasm:build
 ```
 
-The bindings embed `../layer2/catp-layer2-k12.srs`, which is suitable for
+The bindings embed `../authorization/catp-authorization-k12.srs`, which is suitable for
 development and testnet consistency only. Mainnet Halo2 usage requires
 documented SRS provenance or replacement with an accepted ceremony output.

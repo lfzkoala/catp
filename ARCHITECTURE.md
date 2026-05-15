@@ -45,17 +45,17 @@ integration plan, and test strategy.
 catp-plugin
   Claude Code hooks, TOML policy engine, audit log, witness command
 
-catp-circuits/layer2
+catp-circuits/authorization
   Halo2 authorization_v1 circuit and off-chain proof path
 
 catp-circuits/groth16
   Groth16 authorization_groth16_v1 circuit, proving/verifying keys,
   proof artifact generator, generated Solidity verifier
 
-catp-contracts/src/layer2
+catp-contracts/src/authorization
   AgentAuthorizer, ActionData, Groth16AuthorizationVerifier, Groth16Verifier
 
-catp-sdk/src/layer2
+catp-sdk/src/authorization
   TypeScript proof artifact adapters and authorizer calldata helpers
 
 catp-verify
@@ -281,8 +281,8 @@ The SDK exposes authorization proof helpers for proof artifact consumption.
 Key files:
 
 ```text
-catp-sdk/src/layer2/Groth16ProofArtifact.ts
-catp-sdk/src/layer2/AuthorizerClient.ts
+catp-sdk/src/authorization/Groth16ProofArtifact.ts
+catp-sdk/src/authorization/AuthorizerClient.ts
 ```
 
 Main adapter flow:

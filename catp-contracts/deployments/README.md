@@ -1,8 +1,8 @@
 # Deployment Artifacts
 
-This directory records CATP Layer 2 testnet deployment metadata.
+This directory records CATP authorization testnet deployment metadata.
 
-## Active Layer 2 EVM Path
+## Active authorization EVM Path
 
 The active Sepolia EVM deployment is:
 
@@ -43,7 +43,7 @@ From the repository root:
 npm run groth16:generate
 npm run groth16:check
 cd catp-contracts
-forge test --match-path test/layer2/Groth16AuthorizationVerifier.t.sol
+forge test --match-path test/authorization/Groth16AuthorizationVerifier.t.sol
 cd ..
 scripts/deploy-groth16-sepolia.sh --dry-run
 ```

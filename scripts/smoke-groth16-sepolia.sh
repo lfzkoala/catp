@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONTRACTS_DIR="$ROOT_DIR/catp-contracts"
 DEPLOYMENT_FILE="$CONTRACTS_DIR/deployments/sepolia-groth16.json"
-VERIFIER_FILE="$CONTRACTS_DIR/src/layer2/Groth16Verifier.sol"
-FIXTURE_FILE="$CONTRACTS_DIR/test/layer2/Groth16SmokeFixture.sol"
+VERIFIER_FILE="$CONTRACTS_DIR/src/authorization/Groth16Verifier.sol"
+FIXTURE_FILE="$CONTRACTS_DIR/test/authorization/Groth16SmokeFixture.sol"
 SMOKE_JSON="$ROOT_DIR/catp-circuits/groth16/build/authorization_groth16_v1.json"
 SETUP_MANIFEST="$ROOT_DIR/catp-circuits/groth16/keys/authorization_groth16_v1.manifest.json"
 

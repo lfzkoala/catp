@@ -1,9 +1,10 @@
-use catp_layer2::{
+use catp_authorization::{
     fr_from_be_bytes, AuthorizationProofSystem, AuthorizationPublicInputs, CatpError, CatpResult,
     Proof,
 };
 
-const LAYER2_SRS: &[u8] = include_bytes!("../../catp-circuits/layer2/catp-layer2-k12.srs");
+const AUTHORIZATION_SRS: &[u8] =
+    include_bytes!("../../catp-circuits/authorization/catp-authorization-k12.srs");
 
 /// Verify a ProveAuthorization proof.
 ///
@@ -11,7 +12,7 @@ const LAYER2_SRS: &[u8] = include_bytes!("../../catp-circuits/layer2/catp-layer2
 /// `public_inputs` must match the values used to generate the proof.
 /// Returns `Ok(true)` if valid, `Err` if the proof is malformed or verification fails.
 pub fn verify(proof_bytes: &[u8], public_inputs: &AuthorizationPublicInputs) -> CatpResult<bool> {
-    let ps = AuthorizationProofSystem::from_bytes(LAYER2_SRS)?;
+    let ps = AuthorizationProofSystem::from_bytes(AUTHORIZATION_SRS)?;
     ps.verify_authorization(&Proof(proof_bytes.to_vec()), public_inputs)
 }
 
@@ -39,7 +40,7 @@ pub fn parse_policy_commitment(hex: &str) -> CatpResult<halo2curves::bn256::Fr> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use catp_layer2::{
+    use catp_authorization::{
         action_public_fields, native_policy_commitment,
         types::{Action, ActionType, AuthorizationPolicy},
     };
@@ -71,7 +72,7 @@ mod tests {
             current_timestamp: 5000,
             cumulative_spend: 2000,
         };
-        let ps = AuthorizationProofSystem::from_bytes(LAYER2_SRS).unwrap();
+        let ps = AuthorizationProofSystem::from_bytes(AUTHORIZATION_SRS).unwrap();
         let proof = ps
             .prove_authorization(policy, action, public_inputs.clone())
             .unwrap()

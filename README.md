@@ -367,7 +367,7 @@ for the recorded audit agent. Cryptographic proof verification is performed by
 the EVM verifier or the dedicated off-chain verifier path.
 
 See [docs/E2E_GROTH16_SEPOLIA.md](docs/E2E_GROTH16_SEPOLIA.md) for the full
-end-to-end flow and [docs/SECURITY_REVIEW_LAYER2.md](docs/SECURITY_REVIEW_LAYER2.md)
+end-to-end flow and [docs/SECURITY_REVIEW_AUTHORIZATION.md](docs/SECURITY_REVIEW_AUTHORIZATION.md)
 for the authorization proof review checklist.
 
 For a minimal runnable policy/action fixture, see
@@ -412,7 +412,7 @@ Run the Solidity Groth16 adapter tests:
 
 ```bash
 cd catp-contracts
-forge test --match-path test/layer2/Groth16AuthorizationVerifier.t.sol
+forge test --match-path test/authorization/Groth16AuthorizationVerifier.t.sol
 ```
 
 ---
@@ -435,7 +435,7 @@ It uses:
 
 This path is available for off-chain verification and proof-system research. It is not the current EVM deployment path because the generated Solidity verifier exceeded the EVM runtime bytecode limit and the Halo2 EVM adapter has been removed from the active repository surface.
 
-The committed `catp-layer2-k12.srs` is for development and testnet consistency. Mainnet Halo2 usage would require documented SRS provenance or replacement with accepted ceremony output.
+The committed `catp-authorization-k12.srs` is for development and testnet consistency. Mainnet Halo2 usage would require documented SRS provenance or replacement with accepted ceremony output.
 
 ---
 
@@ -450,13 +450,13 @@ catp/
 │       ├── hook/           # pre.ts / post.ts hook handlers
 │       └── commands/       # init, validate, log, witness CLI commands
 ├── catp-circuits/          # Rust/Go — ZK circuits and verifier generators
-│   ├── layer2/             # Halo2 ProveAuthorization circuit + SRS + e2e tests
+│   ├── authorization/      # Halo2 ProveAuthorization circuit + SRS + e2e tests
 │   ├── groth16/            # gnark Groth16 authorization verifier path
 │   └── wasm/               # wasm-pack source bindings; pkg/ is generated
 ├── catp-contracts/         # Solidity — verifiers + protocol contracts
-│   └── src/layer2/         # AgentAuthorizer, verifier wrappers, proof adapters
+│   └── src/authorization/         # AgentAuthorizer, verifier wrappers, proof adapters
 ├── catp-sdk/               # TypeScript — developer-facing SDK
-│   └── src/layer2/         # types, PolicyBuilder, AuthorizerClient, ProofClient
+│   └── src/authorization/         # types, PolicyBuilder, AuthorizerClient, ProofClient
 └── catp-verify/            # Rust — off-chain proof verification endpoint
 ```
 

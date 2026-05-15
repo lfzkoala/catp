@@ -107,7 +107,7 @@ Run the Solidity proof adapter tests:
 
 ```bash
 cd catp-contracts
-forge test --match-path test/layer2/Groth16AuthorizationVerifier.t.sol
+forge test --match-path test/authorization/Groth16AuthorizationVerifier.t.sol
 ```
 
 ## SDK Consumption
@@ -120,7 +120,7 @@ artifact and convert it into the fields needed by
 import {
   executeAuthorizedArgsFromGroth16Call,
   groth16ArtifactToAuthorizationCall,
-} from "@catp/sdk/layer2";
+} from "@catp/sdk/authorization";
 
 const call = groth16ArtifactToAuthorizationCall(artifact);
 const args = executeAuthorizedArgsFromGroth16Call(call);

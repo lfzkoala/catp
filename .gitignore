@@ -12,8 +12,8 @@ coverage/
 *.key
 *.pem
 *.srs
-!catp-circuits/layer2/catp-layer2-k12.srs
-catp-circuits/layer2/Halo2SolidityVerifier.sol
+!catp-circuits/authorization/catp-authorization-k12.srs
+catp-circuits/authorization/Halo2SolidityVerifier.sol
 catp-circuits/groth16/build/
 catp-circuits/wasm/pkg/
 .claude/settings.local.json

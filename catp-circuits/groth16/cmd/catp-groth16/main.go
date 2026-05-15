@@ -167,8 +167,8 @@ func main() {
 
 	outDir := filepath.Join(root, "catp-circuits", "groth16", "build")
 	keyDir := filepath.Join(root, "catp-circuits", "groth16", "keys")
-	contractOut := filepath.Join(root, "catp-contracts", "src", "layer2", "Groth16Verifier.sol")
-	fixtureOut := filepath.Join(root, "catp-contracts", "test", "layer2", "Groth16SmokeFixture.sol")
+	contractOut := filepath.Join(root, "catp-contracts", "src", "authorization", "Groth16Verifier.sol")
+	fixtureOut := filepath.Join(root, "catp-contracts", "test", "authorization", "Groth16SmokeFixture.sol")
 	resolvedWitnessPath := *witnessPath
 	if resolvedWitnessPath != "" && !filepath.IsAbs(resolvedWitnessPath) {
 		resolvedWitnessPath = filepath.Join(root, resolvedWitnessPath)

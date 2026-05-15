@@ -1,5 +1,5 @@
 [package]
-name = "catp-layer2"
+name = "catp-authorization"
 version = "0.1.0"
 edition = "2021"
 

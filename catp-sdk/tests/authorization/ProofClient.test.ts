@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ProofClient, type WasmProver } from "../../src/layer2/ProofClient.js";
-import { ActionType } from "../../src/layer2/types.js";
+import { ProofClient, type WasmProver } from "../../src/authorization/ProofClient.js";
+import { ActionType } from "../../src/authorization/types.js";
 
 const ZERO32 = `0x${"00".repeat(32)}` as `0x${string}`;
 const FAKE_BYTES = new Uint8Array([1, 2, 3, 4, 5]);

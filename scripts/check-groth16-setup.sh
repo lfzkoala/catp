@@ -8,8 +8,8 @@ KEY_DIR="$ROOT_DIR/catp-circuits/groth16/keys"
 MANIFEST="$KEY_DIR/$PROOF_VERSION.manifest.json"
 PK_FILE="$KEY_DIR/$PROOF_VERSION.pk"
 VK_FILE="$KEY_DIR/$PROOF_VERSION.vk"
-VERIFIER_FILE="$CONTRACTS_DIR/src/layer2/Groth16Verifier.sol"
-WRAPPER_FILE="$CONTRACTS_DIR/src/layer2/Groth16AuthorizationVerifier.sol"
+VERIFIER_FILE="$CONTRACTS_DIR/src/authorization/Groth16Verifier.sol"
+WRAPPER_FILE="$CONTRACTS_DIR/src/authorization/Groth16AuthorizationVerifier.sol"
 DEPLOYMENT_FILE="$CONTRACTS_DIR/deployments/sepolia-groth16.json"
 MAX_EVM_RUNTIME_BYTES=24576
 

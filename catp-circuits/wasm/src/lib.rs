@@ -1,10 +1,10 @@
-use catp_layer2::{
+use catp_authorization::{
     action_public_fields, fr_from_be_bytes, fr_to_be_bytes, native_policy_commitment, Action,
     AuthorizationPolicy, AuthorizationProofSystem, AuthorizationPublicInputs, Proof,
 };
 use wasm_bindgen::prelude::*;
 
-const LAYER2_SRS: &[u8] = include_bytes!("../../layer2/catp-layer2-k12.srs");
+const AUTHORIZATION_SRS: &[u8] = include_bytes!("../../authorization/catp-authorization-k12.srs");
 
 /// Compute the Poseidon-BN254 commitment to a policy.
 ///
@@ -56,7 +56,7 @@ pub fn prove_authorization(
         cumulative_spend,
     };
 
-    let ps = AuthorizationProofSystem::from_bytes(LAYER2_SRS)
+    let ps = AuthorizationProofSystem::from_bytes(AUTHORIZATION_SRS)
         .map_err(|e| JsError::new(&e.to_string()))?;
     let proof = ps
         .prove_authorization(policy, action, public_inputs)
@@ -95,7 +95,7 @@ pub fn verify_authorization(
         cumulative_spend,
     };
 
-    let ps = AuthorizationProofSystem::from_bytes(LAYER2_SRS)
+    let ps = AuthorizationProofSystem::from_bytes(AUTHORIZATION_SRS)
         .map_err(|e| JsError::new(&e.to_string()))?;
     let proof = Proof(proof_bytes.to_vec());
     ps.verify_authorization(&proof, &public_inputs)

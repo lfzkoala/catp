@@ -57,25 +57,25 @@ export function merkleRoot(commitments: string[]): `0x${string}` {
     return `0x${"00".repeat(32)}`;
   }
 
-  let layer: Buffer[] = commitments.map((c) => {
+  let level: Buffer[] = commitments.map((c) => {
     const b = Buffer.from(c, "hex");
     return b.length === 32 ? b : createHash("sha256").update(c).digest();
   });
 
-  while (layer.length > 1) {
-    if (layer.length % 2 !== 0) {
-      layer.push(layer[layer.length - 1]);
+  while (level.length > 1) {
+    if (level.length % 2 !== 0) {
+      level.push(level[level.length - 1]);
     }
     const next: Buffer[] = [];
-    for (let i = 0; i < layer.length; i += 2) {
+    for (let i = 0; i < level.length; i += 2) {
       next.push(
-        createHash("sha256").update(layer[i]).update(layer[i + 1]).digest(),
+        createHash("sha256").update(level[i]).update(level[i + 1]).digest(),
       );
     }
-    layer = next;
+    level = next;
   }
 
-  return `0x${layer[0].toString("hex")}`;
+  return `0x${level[0].toString("hex")}`;
 }
 
 async function submitOnChain(
