@@ -47,7 +47,7 @@ impl AuthorizationProofSystem {
 
     /// Load a proof system from a serialized SRS file written by `generate_verifier`.
     /// The SRS must have been generated with k=12. Use this in production so that
-    /// proofs verify against the deployed `Halo2SolidityVerifier.sol`.
+    /// proofs verify against the off-chain Halo2 verifier path.
     pub fn from_file(path: &std::path::Path) -> CatpResult<Self> {
         let mut f =
             std::fs::File::open(path).map_err(|e| CatpError::Serialization(e.to_string()))?;

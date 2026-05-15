@@ -80,7 +80,7 @@ CATP currently contains two Layer 2 authorization proof paths.
 | Path | Role | Status |
 |------|------|--------|
 | `authorization_groth16_v1` | Current EVM verifier path | Works on Sepolia; compact verifier runtime is about 6.4 KB and wrapper runtime is about 1.1 KB |
-| `authorization_v1` Halo2 | Off-chain verifier / research path | Works locally; generated Solidity verifier runtime is about 319 KB and does not fit under the EVM 24,576-byte runtime limit |
+| `authorization_v1` Halo2 | Off-chain verifier / research path | Works locally; EVM verifier path was removed after generated runtime exceeded the EVM 24,576-byte limit |
 
 Groth16 does require a circuit-specific trusted setup. The keys currently checked into `catp-circuits/groth16/keys/` are stable dev/testnet keys, not a mainnet ceremony. A mainnet release must either run and document a proper ceremony or explicitly choose a weaker trust model.
 
@@ -428,7 +428,7 @@ It uses:
 - EVM transcript
 - 13 public inputs
 
-This path is available for off-chain verification and proof-system research. It is not the current EVM deployment path because the generated Solidity verifier exceeds the EVM runtime bytecode limit.
+This path is available for off-chain verification and proof-system research. It is not the current EVM deployment path because the generated Solidity verifier exceeded the EVM runtime bytecode limit and the Halo2 EVM adapter has been removed from the active repository surface.
 
 The committed `catp-layer2-k12.srs` is for development and testnet consistency. Mainnet Halo2 usage would require documented SRS provenance or replacement with accepted ceremony output.
 

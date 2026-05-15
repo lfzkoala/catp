@@ -19,10 +19,10 @@ It uses `authorization_groth16_v1`:
 - proof bytes: `256`
 - setup manifest: `catp-circuits/groth16/keys/authorization_groth16_v1.manifest.json`
 
-The historical `sepolia.example.json` Halo2 schema is retained only as a failure
-reference. Do not use it for live authorization verification: the prior Halo2
-Sepolia attempt used an invalid tiny verifier runtime before the bytecode-size
-guard was added.
+The historical Halo2 EVM deployment schema and generated Solidity verifier were
+removed from the active repository surface. Halo2 remains an off-chain research
+path only; use the Groth16 deployment metadata for live authorization
+verification.
 
 ## Required Environment
 

@@ -78,8 +78,7 @@ Delivered:
 - u64 range checks for value, spend, timestamp, and inequality witnesses
 - protocol/token binding across all 32 bytes
 - shared KZG SRS file for testnet/dev consistency
-- generated `Halo2Verifier.sol` artifact; not deployable for this circuit under EVM runtime size limits
-- `Halo2AuthorizationVerifier.sol` wrapper that forwards public inputs; not usable for production EVM until paired with a deployable verifier
+- historical generated Halo2 Solidity verifier path removed after it exceeded EVM runtime size limits
 - `AgentAuthorizer.sol` using `IVerifier`
 - WASM bundle with `compute_policy_commitment`, `prove_authorization`, `verify_authorization`
 - `catp-verify` Rust library and REST endpoint
@@ -441,8 +440,7 @@ This should live in an experimental crate/branch until the state machine is stab
 | `AgentAuthorizer.sol` + `ActionData.sol` | Complete |
 | `catp-verify` REST verification endpoint | Complete |
 | TypeScript SDK Layer 2 | Complete locally |
-| `Halo2Verifier.sol` | Generated artifact; blocked for EVM deployment by runtime bytecode size |
-| `Halo2AuthorizationVerifier.sol` | Complete wrapper; blocked until paired with deployable verifier |
+| Halo2 EVM adapter | Removed from active repository surface after verifier runtime exceeded EVM size limit |
 | SRS persistence (`catp-layer2-k12.srs`) | Complete for testnet/dev |
 | E2E Rust Layer 2 tests | Complete |
 | Compact EVM verifier | Sepolia smoke passed with `authorization_groth16_v1` |
@@ -463,7 +461,7 @@ Current local test count: 214 passing across TypeScript/Jest, Vitest, Rust, and 
 | Phase 0 plugin | policy parser, hook runtime, local audit log |
 | `authorization_v1` proof | Halo2, Poseidon, MainGate, KZG SRS |
 | compact EVM verifier | proof backend, generated verifier, public input order, wrapper calldata format |
-| `Halo2AuthorizationVerifier.sol` | generated verifier calldata format; blocked by Halo2 verifier size |
+| Halo2 EVM adapter | removed; off-chain Halo2 verifier path remains |
 | `Groth16AuthorizationVerifier.sol` | compact verifier calldata format, gas cap, generated Groth16 verifier |
 | `AgentAuthorizer.sol` | `IVerifier`, policy commitment, action encoding |
 | SDK Layer 2 | WASM bundle, contract ABIs, public input schema |

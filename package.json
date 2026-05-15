@@ -3,7 +3,6 @@
   "private": true,
   "workspaces": ["catp-sdk", "catp-plugin"],
   "scripts": {
-    "verifier:sync": "bash scripts/sync-halo2-verifier.sh",
     "groth16:generate": "bash scripts/generate-groth16-verifier.sh",
     "groth16:prove": "bash scripts/prove-groth16-authorization.sh",
     "groth16:encode-execute": "bash scripts/encode-groth16-execute.sh",
