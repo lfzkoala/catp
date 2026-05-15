@@ -5,7 +5,9 @@
 //! authorization policy on-chain.
 
 pub mod circuit;
+pub mod error;
 pub mod proof;
+pub mod proof_bytes;
 pub mod types;
 
 #[cfg(test)]
@@ -15,5 +17,7 @@ pub use circuit::{
     action_public_fields, fr_from_be_bytes, fr_to_be_bytes, native_policy_commitment,
     AuthorizationConfig, AuthorizationPublicInputs, ProveAuthorization,
 };
+pub use error::{CatpError, CatpResult};
 pub use proof::AuthorizationProofSystem;
+pub use proof_bytes::Proof;
 pub use types::{Action, ActionType, AuthorizationPolicy};

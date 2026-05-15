@@ -88,22 +88,3 @@ pub struct AuthorizationPolicy {
     #[serde(deserialize_with = "deserialize_u64")]
     pub valid_until: u64,
 }
-
-impl AuthorizationPolicy {
-    /// Compute a SHA-256 commitment for local audit-log compatibility.
-    ///
-    /// Do not use this for Layer 2 authorization proofs. Layer 2 uses the
-    /// Poseidon-BN254 commitment from `native_policy_commitment`.
-    pub fn sha256_audit_commitment(&self) -> catp_primitives::Commitment {
-        use catp_primitives::CommitmentScheme;
-        CommitmentScheme::commit_fields(&[
-            &self.allowed_action.as_u64().to_le_bytes(),
-            &self.allowed_protocol,
-            &self.allowed_token,
-            &self.max_value_per_tx.to_le_bytes(),
-            &self.max_value_total.to_le_bytes(),
-            &self.valid_from.to_le_bytes(),
-            &self.valid_until.to_le_bytes(),
-        ])
-    }
-}

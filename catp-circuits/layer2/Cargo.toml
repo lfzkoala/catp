@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-catp-primitives = { path = "../primitives" }
 # PSE fork — KZG/BN254 backend. Pin to a specific rev before production deploy.
 halo2_proofs = { git = "https://github.com/privacy-scaling-explorations/halo2", tag = "v0.3.0" }
 halo2curves = { version = "0.6", default-features = false, features = ["bits"] }

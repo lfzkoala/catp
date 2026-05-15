@@ -10,8 +10,7 @@
 //! testing. Production deployments must load SRS from the Ethereum KZG ceremony
 //! (EIP-4844 powers-of-tau) via `ParamsKZG::read`. See Phase C in IMPLEMENTATION_PLAN.md.
 
-use catp_primitives::error::{CatpError, CatpResult};
-use catp_primitives::proof::Proof;
+use crate::{CatpError, CatpResult, Proof};
 use halo2_proofs::{
     plonk::{self, keygen_pk, keygen_vk},
     poly::{

@@ -445,7 +445,6 @@ catp/
 │       ├── hook/           # pre.ts / post.ts hook handlers
 │       └── commands/       # init, validate, log, witness CLI commands
 ├── catp-circuits/          # Rust/Go — ZK circuits and verifier generators
-│   ├── primitives/         # Poseidon, SMT, encryption primitives, proof abstractions
 │   ├── layer2/             # Halo2 ProveAuthorization circuit + SRS + e2e tests
 │   ├── groth16/            # gnark Groth16 authorization verifier path
 │   └── wasm/               # wasm-pack source bindings; pkg/ is generated

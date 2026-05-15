@@ -1,8 +1,7 @@
 use catp_layer2::{
     action_public_fields, fr_from_be_bytes, fr_to_be_bytes, native_policy_commitment, Action,
-    AuthorizationPolicy, AuthorizationProofSystem, AuthorizationPublicInputs,
+    AuthorizationPolicy, AuthorizationProofSystem, AuthorizationPublicInputs, Proof,
 };
-use catp_primitives::proof::Proof;
 use wasm_bindgen::prelude::*;
 
 const LAYER2_SRS: &[u8] = include_bytes!("../../layer2/catp-layer2-k12.srs");

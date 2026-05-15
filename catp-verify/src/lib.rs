@@ -1,6 +1,7 @@
-use catp_layer2::{fr_from_be_bytes, AuthorizationProofSystem, AuthorizationPublicInputs};
-use catp_primitives::error::CatpError;
-use catp_primitives::{proof::Proof, CatpResult};
+use catp_layer2::{
+    fr_from_be_bytes, AuthorizationProofSystem, AuthorizationPublicInputs, CatpError, CatpResult,
+    Proof,
+};
 
 const LAYER2_SRS: &[u8] = include_bytes!("../../catp-circuits/layer2/catp-layer2-k12.srs");
 
