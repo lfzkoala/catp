@@ -93,9 +93,26 @@ export function cmdWitness(opts: {
   if (opts.out) {
     writeFileSync(opts.out, encoded, "utf8");
     process.stdout.write(`Wrote Groth16 witness to ${opts.out}\n`);
+    process.stdout.write(formatGroth16WitnessSummary(witness));
   } else {
     process.stdout.write(encoded);
   }
+}
+
+export function formatGroth16WitnessSummary(witness: Groth16Witness): string {
+  const lines = [
+    "proofVersion=authorization_groth16_v1",
+    `actionType=${witness.actionType}`,
+    `value=${witness.value}`,
+    `currentTimestamp=${witness.currentTimestamp}`,
+    `cumulativeSpend=${witness.cumulativeSpend}`,
+    `maxValuePerTx=${witness.maxValuePerTx}`,
+    `maxValueTotal=${witness.maxValueTotal}`,
+    `validFrom=${witness.validFrom}`,
+    `validUntil=${witness.validUntil}`,
+    "next=Run catp prove authorization with the same policy/action inputs to generate a proof manifest.",
+  ];
+  return `${lines.join("\n")}\n`;
 }
 
 export function buildGroth16WitnessFromSources(opts: {

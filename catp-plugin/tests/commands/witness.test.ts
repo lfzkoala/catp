@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { appendAuditEntry, computeCommitment } from "../../src/audit/logger.js";
-import { buildGroth16Witness, cmdWitness } from "../../src/commands/witness.js";
+import { buildGroth16Witness, cmdWitness, formatGroth16WitnessSummary } from "../../src/commands/witness.js";
 import type { CatpPolicy } from "../../src/policy/types.js";
 
 const tmpBase = join(tmpdir(), `catp-witness-test-${Date.now()}`);
@@ -124,7 +124,11 @@ allow = true
     }), "utf8");
 
     const originalWrite = process.stdout.write.bind(process.stdout);
-    process.stdout.write = (() => true) as typeof process.stdout.write;
+    let output = "";
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      output += chunk.toString();
+      return true;
+    }) as typeof process.stdout.write;
     try {
       cmdWitness({
         file: policyPath,
@@ -145,6 +149,12 @@ allow = true
       cumulativeSpend: "0",
       allowedAction: "0",
     });
+    expect(output).toContain(`Wrote Groth16 witness to ${outPath}`);
+    expect(output).toContain("proofVersion=authorization_groth16_v1");
+    expect(output).toContain("value=500");
+    expect(output).toContain("currentTimestamp=150");
+    expect(output).toContain("cumulativeSpend=0");
+    expect(output).toContain("next=Run catp prove authorization");
   });
 
   it("writes witness JSON from an audit entry commitment", () => {
@@ -189,7 +199,11 @@ allow = true
     });
 
     const originalWrite = process.stdout.write.bind(process.stdout);
-    process.stdout.write = (() => true) as typeof process.stdout.write;
+    let output = "";
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      output += chunk.toString();
+      return true;
+    }) as typeof process.stdout.write;
     try {
       cmdWitness({
         file: policyPath,
@@ -206,5 +220,29 @@ allow = true
       currentTimestamp: "150",
       cumulativeSpend: "0",
     });
+    expect(output).toContain("proofVersion=authorization_groth16_v1");
+    expect(output).toContain("currentTimestamp=150");
+  });
+
+  it("formats a useful witness summary", () => {
+    const witness = buildGroth16Witness(
+      policy,
+      {
+        actionType: "Swap",
+        protocol: PROTOCOL,
+        token: TOKEN,
+        value: "500",
+      },
+      { currentTimestamp: "150", cumulativeSpend: "25" },
+    );
+
+    const summary = formatGroth16WitnessSummary(witness);
+
+    expect(summary).toContain("proofVersion=authorization_groth16_v1");
+    expect(summary).toContain("actionType=0");
+    expect(summary).toContain("value=500");
+    expect(summary).toContain("cumulativeSpend=25");
+    expect(summary).toContain("maxValuePerTx=1000");
+    expect(summary).toContain("next=Run catp prove authorization");
   });
 });

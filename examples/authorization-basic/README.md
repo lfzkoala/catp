@@ -63,6 +63,18 @@ validFrom
 validUntil
 ```
 
+The command summary should include:
+
+```text
+proofVersion=authorization_groth16_v1
+actionType=0
+value=500
+currentTimestamp=1778042846
+cumulativeSpend=0
+maxValuePerTx=1000
+maxValueTotal=10000
+```
+
 ## Generate And Validate A Proof Manifest
 
 Full Groth16 proof generation requires a repository checkout because it uses the
