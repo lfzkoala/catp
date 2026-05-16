@@ -2,11 +2,17 @@ import { findPolicyFile, loadPolicy } from "../policy/loader.js";
 import { appendAuditEntry, getLastCommitment } from "../audit/logger.js";
 import { claudeCodeAdapter } from "../adapters/claude-code.js";
 import { recordPostAction } from "../enforcement/core.js";
+import type { RuntimeAdapter } from "../runtime/types.js";
 import { parseHookAction, readStdin } from "./runtime.js";
 
-export async function runPostHook(): Promise<void> {
+export interface HookOptions {
+  adapter?: RuntimeAdapter;
+}
+
+export async function runPostHook(opts: HookOptions = {}): Promise<void> {
+  const adapter = opts.adapter ?? claudeCodeAdapter;
   const raw = await readStdin();
-  const action = parseHookAction(raw, claudeCodeAdapter, "post");
+  const action = parseHookAction(raw, adapter, "post");
   if (!action) {
     process.exit(0);
   }

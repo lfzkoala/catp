@@ -2,11 +2,17 @@ import { findPolicyFile, loadPolicy } from "../policy/loader.js";
 import { appendAuditEntry, getLastCommitment } from "../audit/logger.js";
 import { claudeCodeAdapter } from "../adapters/claude-code.js";
 import { evaluatePreAction } from "../enforcement/core.js";
+import type { RuntimeAdapter } from "../runtime/types.js";
 import { parseHookAction, readStdin } from "./runtime.js";
 
-export async function runPreHook(): Promise<void> {
+export interface HookOptions {
+  adapter?: RuntimeAdapter;
+}
+
+export async function runPreHook(opts: HookOptions = {}): Promise<void> {
+  const adapter = opts.adapter ?? claudeCodeAdapter;
   const raw = await readStdin();
-  const action = parseHookAction(raw, claudeCodeAdapter, "pre");
+  const action = parseHookAction(raw, adapter, "pre");
   if (!action) {
     process.exit(0);
   }
