@@ -52,6 +52,50 @@ is_address() {
   [[ "$value" =~ ^0x[0-9a-fA-F]{40}$ ]]
 }
 
+lower_hex() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+hex_byte_length() {
+  local value="$1"
+  echo $(( (${#value} - 2) / 2 ))
+}
+
+public_input() {
+  local index="$1"
+  jq -r ".publicInputs[$index] // empty" "$ARTIFACT"
+}
+
+assert_public_input() {
+  local index="$1"
+  local value
+  value="$(public_input "$index")"
+  is_bytes32 "$value" || fail "publicInputs[$index] must be bytes32 hex"
+}
+
+u256_hex_from_decimal() {
+  local value="$1"
+  cast --to-uint256 "$value"
+}
+
+u256_hex_from_action_word() {
+  local word_hex="$1"
+  echo "0x$word_hex"
+}
+
+u64_limb_public_hex_from_word() {
+  local word_hex="$1"
+  local limb_index="$2"
+  local offset=$((limb_index * 16))
+  local chunk="${word_hex:$offset:16}"
+  local reversed=""
+  local i
+  for ((i = 7; i >= 0; i -= 1)); do
+    reversed+="${chunk:$((i * 2)):2}"
+  done
+  echo "0x000000000000000000000000000000000000000000000000$reversed"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --artifact)
@@ -117,15 +161,47 @@ is_bytes32 "$policy_commitment" || fail "policyCommitment must be bytes32 hex"
 is_hex "$action_data" || fail "actionData must be hex"
 is_hex "$proof" || fail "proof must be hex"
 [[ $(( (${#action_data} - 2) % 2 )) -eq 0 ]] || fail "actionData hex must have an even byte length"
-[[ "${#proof}" -eq 514 ]] || fail "proof must be 256 bytes"
+[[ "$(hex_byte_length "$action_data")" == "128" ]] || fail "actionData must be 128 bytes"
+[[ "$(hex_byte_length "$proof")" == "256" ]] || fail "proof must be 256 bytes"
 [[ "$current_timestamp" =~ ^[0-9]+$ ]] || fail "currentTimestamp must be a decimal integer"
 
 public_input_count="$(jq -r '.publicInputs | length' "$ARTIFACT")"
 [[ "$public_input_count" == "13" ]] || fail "expected 13 public inputs, got $public_input_count"
-public_policy_commitment="$(jq -r '.publicInputs[0] // empty' "$ARTIFACT")"
-public_timestamp="$(jq -r '.publicInputs[11] // empty' "$ARTIFACT")"
-[[ "$public_policy_commitment" == "$policy_commitment" ]] || fail "publicInputs[0] does not match policyCommitment"
-[[ "$public_timestamp" == "$(printf '0x%064x' "$current_timestamp")" ]] || fail "publicInputs[11] does not match currentTimestamp"
+for index in $(seq 0 12); do
+  assert_public_input "$index"
+done
+
+value="$(jq -r '.value // empty' "$ARTIFACT")"
+cumulative_spend="$(jq -r '.cumulativeSpend // empty' "$ARTIFACT")"
+[[ "$value" =~ ^[0-9]+$ ]] || fail "value must be a decimal integer"
+[[ "$value" != "0" ]] || fail "value must be greater than zero"
+[[ "$cumulative_spend" =~ ^[0-9]+$ ]] || fail "cumulativeSpend must be a decimal integer"
+
+public_policy_commitment="$(public_input 0)"
+public_timestamp="$(public_input 11)"
+public_value="$(public_input 10)"
+public_cumulative_spend="$(public_input 12)"
+[[ "$(lower_hex "$public_policy_commitment")" == "$(lower_hex "$policy_commitment")" ]] || fail "publicInputs[0] does not match policyCommitment"
+[[ "$(lower_hex "$public_value")" == "$(lower_hex "$(u256_hex_from_decimal "$value")")" ]] || fail "publicInputs[10] does not match value"
+[[ "$(lower_hex "$public_timestamp")" == "$(lower_hex "$(u256_hex_from_decimal "$current_timestamp")")" ]] || fail "publicInputs[11] does not match currentTimestamp"
+[[ "$(lower_hex "$public_cumulative_spend")" == "$(lower_hex "$(u256_hex_from_decimal "$cumulative_spend")")" ]] || fail "publicInputs[12] does not match cumulativeSpend"
+
+action_data_hex="${action_data:2}"
+action_type_word="${action_data_hex:0:64}"
+protocol_word="${action_data_hex:64:64}"
+token_word="${action_data_hex:128:64}"
+value_word="${action_data_hex:192:64}"
+
+[[ "$(lower_hex "$(u256_hex_from_action_word "$action_type_word")")" == "$(lower_hex "$(public_input 1)")" ]] || fail "actionData actionType does not match publicInputs[1]"
+for limb in 0 1 2 3; do
+  public_index=$((2 + limb))
+  [[ "$(lower_hex "$(u64_limb_public_hex_from_word "$protocol_word" "$limb")")" == "$(lower_hex "$(public_input "$public_index")")" ]] || fail "actionData protocol limb $limb does not match publicInputs[$public_index]"
+done
+for limb in 0 1 2 3; do
+  public_index=$((6 + limb))
+  [[ "$(lower_hex "$(u64_limb_public_hex_from_word "$token_word" "$limb")")" == "$(lower_hex "$(public_input "$public_index")")" ]] || fail "actionData token limb $limb does not match publicInputs[$public_index]"
+done
+[[ "$(lower_hex "$(u256_hex_from_action_word "$value_word")")" == "$(lower_hex "$public_value")" ]] || fail "actionData value does not match publicInputs[10]"
 
 if [[ -n "$AUTHORIZER" ]]; then
   is_address "$AUTHORIZER" || fail "authorizer must be an EVM address"
@@ -150,6 +226,7 @@ output="$(jq -n \
   --arg policyCommitment "$policy_commitment" \
   --arg actionData "$action_data" \
   --arg currentTimestamp "$current_timestamp" \
+  --arg cumulativeSpend "$cumulative_spend" \
   --arg proof "$proof" \
   --arg registerCalldata "$register_calldata" \
   --arg executeCalldata "$execute_calldata" \
@@ -167,6 +244,11 @@ output="$(jq -n \
       signature: "executeAuthorized(bytes32,bytes,uint256,bytes)",
       args: [$policyCommitment, $actionData, $currentTimestamp, $proof],
       calldata: $executeCalldata
+    },
+    validation: {
+      publicInputs: "matched",
+      actionData: "matched",
+      cumulativeSpend: $cumulativeSpend
     }
   }')"
 

@@ -117,7 +117,10 @@ This validates artifact shape and emits calldata for:
 - `registerPolicy(bytes32)`
 - `executeAuthorized(bytes32,bytes,uint256,bytes)`
 
-It does not read RPC state and does not broadcast.
+It checks 13 public inputs, 128-byte ABI `actionData`, 256-byte proof bytes,
+and consistency between the action data, public action fields, value,
+timestamp, cumulative spend, and policy commitment. It does not read RPC state
+and does not broadcast.
 
 ## 5. Execute On Sepolia
 

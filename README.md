@@ -304,6 +304,11 @@ This validates the proof artifact and emits calldata for:
 - `registerPolicy(bytes32)`
 - `executeAuthorized(bytes32,bytes,uint256,bytes)`
 
+The encoder checks the contract-facing artifact shape before emitting calldata:
+13 public inputs, a 128-byte ABI `actionData` payload, a 256-byte proof, and
+matching policy commitment, action fields, value, timestamp, and cumulative
+spend.
+
 ### 5. Dry-Run Execution
 
 ```bash

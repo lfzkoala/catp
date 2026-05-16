@@ -73,7 +73,7 @@ Out of scope for this review:
 | Action/protocol/token binding | Reviewed | Public action fields are checked against private allowed policy fields. |
 | Timestamp semantics | Reviewed | Circuit proves policy validity window; `AgentAuthorizer` enforces freshness around execution timestamp. |
 | Cumulative spend replay binding | Reviewed | Contract checks proof spend against current state, then increments by action value. |
-| Proof shape validation | Reviewed | Wrapper/SDK/plugin require 13 inputs, 128-byte `actionData`, and 256 proof bytes before execution/manifest use. |
+| Proof shape validation | Reviewed | Wrapper/SDK/plugin and calldata encoder require 13 inputs, 128-byte `actionData`, and 256 proof bytes before execution/manifest use. |
 | Setup reproducibility | Reviewed with caveat | `npm run groth16:check` verifies key/source/deployment metadata consistency. Mainnet ceremony remains open. |
 | Sepolia deployment metadata | Reviewed | `catp-contracts/deployments/sepolia-groth16.json` records addresses, hashes, gas, blocks, and smoke txs. |
 
@@ -112,9 +112,10 @@ Regression/guard:
 ### Low: Proof Manifest Validation Is Structural
 
 `catp verify authorization` validates the manifest and embedded Groth16 artifact
-shape. It checks the contract-facing shape, including 13 public inputs, 128-byte
-ABI `actionData`, 256-byte proof bytes, and consistency between `actionData`
-and the public action fields. With `--check-audit`, it also checks that the
+shape. The CLI, SDK, and calldata encoder check the contract-facing shape,
+including 13 public inputs, 128-byte ABI `actionData`, 256-byte proof bytes, and
+consistency between `actionData` and the public action fields. With
+`--check-audit`, it also checks that the
 manifest's audit commitment exists in the local audit log for the recorded audit
 agent and that the audit entry's structured authorization action matches the
 manifest action data, value, timestamp, and cumulative spend when those audit
