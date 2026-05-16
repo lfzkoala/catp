@@ -245,6 +245,14 @@ describe("authorization proof manifest", () => {
     ).toThrow("artifact not found");
 
     expect(() =>
+      cmdProveAuthorization({
+        action: join(tmpBase, "action.json"),
+        file: join(tmpBase, "catp-policy.toml"),
+        proverScript: join(tmpBase, "missing-prover.sh"),
+      }),
+    ).toThrow("Full Groth16 proof generation requires a CATP repository checkout");
+
+    expect(() =>
       cmdVerifyAuthorization({
         manifest: manifestPath,
         checkAudit: true,

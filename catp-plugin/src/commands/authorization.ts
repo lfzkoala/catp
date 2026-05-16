@@ -335,7 +335,12 @@ function generateGroth16Artifact(opts: {
   const proverScript = opts.proverScript ?? join(process.cwd(), "scripts", "generate-groth16-verifier.sh");
   if (!existsSync(proverScript)) {
     if (cleanupDir) rmSync(cleanupDir, { recursive: true, force: true });
-    throw new Error(`prover script not found: ${proverScript}`);
+    throw new Error(
+      `prover script not found: ${proverScript}. ` +
+      "Full Groth16 proof generation requires a CATP repository checkout; " +
+      "the npm CLI package only includes local enforcement, audit logs, witness generation, and manifest tooling. " +
+      "Run this command from the repository root or pass --prover-script <path>.",
+    );
   }
 
   const witness = buildGroth16WitnessFromSources({

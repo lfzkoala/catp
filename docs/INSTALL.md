@@ -220,3 +220,6 @@ npm_config_cache=/private/tmp/catp-npm-cache npm pack --dry-run --workspace catp
 If `catp prove authorization --action` fails from a global npm install, use a
 repository checkout. That command path needs the prover scripts and circuit
 assets that are intentionally not bundled into the npm CLI package.
+
+Run it from the repository root, or pass `--prover-script <path>` if you keep
+the Groth16 prover script elsewhere.
