@@ -138,28 +138,29 @@ Exit criteria:
 
 ### P1: Universal Agent Runtime Adapters
 
+Status: active.
+
 Goal: make CATP a runtime-neutral agent authorization protocol, with Claude Code
 as the first adapter rather than the product boundary.
 
 Work:
 
-- Define a runtime-neutral tool/action event shape for enforcement decisions,
-  audit logging, and optional authorization proof generation.
-- Split Claude Code `PreToolUse` / `PostToolUse` parsing from the core policy
-  engine and audit writer.
+- Maintain the runtime-neutral `ToolAction` event shape for enforcement
+  decisions, audit logging, and optional authorization proof generation.
+- Keep Claude Code `PreToolUse` / `PostToolUse` parsing isolated from the core
+  policy engine and audit writer.
 - Keep the existing Claude Code hook behavior stable while routing it through
   the generic runtime interface.
-- Document the adapter model for future integrations such as OpenAI Agents SDK,
-  LangGraph/LangChain, Cursor-style tool runners, MCP tool gateways, and local
-  shell/tool executors.
+- Add future runtime adapters only when there is a concrete payload shape and
+  test fixture, such as OpenAI Agents SDK, LangGraph/LangChain, Cursor-style
+  tool runners, MCP tool gateways, or local shell/tool executors.
 
 Exit criteria:
 
 - The core enforcement path can be tested without Claude Code hook fixtures.
-- Adding a new agent runtime only requires implementing an adapter that maps
-  its tool-call event into CATP's common event shape.
-- README and ARCHITECTURE describe CATP as a universal authorization protocol
-  with Claude Code as the first supported adapter.
+- README and ARCHITECTURE describe the adapter model.
+- Adding a new agent runtime only requires implementing and testing an adapter
+  that maps its tool-call event into CATP's common event shape.
 
 ---
 

@@ -118,6 +118,17 @@ Any change to public inputs, policy encoding, circuit constraints, commitment ha
 
 No blockchain or ZK setup is required for local enforcement.
 
+Claude Code is the first supported runtime adapter, not the protocol boundary.
+The local enforcement core consumes CATP `ToolAction` events:
+
+```text
+runtime adapter -> ToolAction -> policy decision -> audit entry
+```
+
+Future runtimes should plug in by mapping their tool-call events into
+`ToolAction` while leaving the policy engine, audit logger, witness builder, and
+proof manifest flow unchanged.
+
 ### Install
 
 For a fuller installation guide, see [docs/INSTALL.md](docs/INSTALL.md).

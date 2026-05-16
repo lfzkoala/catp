@@ -125,6 +125,37 @@ Outputs:
 
 Policy rules are evaluated top-to-bottom. The first matching rule determines whether the tool call is allowed. Unmatched tools are allowed by default.
 
+### Runtime Adapter Model
+
+Runtime adapters are deliberately thin. An adapter validates a runtime-specific
+event and maps it into CATP's `ToolAction` contract:
+
+```text
+runtime payload
+  -> RuntimeAdapter.fromPreToolUse / fromPostToolUse
+  -> ToolAction { runtime, phase, sessionId?, toolName, toolInput, raw? }
+  -> evaluatePreAction / recordPostAction
+```
+
+Adapter responsibilities:
+
+- Parse and validate the upstream runtime payload.
+- Set a stable `runtime` id.
+- Preserve the original payload in `raw` for debugging.
+- Normalize the runtime's tool name into `toolName`.
+- Normalize the runtime's structured tool input into `toolInput`.
+
+Core responsibilities:
+
+- Evaluate `ToolAction` against `catp-policy.toml`.
+- Write audit entries and commitment chains.
+- Extract optional `toolInput.catp_authorization` or `toolInput.authorization`
+  data for the authorization proof flow.
+
+Adding a new runtime should not change the policy engine, audit logger, witness
+builder, or proof manifest commands. It should add an adapter and focused tests
+for that adapter's payload shape.
+
 Audit entries are written under:
 
 ```text
