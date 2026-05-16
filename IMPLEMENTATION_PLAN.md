@@ -99,6 +99,19 @@ research.
 - `examples/authorization-basic` remains the first user-facing proof fixture.
 - `npm run groth16:check` remains the canonical setup integrity check.
 
+### Universal Agent Runtime Adapters
+
+- Runtime-neutral `ToolAction` and `RuntimeAdapter` contracts are documented in
+  code and architecture docs.
+- Claude Code `PreToolUse` / `PostToolUse` parsing is isolated in the
+  `claude-code` adapter.
+- Hook stdin parsing is centralized and tested.
+- `catp hook pre/post` accept an injectable adapter internally and expose
+  `--runtime claude-code` in the CLI.
+- `catp hook runtimes` lists supported runtime adapter ids.
+- README and ARCHITECTURE describe the adapter model and current supported
+  runtime.
+
 ### Packaging Decision For WASM And Proving
 
 - `@catp-protocol/cli` stays light.
@@ -136,35 +149,14 @@ Exit criteria:
 - Groth16 setup hashes, verifier source hash, wrapper hash, and deployment
   metadata remain reproducible through `npm run groth16:check`.
 
-### P1: Universal Agent Runtime Adapters
-
-Status: active.
-
-Goal: make CATP a runtime-neutral agent authorization protocol, with Claude Code
-as the first adapter rather than the product boundary.
-
-Work:
-
-- Maintain the runtime-neutral `ToolAction` event shape for enforcement
-  decisions, audit logging, and optional authorization proof generation.
-- Keep Claude Code `PreToolUse` / `PostToolUse` parsing isolated from the core
-  policy engine and audit writer.
-- Keep the existing Claude Code hook behavior stable while routing it through
-  the generic runtime interface.
-- Add future runtime adapters only when there is a concrete payload shape and
-  test fixture, such as OpenAI Agents SDK, LangGraph/LangChain, Cursor-style
-  tool runners, MCP tool gateways, or local shell/tool executors.
-
-Exit criteria:
-
-- The core enforcement path can be tested without Claude Code hook fixtures.
-- README and ARCHITECTURE describe the adapter model.
-- Adding a new agent runtime only requires implementing and testing an adapter
-  that maps its tool-call event into CATP's common event shape.
-
----
-
 ## Deferred Decisions
+
+### Additional Runtime Adapters
+
+Claude Code is the only supported runtime adapter today. Add future runtime
+adapters only when there is a concrete payload shape and test fixture, such as
+OpenAI Agents SDK, LangGraph/LangChain, Cursor-style tool runners, MCP tool
+gateways, or local shell/tool executors.
 
 ### Local Cryptographic Verification For Groth16 Manifests
 
