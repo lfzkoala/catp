@@ -75,6 +75,9 @@ export function buildAuthorizationProofManifest(
   if (opts.chainId !== undefined && !/^[0-9]+$/.test(opts.chainId)) {
     throw new Error("chainId must be a decimal integer string");
   }
+  if (opts.proofUrl !== undefined) {
+    assertProofUrl(opts.proofUrl, "proofUrl");
+  }
 
   return {
     manifestVersion: "catp_authorization_proof_manifest_v1",
@@ -124,6 +127,9 @@ export function validateAuthorizationProofManifest(manifest: AuthorizationProofM
   }
   if (manifest.chainId !== null && !/^[0-9]+$/.test(manifest.chainId)) {
     throw new Error("chainId must be a decimal integer string");
+  }
+  if (manifest.proofUrl !== null) {
+    assertProofUrl(manifest.proofUrl, "proofUrl");
   }
 }
 
@@ -578,6 +584,25 @@ function assertAddress(value: string, field: string): void {
   if (!/^0x[0-9a-fA-F]{40}$/.test(value)) {
     throw new Error(`${field} must be an EVM address`);
   }
+}
+
+function assertProofUrl(value: string, field: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`${field} must be a valid URL`);
+  }
+  if (parsed.protocol === "https:" || parsed.protocol === "ipfs:" || parsed.protocol === "ar:") {
+    return;
+  }
+  if (
+    parsed.protocol === "http:" &&
+    (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1" || parsed.hostname === "::1" || parsed.hostname === "[::1]")
+  ) {
+    return;
+  }
+  throw new Error(`${field} must use https, ipfs, ar, or localhost http`);
 }
 
 function hexByteLength(value: string): number {

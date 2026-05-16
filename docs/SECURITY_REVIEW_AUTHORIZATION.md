@@ -74,6 +74,7 @@ Out of scope for this review:
 | Timestamp semantics | Reviewed | Circuit proves policy validity window; `AgentAuthorizer` enforces freshness around execution timestamp. |
 | Cumulative spend replay binding | Reviewed | Contract checks proof spend against current state, then increments by action value. |
 | Proof shape validation | Reviewed | Wrapper/SDK/plugin and calldata encoder require 13 inputs, 128-byte `actionData`, and 256 proof bytes before execution/manifest use. |
+| External proof references | Reviewed | Manifest `proofUrl` accepts HTTPS, IPFS, Arweave, or localhost HTTP only. |
 | Setup reproducibility | Reviewed with caveat | `npm run groth16:check` verifies key/source/deployment metadata consistency. Mainnet ceremony remains open. |
 | Sepolia deployment metadata | Reviewed | `catp-contracts/deployments/sepolia-groth16.json` records addresses, hashes, gas, blocks, and smoke txs. |
 

@@ -155,6 +155,26 @@ describe("authorization proof manifest", () => {
     expect(() =>
       buildAuthorizationProofManifest(artifact, { verifier: "0x1234" }),
     ).toThrow("verifier must be an EVM address");
+
+    expect(() =>
+      buildAuthorizationProofManifest(artifact, { proofUrl: "javascript:alert(1)" }),
+    ).toThrow("proofUrl must use https, ipfs, ar, or localhost http");
+
+    expect(() =>
+      validateAuthorizationProofManifest({
+        ...buildAuthorizationProofManifest(artifact),
+        proofUrl: "not-a-url",
+      }),
+    ).toThrow("proofUrl must be a valid URL");
+  });
+
+  it("accepts supported proofUrl schemes", () => {
+    expect(buildAuthorizationProofManifest(artifact, { proofUrl: "https://example.com/proof.json" }).proofUrl)
+      .toBe("https://example.com/proof.json");
+    expect(buildAuthorizationProofManifest(artifact, { proofUrl: "ipfs://bafybeigdyrzt/proof.json" }).proofUrl)
+      .toBe("ipfs://bafybeigdyrzt/proof.json");
+    expect(buildAuthorizationProofManifest(artifact, { proofUrl: "http://localhost:8080/proof.json" }).proofUrl)
+      .toBe("http://localhost:8080/proof.json");
   });
 
   it("writes a manifest file from the command", () => {
