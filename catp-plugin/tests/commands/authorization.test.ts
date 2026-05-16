@@ -219,6 +219,7 @@ describe("authorization proof manifest", () => {
       chainId: 11155111,
       groth16AuthorizationVerifier: `0x${"12".repeat(20)}`,
       agentAuthorizer: `0x${"34".repeat(20)}`,
+      authorizationProofVersion: "authorization_groth16_v1",
     }), "utf8");
 
     expect(readDeploymentMetadata(deploymentPath)).toEqual({
@@ -243,6 +244,14 @@ describe("authorization proof manifest", () => {
       chainId: "sepolia",
     }), "utf8");
     expect(() => readDeploymentMetadata(invalidChainPath)).toThrow("deployment.chainId must be a decimal integer");
+
+    const invalidProofVersionPath = join(tmpBase, "invalid-proof-version-deployment.json");
+    writeFileSync(invalidProofVersionPath, JSON.stringify({
+      authorizationProofVersion: "authorization_v1",
+    }), "utf8");
+    expect(() => readDeploymentMetadata(invalidProofVersionPath)).toThrow(
+      "deployment.authorizationProofVersion must be authorization_groth16_v1",
+    );
   });
 
   it("rejects invalid prove and verify command inputs", () => {

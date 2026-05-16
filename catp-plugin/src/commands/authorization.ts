@@ -208,8 +208,12 @@ export function readDeploymentMetadata(path: string): {
   const verifier = optionalString(parsed.groth16AuthorizationVerifier, "deployment.groth16AuthorizationVerifier");
   const agentAuthorizer = optionalString(parsed.agentAuthorizer, "deployment.agentAuthorizer");
   const chainId = optionalIntegerString(parsed.chainId, "deployment.chainId");
+  const proofVersion = optionalString(parsed.authorizationProofVersion, "deployment.authorizationProofVersion");
   if (verifier !== undefined) assertAddress(verifier, "deployment.groth16AuthorizationVerifier");
   if (agentAuthorizer !== undefined) assertAddress(agentAuthorizer, "deployment.agentAuthorizer");
+  if (proofVersion !== undefined && proofVersion !== PROOF_VERSION) {
+    throw new Error(`deployment.authorizationProofVersion must be ${PROOF_VERSION}`);
+  }
   return { verifier, agentAuthorizer, chainId };
 }
 
