@@ -79,6 +79,24 @@ deployment metadata live in this repo.
 
 ---
 
+## Package Boundary
+
+CATP intentionally keeps the published npm CLI small:
+
+- `@catp-protocol/cli`: local enforcement, audit logs, witness generation,
+  authorization proof manifests, and artifact validation.
+- Repository checkout: Groth16 proof generation, calldata encoding, Sepolia
+  execution, contracts, circuits, and setup/deployment checks.
+- `catp-circuits/wasm` and SDK `ProofClient`: local Halo2/off-chain
+  `authorization_v1` helpers. They are not currently published as `catp-wasm`
+  and are not the active EVM path.
+
+The active EVM/testnet proof path is `authorization_groth16_v1`. The Halo2
+`authorization_v1` path remains useful for off-chain verification and
+proof-system research.
+
+---
+
 ## Authorization Proof Systems
 
 CATP currently contains two authorization proof paths.

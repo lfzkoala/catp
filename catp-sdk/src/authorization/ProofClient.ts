@@ -6,7 +6,13 @@ export interface ProofResult {
   publicInputs: AuthorizationPublicInputs;
 }
 
-/** Subset of the catp-wasm WASM exports needed for proof generation. */
+/**
+ * Subset of the local catp-circuits/wasm exports used by the Halo2/off-chain
+ * authorization_v1 path.
+ *
+ * This is not the active Groth16/EVM proof path and is not currently published
+ * as a separate catp-wasm npm package.
+ */
 export interface WasmProver {
   compute_policy_commitment(policy_json: string): Uint8Array;
   prove_authorization(
@@ -102,7 +108,7 @@ function bytesToBase64(bytes: Uint8Array): string {
 
 export class ProofClient {
   /**
-   * @param wasm - catp-wasm WASM module (import * as wasm from './catp_wasm.js')
+   * @param wasm - local catp-circuits/wasm module built with `npm run wasm:build`
    * @param verifyUrl - base URL of a running catp-verify server
    */
   constructor(

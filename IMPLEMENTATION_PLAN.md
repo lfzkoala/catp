@@ -169,13 +169,19 @@ Exit criteria:
 
 ### P1: Packaging Decision for WASM and Proving
 
-Goal: decide how much proving capability belongs in published packages.
+Goal: keep package boundaries explicit so users know which path is supported by
+npm and which path requires a repository checkout.
 
-Options:
+Current decision:
 
-- Keep npm CLI light and repo-based for proving.
-- Publish `catp-wasm` as a separate generated package artifact.
-- Provide a hosted or local verifier/prover service.
+- Keep `@catp-protocol/cli` light. It publishes local enforcement, audit logs,
+  witness generation, proof manifest tooling, and artifact validation.
+- Keep full `authorization_groth16_v1` proof generation, calldata encoding,
+  Sepolia execution, contracts, and setup checks repository-based.
+- Do not publish `catp-wasm` yet. `catp-circuits/wasm` and SDK `ProofClient`
+  remain local artifacts for the Halo2/off-chain `authorization_v1` path.
+- Do not add a hosted prover/verifier service until there is a concrete
+  product reason, threat model, and operational plan.
 
 Exit criteria:
 
