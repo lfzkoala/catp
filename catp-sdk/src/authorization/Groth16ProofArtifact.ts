@@ -14,6 +14,9 @@ export function groth16ArtifactToAuthorizationCall(
   }
   assertBytes32Hex(artifact.policyCommitment, "policyCommitment");
   assertHex(artifact.actionData, "actionData");
+  if (hexByteLength(artifact.actionData) !== 128) {
+    throw new Error("actionData must be 128 bytes");
+  }
   assertHex(artifact.proof, "proof");
   if (hexByteLength(artifact.proof) !== 256) {
     throw new Error("proof must be 256 bytes");

@@ -121,6 +121,7 @@ verifier=0xeeebbf575556cd673209525573334934a4f1c3f1
 agentAuthorizer=0xb5290d2c376d84c15de4fbfde64a9a5499eee23e
 sourceArtifact=/tmp/catp-authorization-basic.proof.json
 cryptographicVerification=external:EVM-or-offchain-verifier
+verifyCommand=catp verify authorization --manifest /tmp/catp-authorization-basic.manifest.json
 ```
 
 Validate the manifest:
@@ -135,6 +136,9 @@ deployment metadata, value, timestamp, and cumulative spend.
 
 This manifest validation is structural. Cryptographic verification is performed
 by the EVM verifier or a dedicated off-chain verifier path.
+
+The manifest validator also checks the contract-facing shape: 13 public inputs,
+a 128-byte ABI `actionData` payload, and a 256-byte Groth16 proof.
 
 ## Optional: Prepare On-Chain Execution
 

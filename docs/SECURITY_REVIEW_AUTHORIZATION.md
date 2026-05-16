@@ -73,7 +73,7 @@ Out of scope for this review:
 | Action/protocol/token binding | Reviewed | Public action fields are checked against private allowed policy fields. |
 | Timestamp semantics | Reviewed | Circuit proves policy validity window; `AgentAuthorizer` enforces freshness around execution timestamp. |
 | Cumulative spend replay binding | Reviewed | Contract checks proof spend against current state, then increments by action value. |
-| Proof shape validation | Reviewed | Wrapper/SDK/plugin require 13 inputs and 256 proof bytes before execution/manifest use. |
+| Proof shape validation | Reviewed | Wrapper/SDK/plugin require 13 inputs, 128-byte `actionData`, and 256 proof bytes before execution/manifest use. |
 | Setup reproducibility | Reviewed with caveat | `npm run groth16:check` verifies key/source/deployment metadata consistency. Mainnet ceremony remains open. |
 | Sepolia deployment metadata | Reviewed | `catp-contracts/deployments/sepolia-groth16.json` records addresses, hashes, gas, blocks, and smoke txs. |
 

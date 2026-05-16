@@ -173,7 +173,7 @@ export function cmdProveAuthorization(opts: {
     if (opts.out) {
       writeFileSync(opts.out, encoded, "utf8");
       process.stdout.write(`Wrote authorization proof manifest to ${opts.out}\n`);
-      process.stdout.write(formatAuthorizationManifestSummary(manifest, { includeStatus: false }));
+      process.stdout.write(formatAuthorizationManifestSummary(manifest, { includeStatus: false, manifestPath: opts.out }));
     } else {
       process.stdout.write(encoded);
     }
@@ -233,7 +233,7 @@ export function cmdVerifyAuthorization(opts: { manifest?: string; checkAudit?: b
 
 export function formatAuthorizationManifestSummary(
   manifest: AuthorizationProofManifest,
-  opts: { extraLines?: string[]; includeStatus?: boolean } = {},
+  opts: { extraLines?: string[]; includeStatus?: boolean; manifestPath?: string } = {},
 ): string {
   const lines = [
     ...(opts.includeStatus === false ? [] : ["Authorization proof manifest is structurally valid."]),
@@ -257,6 +257,9 @@ export function formatAuthorizationManifestSummary(
   } else {
     lines.push("next=Attach deployment metadata to execute this proof on-chain.");
   }
+  if (opts.manifestPath) {
+    lines.push(`verifyCommand=catp verify authorization --manifest ${opts.manifestPath}${manifest.auditCommitment ? " --check-audit" : ""}`);
+  }
   return `${lines.join("\n")}\n`;
 }
 
@@ -266,6 +269,9 @@ function validateGroth16Artifact(artifact: AuthorizationProofArtifact): void {
   }
   assertBytes32(artifact.policyCommitment, "policyCommitment");
   assertHex(artifact.actionData, "actionData");
+  if (hexByteLength(artifact.actionData) !== 128) {
+    throw new Error("actionData must be 128 bytes");
+  }
   assertHex(artifact.proof, "proof");
   if (hexByteLength(artifact.proof) !== 256) {
     throw new Error("proof must be 256 bytes");

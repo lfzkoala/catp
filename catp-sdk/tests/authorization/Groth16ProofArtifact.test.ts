@@ -99,6 +99,13 @@ describe("groth16ArtifactToAuthorizationCall", () => {
     expect(() =>
       groth16ArtifactToAuthorizationCall({
         ...artifact,
+        actionData: `0x${"aa".repeat(127)}`,
+      }),
+    ).toThrow("actionData must be 128 bytes");
+
+    expect(() =>
+      groth16ArtifactToAuthorizationCall({
+        ...artifact,
         publicInputs: ["0x1234", ...artifact.publicInputs.slice(1)] as Groth16AuthorizationProofArtifact["publicInputs"],
       }),
     ).toThrow("publicInputs[0] must be a 32-byte hex string");

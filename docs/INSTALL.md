@@ -176,6 +176,10 @@ Validate the manifest:
 catp verify authorization --manifest catp-proof-manifest.json
 ```
 
+When `catp prove authorization --out <manifest>` succeeds, the command prints a
+ready-to-run `catp verify authorization --manifest ...` line. If the manifest is
+linked to an audit commitment, the suggested command includes `--check-audit`.
+
 For audit-linked manifests:
 
 ```bash

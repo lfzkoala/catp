@@ -42,7 +42,7 @@ const artifact = {
     u64Input(1778042846),
     u64Input(25),
   ],
-  actionData: "0x1234",
+  actionData: `0x${"aa".repeat(128)}`,
   currentTimestamp: "1778042846",
   cumulativeSpend: "25",
   value: "500",
@@ -106,6 +106,13 @@ describe("authorization proof manifest", () => {
     ).toThrow("proof must be 256 bytes");
 
     expect(() =>
+      buildAuthorizationProofManifest({
+        ...artifact,
+        actionData: "0x1234",
+      }),
+    ).toThrow("actionData must be 128 bytes");
+
+    expect(() =>
       buildAuthorizationProofManifest(artifact, { chainId: "sepolia" }),
     ).toThrow("chainId must be a decimal integer string");
 
@@ -147,6 +154,7 @@ describe("authorization proof manifest", () => {
     expect(output).toContain("chainId=11155111");
     expect(output).toContain(`sourceArtifact=${artifactPath}`);
     expect(output).toContain("cryptographicVerification=external:EVM-or-offchain-verifier");
+    expect(output).toContain(`verifyCommand=catp verify authorization --manifest ${outPath} --check-audit`);
   });
 
   it("reads verifier metadata from deployment JSON", () => {
@@ -376,5 +384,6 @@ JSON
     expect(summary).toContain(`verifier=0x${"12".repeat(20)}`);
     expect(summary).toContain(`agentAuthorizer=0x${"34".repeat(20)}`);
     expect(summary).toContain("next=Use the proof artifact with AgentAuthorizer.executeAuthorized");
+    expect(summary).not.toContain("verifyCommand=");
   });
 });
