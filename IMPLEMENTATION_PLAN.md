@@ -68,6 +68,12 @@ research.
 - `catp prove authorization`
 - `catp verify authorization`
 - `examples/authorization-basic`
+- Manifest validation checks proof version, 13 public inputs, 128-byte
+  `actionData`, 256-byte proof bytes, and public input mirrors.
+- Audit-linked manifest validation checks audit entry presence and structured
+  authorization action consistency.
+- Calldata encoder validates the contract-facing artifact shape before emitting
+  `registerPolicy` / `executeAuthorized` calldata.
 
 ### Repository Cleanup
 
@@ -77,40 +83,48 @@ research.
 - Moved test-only Solidity stubs out of production sources.
 - Removed unused primitives crate and inactive output-verification contracts.
 
+### Release Hygiene And Proof UX
+
+- README, INSTALL, ARCHITECTURE, examples, and security review docs aligned to
+  the current enforcement + authorization scope.
+- npm CLI package boundary documented: local enforcement, audit logs, witness
+  generation, proof manifest tooling, and artifact validation are in npm; full
+  Groth16 proof generation requires a repository checkout.
+- `catp witness --out` prints a ready-to-edit `proveCommand=...` line for
+  action and audit-linked sources.
+- `catp prove authorization --out` prints a ready-to-run `verifyCommand=...`
+  line, including `--check-audit` when applicable.
+- Global npm install smoke path documented and verified for `0.2.1`.
+- Missing repo checkout/prover script errors now explain how to proceed.
+- `examples/authorization-basic` remains the first user-facing proof fixture.
+- `npm run groth16:check` remains the canonical setup integrity check.
+
+### Packaging Decision For WASM And Proving
+
+- `@catp-protocol/cli` stays light.
+- Full `authorization_groth16_v1` proving, calldata encoding, Sepolia execution,
+  contracts, and setup checks stay repository-based.
+- `catp-circuits/wasm` and SDK `ProofClient` remain local Halo2/off-chain
+  `authorization_v1` artifacts.
+- `catp-wasm` is not published yet.
+- Hosted prover/verifier service is deferred until there is a concrete product
+  reason, threat model, and operational plan.
+
 ---
 
-## Next Milestones
-
-### P0: Release Hygiene
-
-Goal: make the current 0.2.x surface boring to install, test, and explain.
-
-Work:
-
-- Keep README, INSTALL, ARCHITECTURE, and release notes aligned with the current
-  enforcement + authorization scope.
-- Document npm package limits clearly: local enforcement and manifest tooling are
-  in npm; full Groth16 proof generation requires a repo checkout.
-- Keep `examples/authorization-basic` working as the first user-facing proof
-  fixture.
-- Keep `npm run groth16:check` as the canonical setup integrity check.
-
-Exit criteria:
-
-- A new user can install `@catp-protocol/cli`, run `catp init`, `catp validate`,
-  and understand when they need the repo checkout.
-- A developer can reproduce the Groth16 proof artifact and verify/deploy path
-  from documented commands.
+## Active Milestones
 
 ### P0: Authorization Proof Security Hardening
 
-Goal: reduce the chance that `authorization_groth16_v1` verifies an invalid
-action or drifts from its documented public input schema.
+Status: ongoing guardrail work.
+
+Goal: keep `authorization_groth16_v1` from accepting invalid actions or drifting
+from its documented public input schema.
 
 Work:
 
-- Keep `docs/SECURITY_REVIEW_AUTHORIZATION.md` current.
-- Add regression tests for any issue found in policy encoding, witness
+- Keep `docs/SECURITY_REVIEW_AUTHORIZATION.md` current as the living review.
+- Add regression tests for any new issue found in policy encoding, witness
   generation, proof artifact validation, calldata encoding, or contract state
   checks.
 - Treat changes to public input order, action encoding, commitment hash, proof
@@ -121,26 +135,6 @@ Exit criteria:
 - Critical/high review findings are fixed or explicitly deferred with rationale.
 - Groth16 setup hashes, verifier source hash, wrapper hash, and deployment
   metadata remain reproducible through `npm run groth16:check`.
-
-### P1: Proof UX
-
-Goal: make audit-linked authorization proofs feel like one product flow instead
-of several scripts.
-
-Work:
-
-- Improve CLI messages for `catp witness`, `catp prove authorization`, and
-  `catp verify authorization`.
-- Decide whether cryptographic local verification of Groth16 manifests belongs
-  in the CLI, SDK, or a separate verifier binary/service.
-- Add a short “copy this flow” example for audit-linked proof manifests.
-
-Exit criteria:
-
-- A user can move from an audit entry to a proof manifest without reading the
-  prover internals.
-- Manifest verification output is understandable without exposing private policy
-  fields.
 
 ### P1: Universal Agent Runtime Adapters
 
@@ -167,26 +161,24 @@ Exit criteria:
 - README and ARCHITECTURE describe CATP as a universal authorization protocol
   with Claude Code as the first supported adapter.
 
-### P1: Packaging Decision for WASM and Proving
+---
 
-Goal: keep package boundaries explicit so users know which path is supported by
-npm and which path requires a repository checkout.
+## Deferred Decisions
 
-Current decision:
+### Local Cryptographic Verification For Groth16 Manifests
 
-- Keep `@catp-protocol/cli` light. It publishes local enforcement, audit logs,
-  witness generation, proof manifest tooling, and artifact validation.
-- Keep full `authorization_groth16_v1` proof generation, calldata encoding,
-  Sepolia execution, contracts, and setup checks repository-based.
-- Do not publish `catp-wasm` yet. `catp-circuits/wasm` and SDK `ProofClient`
-  remain local artifacts for the Halo2/off-chain `authorization_v1` path.
-- Do not add a hosted prover/verifier service until there is a concrete
-  product reason, threat model, and operational plan.
+`catp verify authorization` intentionally performs structural and audit-linked
+manifest validation today. Cryptographic verification remains the job of the EVM
+verifier or a dedicated off-chain verifier path.
 
-Exit criteria:
+Do not add local Groth16 cryptographic verification to the CLI until the project
+chooses a stable verifier implementation and package boundary.
 
-- The package boundary is explicit and reflected in README, INSTALL, and SDK
-  examples.
+### Published WASM Package Or Hosted Prover
+
+`catp-wasm` and hosted prover/verifier services are out of the current package
+surface. Revisit only with a concrete product reason, threat model, and
+operations plan.
 
 ---
 
