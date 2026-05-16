@@ -1,6 +1,6 @@
 {
   "name": "@catp-protocol/cli",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Cryptographic Agent Trust Protocol — local enforcement plugin for Claude Code with TOML policy and tamper-evident audit log",
   "keywords": [
     "claude-code",
