@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { Command } from "commander";
 import { runPreHook } from "./hook/pre.js";
 import { runPostHook } from "./hook/post.js";
-import { getRuntimeAdapter, supportedRuntimeAdapters } from "./adapters/index.js";
+import { formatSupportedRuntimeAdapters, getRuntimeAdapter, supportedRuntimeAdapters } from "./adapters/index.js";
 import { cmdInit } from "./commands/init.js";
 import { cmdValidate } from "./commands/validate.js";
 import { cmdLogShow, cmdLogVerify } from "./commands/log.js";
@@ -43,6 +43,13 @@ function resolveHookAdapter(runtime: string) {
   }
   return adapter;
 }
+
+hook
+  .command("runtimes")
+  .description("List supported runtime adapter ids")
+  .action(() => {
+    process.stdout.write(formatSupportedRuntimeAdapters());
+  });
 
 hook
   .command("pre")

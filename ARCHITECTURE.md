@@ -162,6 +162,8 @@ Current supported runtime adapters:
 |------------|---------|--------------|
 | `claude-code` | `catp-plugin/src/adapters/claude-code.ts` | `catp hook pre/post --runtime claude-code` |
 
+Use `catp hook runtimes` to list supported runtime ids in the installed CLI.
+
 Audit entries are written under:
 
 ```text

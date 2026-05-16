@@ -1,5 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
-import { getRuntimeAdapter, supportedRuntimeAdapters } from "../../src/adapters/index.js";
+import {
+  formatSupportedRuntimeAdapters,
+  getRuntimeAdapter,
+  supportedRuntimeAdapters,
+} from "../../src/adapters/index.js";
 
 describe("runtime adapter registry", () => {
   it("resolves the supported Claude Code adapter", () => {
@@ -9,5 +13,9 @@ describe("runtime adapter registry", () => {
 
   it("returns null for unsupported runtime adapters", () => {
     expect(getRuntimeAdapter("unknown-runtime")).toBeNull();
+  });
+
+  it("formats supported runtime adapters for CLI output", () => {
+    expect(formatSupportedRuntimeAdapters()).toBe("Supported runtime adapters:\n- claude-code\n");
   });
 });

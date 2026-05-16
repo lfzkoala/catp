@@ -185,6 +185,12 @@ Add to `~/.claude/settings.json`:
 also the default. It is shown explicitly so future runtime integrations have a
 stable hook boundary.
 
+List supported runtime adapters with:
+
+```bash
+catp hook runtimes
+```
+
 ### Configure a Policy
 
 ```bash
