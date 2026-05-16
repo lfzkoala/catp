@@ -80,7 +80,8 @@ deployment metadata live in this repo.
 Runtime adapters can be checked against the shared event boundary with
 `catp event validate`. For example, `catp event validate --adapter claude-code`
 validates a Claude Code hook payload from stdin and normalizes it into CATP's
-runtime-neutral `ToolAction` shape.
+runtime-neutral `ToolAction` shape. Run `catp event adapters` to list supported
+adapter names.
 
 ---
 

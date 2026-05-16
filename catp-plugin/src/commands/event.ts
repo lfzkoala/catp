@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { claudeCodeAdapter } from "../adapters/claude-code.js";
+import { adaptRuntimePayload, listRuntimeAdapters } from "../adapters/registry.js";
 import type { RuntimePhase, ToolAction } from "../runtime/types.js";
 import { validateToolAction } from "../runtime/validate.js";
 
@@ -32,6 +32,10 @@ export async function cmdValidateEvent(opts: ValidateEventOptions): Promise<void
   }
 
   process.stdout.write(formatEventValidationSummary(result));
+}
+
+export function cmdListAdapters(): void {
+  process.stdout.write(`${listRuntimeAdapters().join("\n")}\n`);
 }
 
 export function validateEventPayload(
@@ -75,9 +79,7 @@ function adaptPayload(
   }
 
   const phase = parsePhase(opts.phase);
-  return phase === "post"
-    ? claudeCodeAdapter.fromPostToolUse(payload)
-    : claudeCodeAdapter.fromPreToolUse(payload);
+  return adaptRuntimePayload(opts.adapter, phase, payload);
 }
 
 function parsePhase(value: string | undefined): RuntimePhase {

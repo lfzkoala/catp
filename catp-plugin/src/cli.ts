@@ -8,7 +8,7 @@ import { cmdValidate } from "./commands/validate.js";
 import { cmdLogShow, cmdLogVerify } from "./commands/log.js";
 import { cmdAnchor } from "./commands/anchor.js";
 import { cmdWitness } from "./commands/witness.js";
-import { cmdValidateEvent } from "./commands/event.js";
+import { cmdListAdapters, cmdValidateEvent } from "./commands/event.js";
 import { cmdProveAuthorization, cmdVerifyAuthorization } from "./commands/authorization.js";
 
 const require = createRequire(import.meta.url);
@@ -46,6 +46,11 @@ hook
   .action(() => { runPostHook().catch(() => process.exit(0)); });
 
 const event = program.command("event").description("Runtime-neutral event utilities");
+
+event
+  .command("adapters")
+  .description("List supported runtime adapters")
+  .action(cmdListAdapters);
 
 event
   .command("validate")

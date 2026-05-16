@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  cmdListAdapters,
   formatEventValidationSummary,
   validateEventPayload,
 } from '../../src/commands/event.js';
@@ -84,5 +85,23 @@ describe('formatEventValidationSummary', () => {
 
     expect(summary).toContain('✗ event invalid');
     expect(summary).toContain('toolName must be a non-empty string');
+  });
+});
+
+describe('cmdListAdapters', () => {
+  it('prints supported adapter names', () => {
+    const originalWrite = process.stdout.write.bind(process.stdout);
+    let output = '';
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      output += chunk.toString();
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      cmdListAdapters();
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    expect(output).toBe('claude-code\n');
   });
 });
