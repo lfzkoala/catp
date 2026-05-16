@@ -16,22 +16,23 @@ interface EventValidationResult {
 }
 
 export async function cmdValidateEvent(opts: ValidateEventOptions): Promise<void> {
-  let parsed: unknown;
-  try {
-    const raw = opts.file ? readFileSync(opts.file, "utf8") : await readStdin();
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    process.stderr.write(`catp: invalid event JSON: ${(err as Error).message}\n`);
-    process.exit(1);
-  }
-
-  const result = validateEventPayload(parsed, opts);
+  const result = validateEventPayload(await readEventJson(opts), opts);
   if (!result.ok) {
     process.stderr.write(formatEventValidationSummary(result));
     process.exit(1);
   }
 
   process.stdout.write(formatEventValidationSummary(result));
+}
+
+export async function cmdNormalizeEvent(opts: ValidateEventOptions): Promise<void> {
+  const result = validateEventPayload(await readEventJson(opts), opts);
+  if (!result.ok || !result.action) {
+    process.stderr.write(formatEventValidationSummary(result));
+    process.exit(1);
+  }
+
+  process.stdout.write(`${JSON.stringify(result.action, null, 2)}\n`);
 }
 
 export function cmdListAdapters(): void {
@@ -84,6 +85,16 @@ function adaptPayload(
 
 function parsePhase(value: string | undefined): RuntimePhase {
   return value === "post" ? "post" : "pre";
+}
+
+async function readEventJson(opts: Pick<ValidateEventOptions, "file">): Promise<unknown> {
+  try {
+    const raw = opts.file ? readFileSync(opts.file, "utf8") : await readStdin();
+    return JSON.parse(raw);
+  } catch (err) {
+    process.stderr.write(`catp: invalid event JSON: ${(err as Error).message}\n`);
+    process.exit(1);
+  }
 }
 
 async function readStdin(): Promise<string> {

@@ -1,6 +1,10 @@
 import { describe, expect, it } from '@jest/globals';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   cmdListAdapters,
+  cmdNormalizeEvent,
   formatEventValidationSummary,
   validateEventPayload,
 } from '../../src/commands/event.js';
@@ -105,3 +109,70 @@ describe('cmdListAdapters', () => {
     expect(output).toBe('claude-code\n');
   });
 });
+
+describe('cmdNormalizeEvent', () => {
+  it('prints canonical ToolAction JSON for valid standard payloads', async () => {
+    const output = await captureStdout(() =>
+      cmdNormalizeEvent({
+        file: writeJsonFixture({
+          runtime: 'test-runtime',
+          phase: 'pre',
+          toolName: 'Bash',
+          toolInput: { command: 'ls' },
+        }),
+      })
+    );
+
+    expect(JSON.parse(output)).toEqual({
+      runtime: 'test-runtime',
+      phase: 'pre',
+      toolName: 'Bash',
+      toolInput: { command: 'ls' },
+    });
+  });
+
+  it('prints canonical ToolAction JSON for adapter payloads', async () => {
+    const output = await captureStdout(() =>
+      cmdNormalizeEvent({
+        adapter: 'claude-code',
+        file: writeJsonFixture({
+          tool_name: 'Write',
+          tool_input: { file_path: 'src/app.ts' },
+        }),
+        phase: 'post',
+      })
+    );
+
+    expect(JSON.parse(output)).toMatchObject({
+      runtime: 'claude-code',
+      phase: 'post',
+      toolName: 'Write',
+      toolInput: { file_path: 'src/app.ts' },
+    });
+  });
+});
+
+async function captureStdout<T>(run: () => Promise<T> | T): Promise<string> {
+  const originalWrite = process.stdout.write.bind(process.stdout);
+  let output = '';
+
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    output += chunk.toString();
+    return true;
+  }) as typeof process.stdout.write;
+
+  try {
+    await run();
+    return output;
+  } finally {
+    process.stdout.write = originalWrite;
+  }
+}
+
+function writeJsonFixture(value: unknown): string {
+  const dir = mkdtempSync(join(tmpdir(), 'catp-event-test-'));
+  const file = join(dir, 'event.json');
+  writeFileSync(file, JSON.stringify(value), 'utf8');
+  process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
+  return file;
+}

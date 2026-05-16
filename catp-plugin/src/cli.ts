@@ -8,7 +8,7 @@ import { cmdValidate } from "./commands/validate.js";
 import { cmdLogShow, cmdLogVerify } from "./commands/log.js";
 import { cmdAnchor } from "./commands/anchor.js";
 import { cmdWitness } from "./commands/witness.js";
-import { cmdListAdapters, cmdValidateEvent } from "./commands/event.js";
+import { cmdListAdapters, cmdNormalizeEvent, cmdValidateEvent } from "./commands/event.js";
 import { cmdProveAuthorization, cmdVerifyAuthorization } from "./commands/authorization.js";
 
 const require = createRequire(import.meta.url);
@@ -59,6 +59,17 @@ event
   .option("--adapter <name>", "adapter payload to normalize first: claude-code")
   .option("--phase <phase>", "adapter phase: pre or post", "pre")
   .action((opts) => { cmdValidateEvent(opts).catch((err) => {
+    process.stderr.write(`catp: ${(err as Error).message}\n`);
+    process.exit(1);
+  }); });
+
+event
+  .command("normalize")
+  .description("Normalize a CATP ToolAction event or adapter payload to canonical JSON")
+  .option("--file <path>", "read event JSON from file instead of stdin")
+  .option("--adapter <name>", "adapter payload to normalize first: claude-code")
+  .option("--phase <phase>", "adapter phase: pre or post", "pre")
+  .action((opts) => { cmdNormalizeEvent(opts).catch((err) => {
     process.stderr.write(`catp: ${(err as Error).message}\n`);
     process.exit(1);
   }); });

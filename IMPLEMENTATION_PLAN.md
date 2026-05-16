@@ -50,7 +50,8 @@ research.
 
 - `catp-policy.toml` schema and parser
 - Runtime-neutral `ToolAction` enforcement core with a Claude Code adapter
-- `catp event validate` for checking canonical events and adapter payloads
+- `catp event validate` / `catp event normalize` for checking canonical events
+  and adapter payloads
 - Runtime adapter registry for stable adapter discovery and normalization
 - `PreToolUse` / `PostToolUse` hook handlers
 - Local audit log with commitment-chain verification
