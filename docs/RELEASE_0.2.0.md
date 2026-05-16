@@ -1,14 +1,14 @@
-# CATP CLI 0.2.x Release Notes
+# CATP CLI 0.2.2 Release Notes
 
 Package:
 
 ```text
-@catp-protocol/cli@0.2.1
+@catp-protocol/cli@0.2.2
 ```
 
-`0.2.1` is the published patch release for `0.2.0` that fixes CLI version
-reporting. The repository has continued hardening the same `0.2.x` surface for
-the next patch release.
+`0.2.2` is the current published patch release for the `0.2.x` MVP line. It
+keeps the npm package focused on the installable CLI surface while folding in
+the hardening and proof UX work completed after `0.2.1`.
 
 ## Why This Release
 
@@ -45,7 +45,7 @@ Published in `0.2.1`:
   deployment JSON.
 - Fixed `catp --version` to report the published package version.
 
-Mainline hardening after `0.2.1`:
+Published in `0.2.2`:
 
 - `catp verify authorization --check-audit` now checks that the audit entry's
   structured authorization action matches the manifest action data, value,
@@ -66,6 +66,9 @@ Mainline hardening after `0.2.1`:
 - Package boundaries are documented: npm CLI remains light; full Groth16
   proving, calldata encoding, execution, contracts, and setup checks remain
   repository-based.
+- The release was verified from a fresh global npm install with
+  `catp --version`, `catp hook runtimes`, `catp init`, `catp validate`,
+  `catp log verify`, and authorization proof help commands.
 
 ## Pre-Publish Checklist
 
@@ -111,7 +114,7 @@ After publishing:
 
 ```bash
 npm view @catp-protocol/cli version
-npm install -g @catp-protocol/cli@0.2.1
+npm install -g @catp-protocol/cli@0.2.2
 catp --version
 catp hook runtimes
 catp init
