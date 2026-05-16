@@ -43,6 +43,7 @@ export function groth16ArtifactToAuthorizationCall(
   if (parseU64(artifact.publicInputs[12], "publicInputs[12]") !== cumulativeSpend) {
     throw new Error("publicInputs[12] must equal cumulativeSpend");
   }
+  validateActionDataMatchesPublicInputs(artifact.actionData, artifact.publicInputs);
 
   return {
     proofVersion: "authorization_groth16_v1",
@@ -70,6 +71,54 @@ export function groth16ArtifactToAuthorizationCall(
       cumulativeSpend,
     } satisfies AuthorizationPublicInputs,
   };
+}
+
+function validateActionDataMatchesPublicInputs(actionData: string, publicInputs: readonly string[]): void {
+  const decoded = decodeActionData(actionData);
+  if (decoded.actionType !== parseU64(publicInputs[1], "publicInputs[1]")) {
+    throw new Error("actionData actionType must equal publicInputs[1]");
+  }
+  for (const [index, limb] of decoded.protocol.entries()) {
+    if (limb !== parseU64(publicInputs[2 + index], `publicInputs[${2 + index}]`)) {
+      throw new Error(`actionData protocol limb ${index} must equal publicInputs[${2 + index}]`);
+    }
+  }
+  for (const [index, limb] of decoded.token.entries()) {
+    if (limb !== parseU64(publicInputs[6 + index], `publicInputs[${6 + index}]`)) {
+      throw new Error(`actionData token limb ${index} must equal publicInputs[${6 + index}]`);
+    }
+  }
+  if (decoded.value !== parseU64(publicInputs[10], "publicInputs[10]")) {
+    throw new Error("actionData value must equal publicInputs[10]");
+  }
+}
+
+function decodeActionData(actionData: string): {
+  actionType: bigint;
+  protocol: bigint[];
+  token: bigint[];
+  value: bigint;
+} {
+  const clean = actionData.slice(2);
+  const actionType = BigInt(`0x${clean.slice(0, 64)}`);
+  const protocol = decodeLeU64Limbs(clean.slice(64, 128));
+  const token = decodeLeU64Limbs(clean.slice(128, 192));
+  const value = BigInt(`0x${clean.slice(192, 256)}`);
+  return { actionType, protocol, token, value };
+}
+
+function decodeLeU64Limbs(wordHex: string): bigint[] {
+  const limbs: bigint[] = [];
+  for (let limbIndex = 0; limbIndex < 4; limbIndex += 1) {
+    const offset = limbIndex * 16;
+    let value = 0n;
+    for (let byteIndex = 0; byteIndex < 8; byteIndex += 1) {
+      const byteHex = wordHex.slice(offset + byteIndex * 2, offset + byteIndex * 2 + 2);
+      value |= BigInt(`0x${byteHex}`) << BigInt(8 * byteIndex);
+    }
+    limbs.push(value);
+  }
+  return limbs;
 }
 
 function parseU64(value: number | bigint | string, field: string): bigint {

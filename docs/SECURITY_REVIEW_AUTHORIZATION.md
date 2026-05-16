@@ -112,9 +112,14 @@ Regression/guard:
 ### Low: Proof Manifest Validation Is Structural
 
 `catp verify authorization` validates the manifest and embedded Groth16 artifact
-shape. With `--check-audit`, it also checks that the manifest's audit commitment
-exists in the local audit log for the recorded audit agent. It does not perform
-cryptographic proof verification locally.
+shape. It checks the contract-facing shape, including 13 public inputs, 128-byte
+ABI `actionData`, 256-byte proof bytes, and consistency between `actionData`
+and the public action fields. With `--check-audit`, it also checks that the
+manifest's audit commitment exists in the local audit log for the recorded audit
+agent and that the audit entry's structured authorization action matches the
+manifest action data, value, timestamp, and cumulative spend when those audit
+fields are present. It does not perform cryptographic proof verification
+locally.
 
 Decision: acceptable for the first proof-sharing manifest. Cryptographic
 verification remains the responsibility of the EVM verifier or dedicated

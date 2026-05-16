@@ -366,8 +366,11 @@ catp verify authorization \
 
 `catp verify authorization` currently performs structural manifest validation.
 With `--check-audit`, it also checks that the manifest's audit commitment exists
-for the recorded audit agent. Cryptographic proof verification is performed by
-the EVM verifier or the dedicated off-chain verifier path.
+for the recorded audit agent and that the audit entry's structured
+authorization action matches the manifest action data, value, timestamp, and
+cumulative spend when those audit fields are present. Cryptographic proof
+verification is performed by the EVM verifier or the dedicated off-chain
+verifier path.
 
 See [docs/E2E_GROTH16_SEPOLIA.md](docs/E2E_GROTH16_SEPOLIA.md) for the full
 end-to-end flow and [docs/SECURITY_REVIEW_AUTHORIZATION.md](docs/SECURITY_REVIEW_AUTHORIZATION.md)

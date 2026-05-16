@@ -23,6 +23,25 @@ afterAll(() => {
 
 const bytes32 = (byte: string) => `0x${byte.repeat(32)}`;
 const u64Input = (value: bigint | number) => `0x${BigInt(value).toString(16).padStart(64, "0")}`;
+const leU64Bytes = (value: bigint | number) => {
+  const bytes: string[] = [];
+  let remaining = BigInt(value);
+  for (let i = 0; i < 8; i += 1) {
+    bytes.push(Number(remaining & 0xffn).toString(16).padStart(2, "0"));
+    remaining >>= 8n;
+  }
+  return bytes.join("");
+};
+const bytes32FromLeU64Limbs = (limbs: Array<bigint | number>) =>
+  `0x${limbs.map(leU64Bytes).join("")}`;
+const actionData = (opts: {
+  actionType: bigint | number;
+  protocol: string;
+  token: string;
+  value: bigint | number;
+}) => `0x${BigInt(opts.actionType).toString(16).padStart(64, "0")}${opts.protocol.slice(2)}${opts.token.slice(2)}${BigInt(opts.value).toString(16).padStart(64, "0")}`;
+const artifactProtocol = bytes32FromLeU64Limbs([1, 2, 3, 4]);
+const artifactToken = bytes32FromLeU64Limbs([5, 6, 7, 8]);
 
 const artifact = {
   proofVersion: "authorization_groth16_v1",
@@ -42,7 +61,12 @@ const artifact = {
     u64Input(1778042846),
     u64Input(25),
   ],
-  actionData: `0x${"aa".repeat(128)}`,
+  actionData: actionData({
+    actionType: 0,
+    protocol: artifactProtocol,
+    token: artifactToken,
+    value: 500,
+  }),
   currentTimestamp: "1778042846",
   cumulativeSpend: "25",
   value: "500",
@@ -111,6 +135,18 @@ describe("authorization proof manifest", () => {
         actionData: "0x1234",
       }),
     ).toThrow("actionData must be 128 bytes");
+
+    expect(() =>
+      buildAuthorizationProofManifest({
+        ...artifact,
+        actionData: actionData({
+          actionType: 1,
+          protocol: artifactProtocol,
+          token: artifactToken,
+          value: 500,
+        }),
+      }),
+    ).toThrow("actionData actionType must equal publicInputs[1]");
 
     expect(() =>
       buildAuthorizationProofManifest(artifact, { chainId: "sepolia" }),
@@ -265,8 +301,8 @@ version = "1"
 
 [authorization]
 allowed_action = "Swap"
-allowed_protocol = "${bytes32("aa")}"
-allowed_token = "${bytes32("bb")}"
+allowed_protocol = "${artifactProtocol}"
+allowed_token = "${artifactToken}"
 max_value_per_tx = "1000"
 max_value_total = "10000"
 valid_from = "100"
@@ -286,8 +322,8 @@ allow = true
       input_summary: "{}",
       authorization: {
         actionType: "Swap",
-        protocol: bytes32("aa"),
-        token: bytes32("bb"),
+        protocol: artifactProtocol,
+        token: artifactToken,
         value: "500",
         currentTimestamp: "150",
         cumulativeSpend: "0",
@@ -359,9 +395,55 @@ JSON
     }
 
     expect(output).toContain("auditEntry=found:manifest-agent");
+    expect(output).toContain("auditAction=matched");
     expect(output).toContain("currentTimestamp=150");
     expect(output).toContain("cumulativeSpend=0");
     expect(output).toContain("cryptographicVerification=external:EVM-or-offchain-verifier");
+  });
+
+  it("rejects audit-linked manifests when action data differs from the audit entry", () => {
+    const policyPath = join(tmpBase, "audit-mismatch-policy.toml");
+    const manifestPath = join(tmpBase, "audit-mismatch-manifest.json");
+    const commitment = computeCommitment("Bash", "allow", "2026-01-02T00:00:00.000Z", "0", null, "{}");
+
+    writeFileSync(policyPath, `
+[agent]
+id = "manifest-mismatch-agent"
+version = "1"
+
+[[rules]]
+tool = "Bash"
+allow = true
+`, "utf8");
+
+    appendAuditEntry("manifest-mismatch-agent", {
+      ts: "2026-01-02T00:00:00.000Z",
+      tool: "Bash",
+      decision: "allow",
+      rule_matched: null,
+      commitment,
+      input_summary: "{}",
+      authorization: {
+        actionType: "Swap",
+        protocol: artifactProtocol,
+        token: artifactToken,
+        value: "501",
+        currentTimestamp: "150",
+        cumulativeSpend: "0",
+      },
+    });
+
+    writeFileSync(manifestPath, JSON.stringify(buildAuthorizationProofManifest(artifact, {
+      auditCommitment: commitment,
+      auditAgent: "manifest-mismatch-agent",
+    })), "utf8");
+
+    expect(() =>
+      cmdVerifyAuthorization({
+        manifest: manifestPath,
+        checkAudit: true,
+      }),
+    ).toThrow("manifest actionData does not match audit authorization action");
   });
 
   it("formats a useful manifest summary", () => {

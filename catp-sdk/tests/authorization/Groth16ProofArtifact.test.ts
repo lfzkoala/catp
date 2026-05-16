@@ -6,6 +6,8 @@ const ZERO32 = `0x${"00".repeat(32)}` as `0x${string}`;
 const ONE32 = `0x${"00".repeat(31)}01` as `0x${string}`;
 const VALUE_500 = `0x${"00".repeat(30)}01f4` as `0x${string}`;
 const PROOF_256 = `0x${"11".repeat(256)}` as `0x${string}`;
+const actionData = (actionType: bigint | number, protocol: string, token: string, value: bigint | number) =>
+  `0x${BigInt(actionType).toString(16).padStart(64, "0")}${protocol.slice(2)}${token.slice(2)}${BigInt(value).toString(16).padStart(64, "0")}` as `0x${string}`;
 
 const artifact = {
   proofVersion: "authorization_groth16_v1",
@@ -25,7 +27,7 @@ const artifact = {
     `0x${"00".repeat(31)}7b`,
     ZERO32,
   ],
-  actionData: `0x${"aa".repeat(128)}`,
+  actionData: actionData(0, ZERO32, ZERO32, 500),
   currentTimestamp: "123",
   cumulativeSpend: "0",
   value: "500",
@@ -102,6 +104,13 @@ describe("groth16ArtifactToAuthorizationCall", () => {
         actionData: `0x${"aa".repeat(127)}`,
       }),
     ).toThrow("actionData must be 128 bytes");
+
+    expect(() =>
+      groth16ArtifactToAuthorizationCall({
+        ...artifact,
+        actionData: actionData(1, ZERO32, ZERO32, 500),
+      }),
+    ).toThrow("actionData actionType must equal publicInputs[1]");
 
     expect(() =>
       groth16ArtifactToAuthorizationCall({

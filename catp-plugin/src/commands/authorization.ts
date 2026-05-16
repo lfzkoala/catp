@@ -5,9 +5,15 @@ import { join } from "node:path";
 import { buildGroth16WitnessFromSources } from "./witness.js";
 import { auditRoot } from "../audit/paths.js";
 import { findPolicyFile, loadPolicy } from "../policy/loader.js";
-import type { AuditEntry } from "../policy/types.js";
+import type { AuditEntry, AuthorizationAction } from "../policy/types.js";
 
 const PROOF_VERSION = "authorization_groth16_v1";
+const ACTION_TYPE: Record<string, string> = {
+  swap: "0",
+  transfer: "1",
+  deposit: "2",
+  withdraw: "3",
+};
 
 export interface AuthorizationProofArtifact {
   proofVersion: string;
@@ -220,10 +226,13 @@ export function cmdVerifyAuthorization(opts: { manifest?: string; checkAudit?: b
     if (!auditAgent) {
       throw new Error("missing --audit-agent <id>; manifest does not include auditAgent");
     }
-    if (!findAuditEntry(auditAgent, manifest.auditCommitment)) {
+    const entry = findAuditEntry(auditAgent, manifest.auditCommitment);
+    if (!entry) {
       throw new Error(`No audit entry found for commitment ${manifest.auditCommitment}`);
     }
+    validateAuditEntryMatchesManifest(entry, manifest);
     extraLines.push(`auditEntry=found:${auditAgent}`);
+    extraLines.push("auditAction=matched");
   }
   process.stdout.write(formatAuthorizationManifestSummary(manifest, {
     extraLines,
@@ -298,6 +307,8 @@ function validateGroth16Artifact(artifact: AuthorizationProofArtifact): void {
   if (normalizeU64(artifact.publicInputs[12], "publicInputs[12]") !== cumulativeSpend) {
     throw new Error("publicInputs[12] must equal cumulativeSpend");
   }
+
+  validateActionDataMatchesPublicInputs(artifact.actionData, artifact.publicInputs);
 }
 
 function generateGroth16Artifact(opts: {
@@ -376,6 +387,107 @@ function findAuditEntry(agentId: string, commitment: string): AuditEntry | null 
     }
   }
   return null;
+}
+
+function validateAuditEntryMatchesManifest(entry: AuditEntry, manifest: AuthorizationProofManifest): void {
+  if (!entry.authorization) {
+    throw new Error(`Audit entry ${entry.commitment} does not contain authorization action data`);
+  }
+
+  const expectedActionData = encodeAuthorizationAction(entry.authorization);
+  if (expectedActionData.toLowerCase() !== manifest.actionData.toLowerCase()) {
+    throw new Error("manifest actionData does not match audit authorization action");
+  }
+
+  const auditValue = normalizeU64(entry.authorization.value, "audit.authorization.value");
+  if (auditValue !== manifest.value) {
+    throw new Error("manifest value does not match audit authorization action");
+  }
+
+  if (entry.authorization.currentTimestamp !== undefined) {
+    const auditTimestamp = normalizeU64(entry.authorization.currentTimestamp, "audit.authorization.currentTimestamp");
+    if (auditTimestamp !== manifest.currentTimestamp) {
+      throw new Error("manifest currentTimestamp does not match audit authorization action");
+    }
+  }
+
+  if (entry.authorization.cumulativeSpend !== undefined) {
+    const auditSpend = normalizeU64(entry.authorization.cumulativeSpend, "audit.authorization.cumulativeSpend");
+    if (auditSpend !== manifest.cumulativeSpend) {
+      throw new Error("manifest cumulativeSpend does not match audit authorization action");
+    }
+  }
+}
+
+function validateActionDataMatchesPublicInputs(actionData: string, publicInputs: string[]): void {
+  const decoded = decodeActionData(actionData);
+  if (decoded.actionType !== normalizeU64(publicInputs[1], "publicInputs[1]")) {
+    throw new Error("actionData actionType must equal publicInputs[1]");
+  }
+  for (const [index, limb] of decoded.protocol.entries()) {
+    if (limb !== normalizeU64(publicInputs[2 + index], `publicInputs[${2 + index}]`)) {
+      throw new Error(`actionData protocol limb ${index} must equal publicInputs[${2 + index}]`);
+    }
+  }
+  for (const [index, limb] of decoded.token.entries()) {
+    if (limb !== normalizeU64(publicInputs[6 + index], `publicInputs[${6 + index}]`)) {
+      throw new Error(`actionData token limb ${index} must equal publicInputs[${6 + index}]`);
+    }
+  }
+  if (decoded.value !== normalizeU64(publicInputs[10], "publicInputs[10]")) {
+    throw new Error("actionData value must equal publicInputs[10]");
+  }
+}
+
+function decodeActionData(actionData: string): {
+  actionType: string;
+  protocol: string[];
+  token: string[];
+  value: string;
+} {
+  const clean = actionData.slice(2);
+  const actionType = BigInt(`0x${clean.slice(0, 64)}`).toString();
+  const protocol = decodeLeU64Limbs(clean.slice(64, 128));
+  const token = decodeLeU64Limbs(clean.slice(128, 192));
+  const value = BigInt(`0x${clean.slice(192, 256)}`).toString();
+  return { actionType, protocol, token, value };
+}
+
+function decodeLeU64Limbs(wordHex: string): string[] {
+  const limbs: string[] = [];
+  for (let limbIndex = 0; limbIndex < 4; limbIndex += 1) {
+    const offset = limbIndex * 16;
+    let value = 0n;
+    for (let byteIndex = 0; byteIndex < 8; byteIndex += 1) {
+      const byteHex = wordHex.slice(offset + byteIndex * 2, offset + byteIndex * 2 + 2);
+      value |= BigInt(`0x${byteHex}`) << BigInt(8 * byteIndex);
+    }
+    limbs.push(value.toString());
+  }
+  return limbs;
+}
+
+function encodeAuthorizationAction(action: AuthorizationAction): string {
+  const actionType = normalizeAuthorizationActionType(action.actionType, "audit.authorization.actionType");
+  const value = normalizeU64(action.value, "audit.authorization.value");
+  assertBytes32(action.protocol, "audit.authorization.protocol");
+  assertBytes32(action.token, "audit.authorization.token");
+  return `0x${u256Hex(actionType)}${action.protocol.slice(2)}${action.token.slice(2)}${u256Hex(value)}`;
+}
+
+function normalizeAuthorizationActionType(value: string | number, field: string): string {
+  if (typeof value === "string" && ACTION_TYPE[value.toLowerCase()] !== undefined) {
+    return ACTION_TYPE[value.toLowerCase()];
+  }
+  const parsed = normalizeU64(value, field);
+  if (!["0", "1", "2", "3"].includes(parsed)) {
+    throw new Error(`${field} must be Swap, Transfer, Deposit, Withdraw, or 0..3`);
+  }
+  return parsed;
+}
+
+function u256Hex(value: string): string {
+  return BigInt(value).toString(16).padStart(64, "0");
 }
 
 function normalizeIntegerString(value: string | number, field: string): string {

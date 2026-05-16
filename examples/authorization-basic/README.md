@@ -138,7 +138,8 @@ This manifest validation is structural. Cryptographic verification is performed
 by the EVM verifier or a dedicated off-chain verifier path.
 
 The manifest validator also checks the contract-facing shape: 13 public inputs,
-a 128-byte ABI `actionData` payload, and a 256-byte Groth16 proof.
+a 128-byte ABI `actionData` payload, a 256-byte Groth16 proof, and consistency
+between `actionData` and the public action fields.
 
 ## Optional: Prepare On-Chain Execution
 

@@ -188,6 +188,11 @@ catp verify authorization \
   --check-audit
 ```
 
+`--check-audit` verifies that the audit commitment exists for the recorded audit
+agent and that the audit entry's structured authorization action matches the
+manifest action data, value, timestamp, and cumulative spend when those fields
+were recorded in the audit entry.
+
 For the complete Sepolia flow, see
 [`docs/E2E_GROTH16_SEPOLIA.md`](E2E_GROTH16_SEPOLIA.md).
 
