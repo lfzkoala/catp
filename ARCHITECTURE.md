@@ -1,15 +1,24 @@
 # CATP Architecture
 
-CATP is a proof-centric agent authorization system. The current repository contains:
+CATP is an authorization and audit protocol for AI agents. The core system
+enforces local policy decisions, records tamper-evident audit logs, and
+produces authorization witnesses/manifests that can be checked by external
+verifiers. ZK proof systems are optional verification backends, not the protocol
+boundary.
+
+The current repository contains:
 
 - a runtime-neutral local enforcement core with a Claude Code adapter
 - a tamper-evident audit log
 - an authorization proof statement
-- a Groth16/BN254 EVM verifier path for testnet execution
-- a Halo2/KZG off-chain verifier path
+- witness and proof manifest tooling
+- an optional Groth16/BN254 EVM verifier path for testnet execution
+- a Halo2/KZG off-chain verifier path for proof-system research
 - Solidity contracts and TypeScript SDK adapters for verifiable authorization
 
-The protocol boundary is the versioned authorization statement and its public input schema. The current EVM implementation is a reference deployment, not the protocol boundary.
+The protocol boundary is the versioned authorization statement, manifest shape,
+and public input schema. The current EVM implementation is a reference
+deployment, not the protocol boundary.
 
 ---
 
@@ -24,15 +33,24 @@ Local enforcement
   runtime adapters, TOML policy checks, tamper-evident audit log
 
 Verifiable authorization
-  private policy commitment, structured action witness, proof manifest,
+  private policy commitment, structured action witness, proof manifest
+
+Optional verifier backends
   Groth16 EVM verifier path, Halo2 off-chain verifier path
+```
+
+In short:
+
+```text
+runtime adapter -> policy engine -> audit log -> witness/proof manifest -> optional verifier backend
 ```
 
 The local enforcement core is runtime-neutral. Claude Code is the first
 supported adapter: it maps `PreToolUse` and `PostToolUse` hook payloads into
 CATP's common `ToolAction` shape before policy evaluation or audit logging.
 When a tool call or action has structured authorization data, it can feed the
-authorization witness/proof flow.
+authorization witness/manifest flow, and a verifier backend can then check the
+authorization statement when needed.
 
 Future protocol areas such as encrypted messaging, output verification,
 reputation, and registry/discovery are extension spaces. They should not
@@ -90,7 +108,8 @@ flowchart TD
   Audit -->|optional audit commitment| Witness
   AuthPolicy --> Witness
 
-  Witness --> Groth16Prover[Groth16 prover<br/>authorization_groth16_v1]
+  Witness --> Manifest[Proof manifest<br/>catp_authorization_proof_manifest_v1]
+  Manifest --> Groth16Prover[Optional Groth16 prover<br/>authorization_groth16_v1]
   Groth16Prover --> ProofArtifact[Proof artifact JSON]
   ProofArtifact --> Encoder[calldata encoder]
   Encoder --> Broadcaster[execution broadcaster]

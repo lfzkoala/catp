@@ -13,7 +13,9 @@ the hardening and proof UX work completed after `0.2.1`.
 ## Why This Release
 
 This release publishes the updated CATP CLI surface for local enforcement,
-authorization proof manifests, and audit-linked manifest validation.
+tamper-evident audit logs, authorization proof manifests, and audit-linked
+manifest validation. CATP remains authorization/audit-first; Groth16 is the
+current optional EVM verification backend.
 
 The npm package is intended for:
 
@@ -21,13 +23,14 @@ The npm package is intended for:
 - TOML policy validation.
 - Tamper-evident audit log viewing and verification.
 - Authorization witness generation.
-- Proof manifest generation from an existing Groth16 artifact.
+- Proof manifest generation from an existing authorization proof artifact.
 - Proof manifest structural validation.
 - Audit-linked proof manifest validation.
 - Runtime adapter hook entrypoints for Claude Code.
 
-Full Groth16 proof generation from `--action` or `--audit-commitment` still
-requires a repository checkout because it depends on:
+Full Groth16 proof generation from `--action` or `--audit-commitment` is
+available as the current EVM verifier backend, but still requires a repository
+checkout because it depends on:
 
 - `scripts/generate-groth16-verifier.sh`
 - `catp-circuits/groth16`

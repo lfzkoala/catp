@@ -1,13 +1,13 @@
 # CATP - Cryptographic Agent Trust Protocol
 
 CATP is an authorization protocol for AI agents: it enforces local policy
-decisions and turns structured agent actions into verifiable authorization
-proofs.
+decisions, records tamper-evident audit trails, and can turn structured agent
+actions into verifiable authorization artifacts.
 
 The active project has two connected surfaces:
 
 1. **Local enforcement**: a runtime-neutral policy core blocks tool calls outside a project policy and writes a tamper-evident audit log; Claude Code is the first supported adapter.
-2. **Verifiable authorization**: a Groth16/BN254 EVM proof path proves that a structured agent action satisfies a committed private policy.
+2. **Verifiable authorization**: witness and proof manifest tooling link structured actions to committed policies. Groth16/BN254 is the current optional EVM verification backend, not the protocol itself.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the current system shape and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the active roadmap.
 
@@ -18,8 +18,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the current system shape and [IMPLEME
 ```text
 In scope
 Local enforcement core            runtime adapters + TOML policy + SHA-256 audit log
-EVM delegated authorization       authorization_groth16_v1 = Groth16/BN254, Sepolia smoke passed
-Off-chain authorization path      authorization_v1 = Halo2/KZG/BN254, not EVM-deployable
+Authorization proof manifests     audit-linked witness + manifest validation
+Optional EVM verification         authorization_groth16_v1 = Groth16/BN254, Sepolia smoke passed
+Off-chain proof research          authorization_v1 = Halo2/KZG/BN254, not EVM-deployable
 
 Future extension space
 Output verification               output commitments + attestor/challenge design
@@ -29,9 +30,9 @@ Registry and discovery            capability proofs + discovery records
 ```
 
 The current product is complete enough to stand alone as an enforcement +
-authorization protocol. The protocol boundary is the authorization proof
-statement and public input schema, not Ethereum itself. Ethereum/Sepolia is the
-current reference deployment target.
+authorization protocol. ZK is not required for local enforcement or audit-log
+integrity. It is an optional backend for privacy-preserving verification when a
+third party, contract, or external system needs a compact authorization proof.
 
 ---
 
