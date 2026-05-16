@@ -6,7 +6,9 @@ Package:
 @catp-protocol/cli@0.2.1
 ```
 
-`0.2.1` is a patch release for `0.2.0` that fixes CLI version reporting.
+`0.2.1` is the published patch release for `0.2.0` that fixes CLI version
+reporting. The repository has continued hardening the same `0.2.x` surface for
+the next patch release.
 
 ## Why This Release
 
@@ -21,7 +23,8 @@ The npm package is intended for:
 - Authorization witness generation.
 - Proof manifest generation from an existing Groth16 artifact.
 - Proof manifest structural validation.
-- Local audit log presence checks for audit-linked manifests.
+- Audit-linked proof manifest validation.
+- Runtime adapter hook entrypoints for Claude Code.
 
 Full Groth16 proof generation from `--action` or `--audit-commitment` still
 requires a repository checkout because it depends on:
@@ -32,12 +35,37 @@ requires a repository checkout because it depends on:
 
 ## User-Facing Changes
 
+Published in `0.2.1`:
+
 - Added `catp prove authorization`.
 - Added `catp verify authorization`.
 - Added audit-linked proof manifest support.
 - Added `catp verify authorization --check-audit`.
 - Added `catp prove authorization --deployment` to read verifier metadata from
   deployment JSON.
+- Fixed `catp --version` to report the published package version.
+
+Mainline hardening after `0.2.1`:
+
+- `catp verify authorization --check-audit` now checks that the audit entry's
+  structured authorization action matches the manifest action data, value,
+  timestamp, and cumulative spend when those fields are present.
+- Manifest validation now checks 13 public inputs, 128-byte ABI `actionData`,
+  256-byte Groth16 proof bytes, and consistency between `actionData` and public
+  action fields.
+- Manifest `proofUrl` is restricted to HTTPS, IPFS, Arweave, or localhost HTTP.
+- Deployment metadata is rejected if `authorizationProofVersion` does not match
+  `authorization_groth16_v1`.
+- The calldata encoder validates the same contract-facing artifact shape before
+  emitting `registerPolicy` / `executeAuthorized` calldata.
+- `catp witness --out` prints a ready-to-edit `proveCommand=...` line.
+- `catp prove authorization --out` prints a ready-to-run `verifyCommand=...`
+  line, including `--check-audit` for audit-linked manifests.
+- Claude Code hook commands now accept `--runtime claude-code`, and
+  `catp hook runtimes` lists supported runtime adapters.
+- Package boundaries are documented: npm CLI remains light; full Groth16
+  proving, calldata encoding, execution, contracts, and setup checks remain
+  repository-based.
 
 ## Pre-Publish Checklist
 
@@ -47,6 +75,10 @@ Run from the repository root:
 npm run typecheck --workspace catp-plugin
 npm test --workspace catp-plugin
 npm run build --workspace catp-plugin
+npm run test --workspace catp-sdk
+npm run typecheck --workspace catp-sdk
+npm run build --workspace catp-sdk
+npm run groth16:check
 npm_config_cache=/private/tmp/catp-npm-cache npm pack --dry-run --workspace catp-plugin
 ```
 
@@ -57,8 +89,11 @@ dist/cli.js
 dist/commands/authorization.js
 dist/commands/witness.js
 dist/audit/*
+dist/adapters/*
+dist/enforcement/*
 dist/hook/*
 dist/policy/*
+dist/runtime/*
 package.json
 ```
 
@@ -78,4 +113,9 @@ After publishing:
 npm view @catp-protocol/cli version
 npm install -g @catp-protocol/cli@0.2.1
 catp --version
+catp hook runtimes
+catp init
+catp validate
+catp prove authorization --help
+catp verify authorization --help
 ```
