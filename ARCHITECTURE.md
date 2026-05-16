@@ -156,6 +156,12 @@ Adding a new runtime should not change the policy engine, audit logger, witness
 builder, or proof manifest commands. It should add an adapter and focused tests
 for that adapter's payload shape.
 
+Current supported runtime adapters:
+
+| Runtime id | Adapter | Hook command |
+|------------|---------|--------------|
+| `claude-code` | `catp-plugin/src/adapters/claude-code.ts` | `catp hook pre/post --runtime claude-code` |
+
 Audit entries are written under:
 
 ```text

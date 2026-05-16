@@ -171,15 +171,19 @@ Add to `~/.claude/settings.json`:
   "hooks": {
     "PreToolUse": [{
       "matcher": ".*",
-      "command": "catp hook pre"
+      "command": "catp hook pre --runtime claude-code"
     }],
     "PostToolUse": [{
       "matcher": ".*",
-      "command": "catp hook post"
+      "command": "catp hook post --runtime claude-code"
     }]
   }
 }
 ```
+
+`--runtime claude-code` is currently the only supported runtime adapter and is
+also the default. It is shown explicitly so future runtime integrations have a
+stable hook boundary.
 
 ### Configure a Policy
 

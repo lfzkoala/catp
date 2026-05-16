@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { Command } from "commander";
 import { runPreHook } from "./hook/pre.js";
 import { runPostHook } from "./hook/post.js";
+import { getRuntimeAdapter, supportedRuntimeAdapters } from "./adapters/index.js";
 import { cmdInit } from "./commands/init.js";
 import { cmdValidate } from "./commands/validate.js";
 import { cmdLogShow, cmdLogVerify } from "./commands/log.js";
@@ -34,15 +35,30 @@ program
 
 const hook = program.command("hook").description("Hook handlers called by agent frameworks");
 
+function resolveHookAdapter(runtime: string) {
+  const adapter = getRuntimeAdapter(runtime);
+  if (!adapter) {
+    process.stderr.write(`catp: unsupported runtime adapter "${runtime}". Supported: ${supportedRuntimeAdapters().join(", ")}\n`);
+    process.exit(0);
+  }
+  return adapter;
+}
+
 hook
   .command("pre")
   .description("PreToolUse handler — reads stdin JSON, allows or blocks")
-  .action(() => { runPreHook().catch(() => process.exit(0)); });
+  .option("--runtime <id>", "runtime adapter id", "claude-code")
+  .action((opts: { runtime: string }) => {
+    runPreHook({ adapter: resolveHookAdapter(opts.runtime) }).catch(() => process.exit(0));
+  });
 
 hook
   .command("post")
   .description("PostToolUse handler — reads stdin JSON, records to audit log")
-  .action(() => { runPostHook().catch(() => process.exit(0)); });
+  .option("--runtime <id>", "runtime adapter id", "claude-code")
+  .action((opts: { runtime: string }) => {
+    runPostHook({ adapter: resolveHookAdapter(opts.runtime) }).catch(() => process.exit(0));
+  });
 
 const log = program.command("log").description("Audit log commands");
 
