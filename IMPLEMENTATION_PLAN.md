@@ -2,15 +2,16 @@
 
 ## Product Goal
 
-CATP makes autonomous agent activity enforceable locally and provable externally.
+CATP makes autonomous agent activity enforceable locally and verifiable
+externally.
 
 The current repository is intentionally scoped to two connected surfaces:
 
 1. **Local enforcement**: Claude Code hooks evaluate tool calls against
    `catp-policy.toml` and write a tamper-evident SHA-256 audit log.
-2. **Authorization proofs**: a structured action is proven against a
-   committed private policy, then verified either off-chain or by the compact
-   Groth16 EVM path.
+2. **External verification**: structured actions are linked to audit
+   commitments, authorization witnesses, proof manifests, and optional verifier
+   backends.
 
 This is now treated as a standalone project scope. Messaging, output
 verification, reputation, and registry/discovery are future extensions, not
@@ -25,22 +26,31 @@ catp-policy.toml
   -> catp hook pre/post
   -> local audit log
   -> structured authorization action
-  -> catp witness / catp prove authorization
-  -> authorization_groth16_v1 proof manifest
-  -> catp verify authorization or AgentAuthorizer.executeAuthorized
+  -> audit export / signed receipt
+  -> optional witness / proof manifest
+  -> optional verifier backend
 ```
 
-Current proof versions:
+Current verification surfaces:
+
+| Surface | Role | Status |
+|---------|------|--------|
+| Audit log | Tamper-evident local evidence | Active npm CLI path |
+| Authorization witness/manifest | Portable authorization artifact | Active npm CLI path |
+| Signed authorization receipt | Non-ZK external verification | Next 0.3.0 mainline |
+| ZK verifier backend | Privacy-preserving compact verification | Optional advanced path |
+
+Current proof backend versions:
 
 | Proof version | Backend | Role |
 |---------------|---------|------|
 | `authorization_groth16_v1` | Groth16/BN254 + MiMC | Active EVM/testnet path |
 | `authorization_v1` | Halo2/KZG/BN254 + Poseidon | Off-chain/research path |
 
-`authorization_groth16_v1` is the active EVM path because the generated Halo2
-Solidity verifier for `authorization_v1` exceeded the EVM runtime bytecode
-limit. The Halo2 path remains useful for off-chain verification and proof-system
-research.
+`authorization_groth16_v1` is the active optional EVM backend because the
+generated Halo2 Solidity verifier for `authorization_v1` exceeded the EVM
+runtime bytecode limit. ZK is not required for CATP local enforcement, audit-log
+integrity, or the planned signed receipt path.
 
 ---
 
@@ -126,6 +136,41 @@ research.
 ---
 
 ## Active Milestones
+
+### P0: Signed Authorization Receipt And Audit Export
+
+Status: active 0.3.0 mainline.
+
+Goal: add a non-ZK verification path that lets a third party verify that CATP
+made a policy decision, linked it to a specific audit commitment, and emitted a
+portable receipt.
+
+Planned shape:
+
+```text
+policyHash + actionHash + decision + auditCommitment + timestamp
+  -> signed authorization receipt
+  -> catp receipt verify
+```
+
+Work:
+
+- Define `catp_authorization_receipt_v1` JSON with stable canonical fields.
+- Add deterministic audit export for one commitment or a date range.
+- Add receipt signing using a local Ed25519 key pair.
+- Add receipt verification by public key.
+- Link receipt fields to the audit entry commitment and policy commitment.
+- Document when to use deterministic replay, signed receipts, and optional ZK
+  proof manifests.
+
+Exit criteria:
+
+- A fresh npm install can export an audit entry, sign a receipt, and verify that
+  receipt without cloning the repository.
+- Receipt verification fails if the audit commitment, policy commitment, action
+  hash, decision, timestamp, or signature is changed.
+- README and INSTALL show the receipt path as the first external verification
+  flow, with Groth16 kept as an optional advanced backend.
 
 ### P0: Authorization Proof Security Hardening
 
