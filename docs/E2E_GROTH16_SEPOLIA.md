@@ -165,6 +165,17 @@ If the proof came from an audit-linked action, include:
 --audit-commitment <64-character-audit-commitment>
 ```
 
+You can also start from the audit entry and let the CLI show the next command:
+
+```bash
+node catp-plugin/dist/cli.js witness \
+  --audit-commitment <64-character-audit-commitment> \
+  --out audit-linked.witness.json
+```
+
+The witness summary includes a ready-to-edit `proveCommand=...` line that keeps
+the same audit source.
+
 Validate manifest structure:
 
 ```bash

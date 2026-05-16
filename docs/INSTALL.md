@@ -188,6 +188,15 @@ catp verify authorization \
   --check-audit
 ```
 
+If you are starting from an audit log entry, run:
+
+```bash
+catp witness --audit-commitment <commitment> --out witness.json
+```
+
+The witness summary prints a ready-to-edit `proveCommand=catp prove
+authorization ...` line that preserves the same audit source.
+
 `--check-audit` verifies that the audit commitment exists for the recorded audit
 agent and that the audit entry's structured authorization action matches the
 manifest action data, value, timestamp, and cumulative spend when those fields

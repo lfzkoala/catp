@@ -278,6 +278,10 @@ catp witness \
   --out witness.json
 ```
 
+When `catp witness --out ...` succeeds, the summary includes a ready-to-edit
+`proveCommand=catp prove authorization ...` line using the same action or audit
+commitment source.
+
 To generate a proof artifact and shareable manifest in one command from the
 repository checkout:
 
@@ -286,6 +290,16 @@ catp prove authorization \
   --action action.json \
   --current-timestamp 1778042846 \
   --cumulative-spend 0 \
+  --artifact-out authorization_groth16_v1.json \
+  --deployment catp-contracts/deployments/sepolia-groth16.json \
+  --out catp-proof-manifest.json
+```
+
+For an audit-linked action, use the audit commitment directly:
+
+```bash
+catp prove authorization \
+  --audit-commitment <64-char-audit-commitment> \
   --artifact-out authorization_groth16_v1.json \
   --deployment catp-contracts/deployments/sepolia-groth16.json \
   --out catp-proof-manifest.json

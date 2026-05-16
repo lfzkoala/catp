@@ -155,6 +155,9 @@ allow = true
     expect(output).toContain("currentTimestamp=150");
     expect(output).toContain("cumulativeSpend=0");
     expect(output).toContain("next=Run catp prove authorization");
+    expect(output).toContain(
+      `proveCommand=catp prove authorization --file ${policyPath} --action ${actionPath} --current-timestamp 150 --cumulative-spend 0 --artifact-out authorization_groth16_v1.json --deployment catp-contracts/deployments/sepolia-groth16.json --out catp-proof-manifest.json`,
+    );
   });
 
   it("writes witness JSON from an audit entry commitment", () => {
@@ -222,6 +225,9 @@ allow = true
     });
     expect(output).toContain("proofVersion=authorization_groth16_v1");
     expect(output).toContain("currentTimestamp=150");
+    expect(output).toContain(
+      `proveCommand=catp prove authorization --file ${policyPath} --audit-commitment ${commitment} --artifact-out authorization_groth16_v1.json --deployment catp-contracts/deployments/sepolia-groth16.json --out catp-proof-manifest.json`,
+    );
   });
 
   it("formats a useful witness summary", () => {

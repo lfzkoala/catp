@@ -93,13 +93,30 @@ export function cmdWitness(opts: {
   if (opts.out) {
     writeFileSync(opts.out, encoded, "utf8");
     process.stdout.write(`Wrote Groth16 witness to ${opts.out}\n`);
-    process.stdout.write(formatGroth16WitnessSummary(witness));
+    process.stdout.write(formatGroth16WitnessSummary(witness, {
+      action: opts.action,
+      auditCommitment: opts.auditCommitment,
+      agent: opts.agent,
+      file: opts.file,
+      currentTimestamp: opts.currentTimestamp,
+      cumulativeSpend: opts.cumulativeSpend,
+    }));
   } else {
     process.stdout.write(encoded);
   }
 }
 
-export function formatGroth16WitnessSummary(witness: Groth16Witness): string {
+export function formatGroth16WitnessSummary(
+  witness: Groth16Witness,
+  opts: {
+    action?: string;
+    auditCommitment?: string;
+    agent?: string;
+    file?: string;
+    currentTimestamp?: string;
+    cumulativeSpend?: string;
+  } = {},
+): string {
   const lines = [
     "proofVersion=authorization_groth16_v1",
     `actionType=${witness.actionType}`,
@@ -112,7 +129,39 @@ export function formatGroth16WitnessSummary(witness: Groth16Witness): string {
     `validUntil=${witness.validUntil}`,
     "next=Run catp prove authorization with the same policy/action inputs to generate a proof manifest.",
   ];
+  const proveCommand = formatProveCommand(opts);
+  if (proveCommand) {
+    lines.push(`proveCommand=${proveCommand}`);
+  }
   return `${lines.join("\n")}\n`;
+}
+
+function formatProveCommand(opts: {
+  action?: string;
+  auditCommitment?: string;
+  agent?: string;
+  file?: string;
+  currentTimestamp?: string;
+  cumulativeSpend?: string;
+}): string | null {
+  if (!opts.action && !opts.auditCommitment) return null;
+
+  const args = ["catp", "prove", "authorization"];
+  if (opts.file) args.push("--file", opts.file);
+  if (opts.action) args.push("--action", opts.action);
+  if (opts.auditCommitment) args.push("--audit-commitment", opts.auditCommitment);
+  if (opts.agent) args.push("--agent", opts.agent);
+  if (opts.currentTimestamp) args.push("--current-timestamp", opts.currentTimestamp);
+  if (opts.cumulativeSpend) args.push("--cumulative-spend", opts.cumulativeSpend);
+  args.push(
+    "--artifact-out",
+    "authorization_groth16_v1.json",
+    "--deployment",
+    "catp-contracts/deployments/sepolia-groth16.json",
+    "--out",
+    "catp-proof-manifest.json",
+  );
+  return args.map(shellQuote).join(" ");
 }
 
 export function buildGroth16WitnessFromSources(opts: {
@@ -213,6 +262,10 @@ function normalizeBytes32(value: string, field: string): string {
     throw new Error(`${field} must be a 0x-prefixed 32-byte hex string`);
   }
   return value;
+}
+
+function shellQuote(value: string): string {
+  return /^[A-Za-z0-9_./:@%+=,-]+$/.test(value) ? value : `'${value.replace(/'/g, "'\\''")}'`;
 }
 
 function normalizeU64(value: string | number, field: string): string {
