@@ -35,7 +35,28 @@ jobs:
         working-directory: catp-plugin
         run: npm run build
 
+      - name: Check release version
+        id: release-version
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(node -p "require('./catp-plugin/package.json').version")"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+
+          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "Tag v$TAG_VERSION does not match catp-plugin/package.json version $PACKAGE_VERSION" >&2
+            exit 1
+          fi
+
+          if npm view "@catp-protocol/cli@$PACKAGE_VERSION" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "@catp-protocol/cli@$PACKAGE_VERSION is already published; skipping npm publish."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "@catp-protocol/cli@$PACKAGE_VERSION is not published yet; publishing from this workflow."
+          fi
+
       - name: Publish
+        if: steps.release-version.outputs.published != 'true'
         working-directory: catp-plugin
         run: npm publish --access public --provenance
         env:
