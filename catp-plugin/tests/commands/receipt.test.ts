@@ -89,6 +89,37 @@ describe("authorization receipt", () => {
     expect(() => verifyAuthorizationReceipt(tampered, publicKeyPem)).toThrow("signature is invalid");
   });
 
+  it("rejects verification with the wrong public key", () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const wrongKey = keyPair();
+    const receipt = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem, {
+      signedAt: "2026-01-01T00:00:01.000Z",
+    });
+
+    expect(() => verifyAuthorizationReceipt(receipt, wrongKey.publicKeyPem)).toThrow("signature is invalid");
+  });
+
+  it("rejects a tampered embedded public key", () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const wrongKey = keyPair();
+    const receipt = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem, {
+      signedAt: "2026-01-01T00:00:01.000Z",
+    });
+    const tampered: AuthorizationReceipt = { ...receipt, publicKeyPem: wrongKey.publicKeyPem };
+
+    expect(() => verifyAuthorizationReceipt(tampered, publicKeyPem)).toThrow("signature is invalid");
+  });
+
+  it("rejects a tampered signature", () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const receipt = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem, {
+      signedAt: "2026-01-01T00:00:01.000Z",
+    });
+    const tampered: AuthorizationReceipt = { ...receipt, signature: Buffer.from("tampered").toString("base64") };
+
+    expect(() => verifyAuthorizationReceipt(tampered, publicKeyPem)).toThrow("signature is invalid");
+  });
+
   it("checks that a receipt matches its audit export", () => {
     const { privateKeyPem, publicKeyPem } = keyPair();
     const exportedAudit = auditExport();
@@ -140,6 +171,15 @@ describe("authorization receipt", () => {
     };
 
     expect(() => verifyReceiptPolicy(receipt, differentPolicy)).toThrow("policyCommitment does not match");
+  });
+
+  it("rejects policy verification when a receipt has no policy commitment", () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const receipt = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem, {
+      signedAt: "2026-01-01T00:00:01.000Z",
+    });
+
+    expect(() => verifyReceiptPolicy(receipt, policy())).toThrow("receipt has no policyCommitment");
   });
 
   it("produces stable receipt JSON for the same payload", () => {
