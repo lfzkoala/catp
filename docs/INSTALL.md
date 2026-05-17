@@ -94,6 +94,23 @@ catp log export --commitment <64-char-audit-commitment> --out catp-audit-export.
 for one audit entry. The bundle is intended as the stable input for the signed
 receipt path.
 
+Sign and verify a receipt:
+
+```bash
+catp receipt keygen \
+  --private-key catp-receipt-private.pem \
+  --public-key catp-receipt-public.pem
+
+catp receipt sign \
+  --audit-export catp-audit-export.json \
+  --private-key catp-receipt-private.pem \
+  --out catp-authorization-receipt.json
+
+catp receipt verify \
+  --receipt catp-authorization-receipt.json \
+  --public-key catp-receipt-public.pem
+```
+
 ### npm CLI Smoke Test
 
 Use a temporary directory:

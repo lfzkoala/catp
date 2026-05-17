@@ -10,6 +10,7 @@ import { cmdLogExport, cmdLogShow, cmdLogVerify } from "./commands/log.js";
 import { cmdAnchor } from "./commands/anchor.js";
 import { cmdWitness } from "./commands/witness.js";
 import { cmdProveAuthorization, cmdVerifyAuthorization } from "./commands/authorization.js";
+import { cmdReceiptKeygen, cmdReceiptSign, cmdReceiptVerify } from "./commands/receipt.js";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json") as { version: string };
@@ -141,6 +142,30 @@ verify
   .option("--check-audit", "check that auditCommitment exists in the local audit log")
   .option("--audit-agent <id>", "agent id to use for --check-audit")
   .action(cmdVerifyAuthorization);
+
+const receipt = program.command("receipt").description("Signed authorization receipt commands");
+
+receipt
+  .command("keygen")
+  .description("Generate an Ed25519 key pair for signing CATP receipts")
+  .option("--private-key <path>", "private key output path", "catp-receipt-private.pem")
+  .option("--public-key <path>", "public key output path", "catp-receipt-public.pem")
+  .action(cmdReceiptKeygen);
+
+receipt
+  .command("sign")
+  .description("Sign a CATP audit export as an authorization receipt")
+  .requiredOption("--audit-export <path>", "catp_audit_export_v1 JSON from catp log export")
+  .requiredOption("--private-key <path>", "Ed25519 private key PEM")
+  .option("--out <path>", "write receipt JSON to file instead of stdout")
+  .action(cmdReceiptSign);
+
+receipt
+  .command("verify")
+  .description("Verify a signed CATP authorization receipt")
+  .requiredOption("--receipt <path>", "catp_authorization_receipt_v1 JSON")
+  .option("--public-key <path>", "Ed25519 public key PEM; defaults to publicKeyPem embedded in the receipt")
+  .action(cmdReceiptVerify);
 
 program.parseAsync(process.argv).catch((err) => {
   process.stderr.write(`catp: ${(err as Error).message}\n`);

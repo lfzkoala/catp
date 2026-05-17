@@ -240,6 +240,27 @@ Logs are written to `${CATP_HOME:-~/.catp}/audit/<agentId>/<YYYY-MM-DD>/actions.
 audit entry. This is the first building block for the 0.3.0 signed receipt
 path.
 
+### Sign an Authorization Receipt
+
+```bash
+catp receipt keygen \
+  --private-key catp-receipt-private.pem \
+  --public-key catp-receipt-public.pem
+
+catp receipt sign \
+  --audit-export catp-audit-export.json \
+  --private-key catp-receipt-private.pem \
+  --out catp-authorization-receipt.json
+
+catp receipt verify \
+  --receipt catp-authorization-receipt.json \
+  --public-key catp-receipt-public.pem
+```
+
+Receipts use `catp_authorization_receipt_v1` and Ed25519 signatures. The signed
+payload binds the audit export hash, audit commitment, entry hash, agent id,
+tool, decision, timestamp, and signer public key.
+
 `catp anchor` can submit a Merkle root of local audit commitments on-chain.
 Structured authorization proofs use a separate private policy commitment path
 verified by `authorization_groth16_v1` on EVM or by the off-chain verifier path.
