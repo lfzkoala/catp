@@ -60,14 +60,21 @@ export function cmdReceiptSign(opts: { auditExport?: string; privateKey?: string
   process.stdout.write(json);
 }
 
-export function cmdReceiptVerify(opts: { receipt?: string; publicKey?: string }): void {
+export function cmdReceiptVerify(opts: { receipt?: string; publicKey?: string; auditExport?: string }): void {
   if (!opts.receipt) {
     throw new Error("missing --receipt <path>");
   }
   const receipt = readAuthorizationReceipt(opts.receipt);
   const publicKeyPem = opts.publicKey ? readFileSync(opts.publicKey, "utf8") : receipt.publicKeyPem;
   verifyAuthorizationReceipt(receipt, publicKeyPem);
+  if (opts.auditExport) {
+    const auditExport = readAuditExport(opts.auditExport);
+    verifyReceiptAuditExport(receipt, auditExport);
+  }
   process.stdout.write("authorizationReceipt=valid\n");
+  if (opts.auditExport) {
+    process.stdout.write("auditExport=matched\n");
+  }
   process.stdout.write(`auditCommitment=${receipt.auditCommitment}\n`);
   process.stdout.write(`auditExportHash=${receipt.auditExportHash}\n`);
 }
@@ -103,6 +110,33 @@ export function verifyAuthorizationReceipt(receipt: AuthorizationReceipt, public
   const ok = verify(null, Buffer.from(stableStringify(payload)), publicKeyPem, Buffer.from(signature, "base64"));
   if (!ok) {
     throw new Error("authorization receipt signature is invalid");
+  }
+}
+
+export function verifyReceiptAuditExport(receipt: AuthorizationReceipt, auditExport: AuditExport): void {
+  validateReceipt(receipt);
+  validateAuditExport(auditExport);
+  const auditExportHash = sha256Hex(stableStringify(auditExport));
+  if (receipt.auditExportHash !== auditExportHash) {
+    throw new Error("receipt auditExportHash does not match audit export");
+  }
+  if (receipt.auditCommitment !== auditExport.commitment) {
+    throw new Error("receipt auditCommitment does not match audit export");
+  }
+  if (receipt.entrySha256 !== auditExport.entrySha256) {
+    throw new Error("receipt entrySha256 does not match audit export");
+  }
+  if (receipt.agentId !== auditExport.agentId) {
+    throw new Error("receipt agentId does not match audit export");
+  }
+  if (receipt.tool !== auditExport.entry.tool) {
+    throw new Error("receipt tool does not match audit export");
+  }
+  if (receipt.decision !== auditExport.entry.decision) {
+    throw new Error("receipt decision does not match audit export");
+  }
+  if (receipt.timestamp !== auditExport.entry.ts) {
+    throw new Error("receipt timestamp does not match audit export");
   }
 }
 

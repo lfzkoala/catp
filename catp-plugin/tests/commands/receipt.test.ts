@@ -1,6 +1,11 @@
 import { describe, expect, it } from "@jest/globals";
 import { createHash, generateKeyPairSync } from "node:crypto";
-import { signAuthorizationReceipt, verifyAuthorizationReceipt, type AuthorizationReceipt } from "../../src/commands/receipt.js";
+import {
+  signAuthorizationReceipt,
+  verifyAuthorizationReceipt,
+  verifyReceiptAuditExport,
+  type AuthorizationReceipt,
+} from "../../src/commands/receipt.js";
 import { stableStringify, type AuditExport } from "../../src/commands/log.js";
 
 function keyPair(): { privateKeyPem: string; publicKeyPem: string } {
@@ -49,6 +54,27 @@ describe("authorization receipt", () => {
     const tampered: AuthorizationReceipt = { ...receipt, decision: "deny" };
 
     expect(() => verifyAuthorizationReceipt(tampered, publicKeyPem)).toThrow("signature is invalid");
+  });
+
+  it("checks that a receipt matches its audit export", () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const exportedAudit = auditExport();
+    const receipt = signAuthorizationReceipt(exportedAudit, privateKeyPem, publicKeyPem, "2026-01-01T00:00:01.000Z");
+
+    expect(() => verifyReceiptAuditExport(receipt, exportedAudit)).not.toThrow();
+  });
+
+  it("rejects a receipt that does not match the supplied audit export", () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const exportedAudit = auditExport();
+    const receipt = signAuthorizationReceipt(exportedAudit, privateKeyPem, publicKeyPem, "2026-01-01T00:00:01.000Z");
+    const differentExport: AuditExport = {
+      ...exportedAudit,
+      entry: { ...exportedAudit.entry, tool: "Write" },
+    };
+    differentExport.entrySha256 = createHash("sha256").update(stableStringify(differentExport.entry)).digest("hex");
+
+    expect(() => verifyReceiptAuditExport(receipt, differentExport)).toThrow("auditExportHash does not match");
   });
 
   it("produces stable receipt JSON for the same payload", () => {

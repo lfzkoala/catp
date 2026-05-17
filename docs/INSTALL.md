@@ -108,7 +108,8 @@ catp receipt sign \
 
 catp receipt verify \
   --receipt catp-authorization-receipt.json \
-  --public-key catp-receipt-public.pem
+  --public-key catp-receipt-public.pem \
+  --audit-export catp-audit-export.json
 ```
 
 ### npm CLI Smoke Test
