@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  computePolicyCommitment,
   encodeActionData,
   executeAuthorizedArgsFromGroth16Call,
 } from "../../src/authorization/AuthorizerClient.js";
@@ -105,37 +104,6 @@ describe("encodeActionData()", () => {
     const swap = encodeActionData({ actionType: ActionType.Swap, protocol: ZERO32, token: ZERO32, value: 1n });
     const transfer = encodeActionData({ actionType: ActionType.Transfer, protocol: ZERO32, token: ZERO32, value: 1n });
     expect(swap).not.toBe(transfer);
-  });
-});
-
-describe("computePolicyCommitment()", () => {
-  const wasm = {
-    compute_policy_commitment: () => new Uint8Array(32),
-  };
-
-  const policy = {
-    allowedAction: ActionType.Swap,
-    allowedProtocol: ZERO32,
-    allowedToken: ZERO32,
-    maxValuePerTx: 100n,
-    maxValueTotal: 1000n,
-    validFrom: 0n,
-    validUntil: 9999999999n,
-  };
-
-  it("rejects numeric fields outside u64 range before calling WASM", () => {
-    expect(() => computePolicyCommitment({ ...policy, maxValuePerTx: 1n << 64n }, wasm)).toThrow(
-      "maxValuePerTx must fit in u64",
-    );
-    expect(() => computePolicyCommitment({ ...policy, maxValueTotal: -1n }, wasm)).toThrow(
-      "maxValueTotal must fit in u64",
-    );
-    expect(() => computePolicyCommitment({ ...policy, validFrom: 1n << 64n }, wasm)).toThrow(
-      "validFrom must fit in u64",
-    );
-    expect(() => computePolicyCommitment({ ...policy, validUntil: -1n }, wasm)).toThrow(
-      "validUntil must fit in u64",
-    );
   });
 });
 

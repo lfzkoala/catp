@@ -45,12 +45,10 @@ Current proof backend versions:
 | Proof version | Backend | Role |
 |---------------|---------|------|
 | `authorization_groth16_v1` | Groth16/BN254 + MiMC | Active EVM/testnet path |
-| `authorization_v1` | Halo2/KZG/BN254 + Poseidon | Off-chain/research path |
 
-`authorization_groth16_v1` is the active optional EVM backend because the
-generated Halo2 Solidity verifier for `authorization_v1` exceeded the EVM
-runtime bytecode limit. ZK is not required for CATP local enforcement, audit-log
-integrity, or the planned signed receipt path.
+`authorization_groth16_v1` is the active optional EVM backend. ZK is not
+required for CATP local enforcement, audit-log integrity, or the signed receipt
+path.
 
 ---
 
@@ -68,7 +66,6 @@ integrity, or the planned signed receipt path.
 
 ### Authorization Proofs
 
-- Halo2 `ProveAuthorization` circuit at `k=12`
 - Groth16 `authorization_groth16_v1` circuit and gnark prover
 - Generated Groth16 Solidity verifier and CATP wrapper
 - `AgentAuthorizer.sol` policy registry and proof execution flow
@@ -88,7 +85,7 @@ integrity, or the planned signed receipt path.
 ### Repository Cleanup
 
 - Removed inactive placeholder crates/modules.
-- Removed blocked Halo2 EVM adapter code.
+- Removed inactive off-chain verifier code from the active repository surface.
 - Removed committed WASM build output.
 - Moved test-only Solidity stubs out of production sources.
 - Removed unused primitives crate and inactive output-verification contracts.
@@ -141,14 +138,11 @@ integrity, or the planned signed receipt path.
 - README and ARCHITECTURE describe the adapter model and current supported
   runtime.
 
-### Packaging Decision For WASM And Proving
+### Packaging Decision For Proving
 
 - `@catp-protocol/cli` stays light.
 - Full `authorization_groth16_v1` proving, calldata encoding, Sepolia execution,
   contracts, and setup checks stay repository-based.
-- `catp-circuits/wasm` and SDK `ProofClient` remain local Halo2/off-chain
-  `authorization_v1` artifacts.
-- `catp-wasm` is not published yet.
 - Hosted prover/verifier service is deferred until there is a concrete product
   reason, threat model, and operational plan.
 
@@ -213,16 +207,15 @@ gateways, or local shell/tool executors.
 
 `catp verify authorization` intentionally performs structural and audit-linked
 manifest validation today. Cryptographic verification remains the job of the EVM
-verifier or a dedicated off-chain verifier path.
+verifier.
 
 Do not add local Groth16 cryptographic verification to the CLI until the project
 chooses a stable verifier implementation and package boundary.
 
-### Published WASM Package Or Hosted Prover
+### Hosted Prover
 
-`catp-wasm` and hosted prover/verifier services are out of the current package
-surface. Revisit only with a concrete product reason, threat model, and
-operations plan.
+Hosted prover/verifier services are out of the current package surface. Revisit
+only with a concrete product reason, threat model, and operations plan.
 
 ---
 

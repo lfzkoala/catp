@@ -60,8 +60,7 @@ Out of scope for this review:
 - Any change to public input layout, policy commitment encoding, proof backend,
   setup keys, or circuit constraints requires a new proof version and verifier
   deployment.
-- The EVM path uses MiMC policy commitment version `2`; it is intentionally
-  separate from the Halo2 off-chain `authorization_v1` path.
+- The EVM path uses MiMC policy commitment version `2`.
 
 ## Review Matrix
 

@@ -13,7 +13,6 @@ The current repository contains:
 - an authorization proof statement
 - witness and proof manifest tooling
 - an optional Groth16/BN254 EVM verifier path for testnet execution
-- a Halo2/KZG off-chain verifier path for proof-system research
 - Solidity contracts and TypeScript SDK adapters for verifiable authorization
 
 The protocol boundary is the versioned authorization statement, manifest shape,
@@ -36,7 +35,7 @@ Verifiable authorization
   private policy commitment, structured action witness, proof manifest
 
 Optional verifier backends
-  Groth16 EVM verifier path, Halo2 off-chain verifier path
+  Groth16 EVM verifier path
 ```
 
 In short:
@@ -65,9 +64,6 @@ integration plan, and test strategy.
 catp-plugin
   runtime adapters, TOML policy engine, audit log, witness command
 
-catp-circuits/authorization
-  Halo2 authorization_v1 circuit and off-chain proof path
-
 catp-circuits/groth16
   Groth16 authorization_groth16_v1 circuit, proving/verifying keys,
   proof artifact generator, generated Solidity verifier
@@ -77,9 +73,6 @@ catp-contracts/src/authorization
 
 catp-sdk/src/authorization
   TypeScript proof artifact adapters and authorizer calldata helpers
-
-catp-verify
-  Rust off-chain verification endpoint/library
 
 scripts
   verifier generation, setup checks, size checks, deployment, proof,
@@ -119,8 +112,6 @@ flowchart TD
   Wrapper --> Verifier[Groth16Verifier.sol]
   AgentAuthorizer --> State[(activePolicies<br/>cumulativeSpend)]
 
-  Witness --> Halo2Path[Halo2 authorization_v1<br/>local/off-chain]
-  Halo2Path --> VerifyService[catp-verify]
 ```
 
 ---
@@ -262,16 +253,13 @@ The public input layout has 13 values:
 
 ## Proof Systems
 
-CATP currently contains two authorization proof paths.
+CATP currently contains one active authorization proof backend.
 
 | Proof version | Backend | Role | Status |
 |---------------|---------|------|--------|
 | `authorization_groth16_v1` | Groth16/BN254 | EVM/testnet path | Deployed and smoke-tested on Sepolia |
-| `authorization_v1` | Halo2/KZG/BN254 | Local/off-chain path | Verifies off-chain; generated Solidity verifier is not EVM-deployable for this circuit |
 
 The Groth16 verifier runtime is about 6.4 KB. The Groth16 authorization wrapper runtime is about 1.1 KB.
-
-The generated Halo2 Solidity verifier for the current circuit is about 319 KB of runtime bytecode, above the EVM 24,576-byte runtime limit.
 
 The checked-in Groth16 proving and verifying keys are deterministic dev/testnet keys. They are not a mainnet ceremony.
 

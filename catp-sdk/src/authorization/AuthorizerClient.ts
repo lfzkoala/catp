@@ -143,41 +143,6 @@ function hexByteLength(hex: string): number {
   return (hex.length - 2) / 2;
 }
 
-/** Compute the Poseidon-BN254 policy commitment via the catp-wasm module.
- *  Returns a `bytes32` hex string suitable for `registerPolicy` and `publicInputs[0]`.
- */
-export function computePolicyCommitment(
-  policy: AuthorizationPolicy,
-  wasm: { compute_policy_commitment: (policy_json: string) => Uint8Array },
-): `0x${string}` {
-  assertU64(policy.maxValuePerTx, "maxValuePerTx");
-  assertU64(policy.maxValueTotal, "maxValueTotal");
-  assertU64(policy.validFrom, "validFrom");
-  assertU64(policy.validUntil, "validUntil");
-
-  const ACTION_NAME = ["Swap", "Transfer", "Deposit", "Withdraw"] as const;
-  const policyJson = JSON.stringify({
-    allowed_action: ACTION_NAME[policy.allowedAction],
-    allowed_protocol: Array.from(hexToBytes(policy.allowedProtocol as `0x${string}`)),
-    allowed_token: Array.from(hexToBytes(policy.allowedToken as `0x${string}`)),
-    max_value_per_tx: policy.maxValuePerTx.toString(),
-    max_value_total: policy.maxValueTotal.toString(),
-    valid_from: policy.validFrom.toString(),
-    valid_until: policy.validUntil.toString(),
-  });
-  return bufferToHex(wasm.compute_policy_commitment(policyJson));
-}
-
-function hexToBytes(hex: `0x${string}`): Uint8Array {
-  assertBytes32Hex(hex, "policy bytes32 field");
-  const h = hex.slice(2);
-  const bytes = new Uint8Array(h.length / 2);
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
-}
-
 function bufferToHex(buf: Uint8Array): `0x${string}` {
   return ("0x" +
     Array.from(buf)

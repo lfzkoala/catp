@@ -19,10 +19,7 @@ It uses `authorization_groth16_v1`:
 - proof bytes: `256`
 - setup manifest: `catp-circuits/groth16/keys/authorization_groth16_v1.manifest.json`
 
-The historical Halo2 EVM deployment schema and generated Solidity verifier were
-removed from the active repository surface. Halo2 remains an off-chain research
-path only; use the Groth16 deployment metadata for live authorization
-verification.
+Use the Groth16 deployment metadata for live authorization verification.
 
 ## Required Environment
 

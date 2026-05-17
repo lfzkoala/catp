@@ -247,7 +247,7 @@ describe("authorization proof manifest", () => {
 
     const invalidProofVersionPath = join(tmpBase, "invalid-proof-version-deployment.json");
     writeFileSync(invalidProofVersionPath, JSON.stringify({
-      authorizationProofVersion: "authorization_v1",
+      authorizationProofVersion: "unsupported_proof_v1",
     }), "utf8");
     expect(() => readDeploymentMetadata(invalidProofVersionPath)).toThrow(
       "deployment.authorizationProofVersion must be authorization_groth16_v1",

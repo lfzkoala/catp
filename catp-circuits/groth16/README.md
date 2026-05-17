@@ -2,10 +2,9 @@
 
 This directory contains the compact EVM verifier path for `authorization_groth16_v1`.
 
-`authorization_groth16_v1` is intentionally a separate proof version from the Halo2
-`authorization_v1` path. It keeps the 13 public authorization inputs but uses a
-Groth16/BN254 proof and a MiMC policy commitment version (`2`) so the EVM verifier
-fits under the contract-size limit.
+`authorization_groth16_v1` uses 13 public authorization inputs, a
+Groth16/BN254 proof, and a MiMC policy commitment version (`2`) so the EVM
+verifier fits under the contract-size limit.
 
 ## Stable Dev/Testnet Setup
 

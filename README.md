@@ -18,9 +18,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the current system shape and [IMPLEME
 ```text
 In scope
 Local enforcement core            runtime adapters + TOML policy + SHA-256 audit log
+Signed authorization receipts     audit export + Ed25519 receipt verification
 Authorization proof manifests     audit-linked witness + manifest validation
 Optional EVM verification         authorization_groth16_v1 = Groth16/BN254, Sepolia smoke passed
-Off-chain proof research          authorization_v1 = Halo2/KZG/BN254, not EVM-deployable
 
 Future extension space
 Output verification               output commitments + attestor/challenge design
@@ -93,27 +93,22 @@ deployment metadata live in this repo.
 CATP intentionally keeps the published npm CLI small:
 
 - `@catp-protocol/cli`: local enforcement, audit logs, witness generation,
-  authorization proof manifests, and artifact validation.
+  signed authorization receipts, authorization proof manifests, and artifact
+  validation.
 - Repository checkout: Groth16 proof generation, calldata encoding, Sepolia
   execution, contracts, circuits, and setup/deployment checks.
-- `catp-circuits/wasm` and SDK `ProofClient`: local Halo2/off-chain
-  `authorization_v1` helpers. They are not currently published as `catp-wasm`
-  and are not the active EVM path.
 
-The active EVM/testnet proof path is `authorization_groth16_v1`. The Halo2
-`authorization_v1` path remains useful for off-chain verification and
-proof-system research.
+The active EVM/testnet proof path is `authorization_groth16_v1`.
 
 ---
 
 ## Authorization Proof Systems
 
-CATP currently contains two authorization proof paths.
+CATP currently contains one active authorization proof backend.
 
 | Path | Role | Status |
 |------|------|--------|
 | `authorization_groth16_v1` | Current EVM verifier path | Works on Sepolia; compact verifier runtime is about 6.4 KB and wrapper runtime is about 1.1 KB |
-| `authorization_v1` Halo2 | Off-chain verifier / research path | Works locally; EVM verifier path was removed after generated runtime exceeded the EVM 24,576-byte limit |
 
 Groth16 does require a circuit-specific trusted setup. The keys currently checked into `catp-circuits/groth16/keys/` are stable dev/testnet keys, not a mainnet ceremony. A mainnet release must either run and document a proper ceremony or explicitly choose a weaker trust model.
 
@@ -540,28 +535,6 @@ forge test --match-path test/authorization/Groth16AuthorizationVerifier.t.sol
 
 ---
 
-## Halo2 Path
-
-The Halo2 authorization proof version is:
-
-```text
-authorization_v1
-```
-
-It uses:
-
-- Halo2/KZG on BN254
-- `k=12`
-- GWC opening
-- EVM transcript
-- 13 public inputs
-
-This path is available for off-chain verification and proof-system research. It is not the current EVM deployment path because the generated Solidity verifier exceeded the EVM runtime bytecode limit and the Halo2 EVM adapter has been removed from the active repository surface.
-
-The committed `catp-authorization-k12.srs` is for development and testnet consistency. Mainnet Halo2 usage would require documented SRS provenance or replacement with accepted ceremony output.
-
----
-
 ## Repository Structure
 
 ```text
@@ -572,15 +545,12 @@ catp/
 │       ├── audit/          # Commitment chain logger and verifier
 │       ├── hook/           # pre.ts / post.ts hook handlers
 │       └── commands/       # init, validate, log, witness CLI commands
-├── catp-circuits/          # Rust/Go — ZK circuits and verifier generators
-│   ├── authorization/      # Halo2 ProveAuthorization circuit + SRS + e2e tests
-│   ├── groth16/            # gnark Groth16 authorization verifier path
-│   └── wasm/               # wasm-pack source bindings; pkg/ is generated
+├── catp-circuits/          # Go — optional Groth16 circuit and verifier generator
+│   └── groth16/            # gnark Groth16 authorization verifier path
 ├── catp-contracts/         # Solidity — verifiers + protocol contracts
 │   └── src/authorization/         # AgentAuthorizer, verifier wrappers, proof adapters
 ├── catp-sdk/               # TypeScript — developer-facing SDK
-│   └── src/authorization/         # types, PolicyBuilder, AuthorizerClient, ProofClient
-└── catp-verify/            # Rust — off-chain proof verification endpoint
+│   └── src/authorization/         # types, PolicyBuilder, AuthorizerClient, Groth16 adapters
 ```
 
 ---
@@ -596,8 +566,6 @@ catp/
 | Authorization | `AgentAuthorizer.sol` + `ActionData.sol` | Complete |
 | Authorization | Groth16 proof/execution scripts | Complete for testnet flow: prove, encode, dry-run, execute |
 | Authorization | TypeScript SDK proof helpers | Complete locally |
-| Authorization | `authorization_v1` Halo2 circuit | Complete locally; EVM verifier blocked by bytecode size |
-| Authorization | `catp-verify` Rust endpoint | Complete |
 | Future extensions | output verification, messaging, reputation, registry/discovery | Not active repo surface |
 
 Run the checks in [CONTRIBUTING.md](CONTRIBUTING.md) before changing protocol or verifier code.
@@ -620,7 +588,6 @@ Full stack:
 | Node.js | >= 20 | catp-plugin, catp-sdk |
 | npm | >= 10 | root scripts, catp-plugin |
 | pnpm | >= 9 | catp-sdk |
-| Rust | stable via `rust-toolchain.toml` | catp-circuits, catp-verify |
 | Go | >= 1.23 | gnark Groth16 prover |
 | Foundry | latest | catp-contracts, deploy/smoke scripts |
 | jq | any modern version | shell scripts |

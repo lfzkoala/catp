@@ -17,7 +17,6 @@ For npm CLI usage:
 For the full proof/development flow:
 
 - Node.js `>=20`
-- Rust toolchain from `rust-toolchain.toml`
 - Go, for the Groth16/Gnark prover path
 - Foundry, for Solidity contract tests/deployment
 - `jq` and `cast`, for calldata/execution scripts

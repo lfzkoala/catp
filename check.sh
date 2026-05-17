@@ -1,18 +1,6 @@
 #!/bin/bash
 set -e
 
-echo "==> cargo fmt"
-cargo fmt --check
-
-echo "==> cargo clippy"
-cargo clippy --workspace -- -D warnings
-
-echo "==> cargo check"
-cargo check --workspace
-
-echo "==> cargo test"
-cargo test --workspace
-
 echo "==> solidity (forge)"
 if command -v forge &>/dev/null; then
   (cd catp-contracts && forge build && forge test)

@@ -6,9 +6,7 @@ import (
 )
 
 // AuthorizationCircuit is the Groth16/BN254 CATP authorization circuit for
-// compact EVM verification. It intentionally uses a separate commitment
-// version from the Halo2 circuit so proof backends are not treated as
-// wire-compatible.
+// compact EVM verification.
 type AuthorizationCircuit struct {
 	PolicyCommitment frontend.Variable `gnark:",public"`
 	ActionType       frontend.Variable `gnark:",public"`

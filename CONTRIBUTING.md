@@ -7,10 +7,9 @@ Contributions are welcome. Open an issue before starting significant work so we 
 ```
 catp/
 ├── catp-plugin/     # TypeScript — local enforcement plugin (npm)
-├── catp-circuits/   # Rust      — Halo2 ZK circuits (cargo)
+├── catp-circuits/   # Go        — optional Groth16 prover/verifier path
 ├── catp-contracts/  # Solidity  — on-chain verifiers (Foundry)
-├── catp-sdk/        # TypeScript — developer SDK (pnpm)
-└── catp-verify/     # Rust      — off-chain verifier service (cargo)
+└── catp-sdk/        # TypeScript — developer SDK (pnpm)
 ```
 
 ## Component Dev Setup
@@ -41,16 +40,6 @@ pnpm run typecheck
 pnpm test
 ```
 
-### catp-circuits (Halo2 ZK circuits)
-
-**Toolchain:** Rust stable (see `rust-toolchain.toml`)
-
-```bash
-cargo test --workspace
-cargo clippy --workspace -- -D warnings
-cargo fmt --check
-```
-
 ### catp-contracts (Solidity)
 
 **Toolchain:** Foundry (install: `curl -L https://foundry.paradigm.xyz | bash`)
@@ -69,21 +58,20 @@ Before pushing or opening a PR, run:
 bash check.sh
 ```
 
-This runs `cargo fmt --check`, `cargo clippy`, and typechecks for both TypeScript packages. CI runs the same checks, so catching failures locally saves a round-trip.
+This runs Solidity checks and typechecks/tests both TypeScript packages. CI runs
+the same checks, so catching failures locally saves a round-trip.
 
 ## Pull Requests
 
 - All PRs must include tests.
 - **catp-plugin**: maintain ≥ 80% coverage (`npm run test:coverage`).
 - **catp-contracts**: include Forge tests for any new contract logic.
-- **catp-circuits**: include MockProver tests for new circuits.
 - CI runs automatically on every PR (see `.github/workflows/ci.yml`).
 
 ## Coding Conventions
 
 - TypeScript: strict mode, `"type": "module"` ESM, no `any`.
 - Solidity: `^0.8.24`, follow existing NatSpec style.
-- Rust: `cargo fmt` + `cargo clippy` must pass before merging.
 
 ## Commit Messages
 
