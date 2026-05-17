@@ -103,12 +103,14 @@ catp receipt keygen \
 
 catp receipt sign \
   --audit-export catp-audit-export.json \
+  --file catp-policy.toml \
   --private-key catp-receipt-private.pem \
   --out catp-authorization-receipt.json
 
 catp receipt verify \
   --receipt catp-authorization-receipt.json \
   --public-key catp-receipt-public.pem \
+  --file catp-policy.toml \
   --audit-export catp-audit-export.json
 ```
 

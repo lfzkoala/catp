@@ -249,20 +249,22 @@ catp receipt keygen \
 
 catp receipt sign \
   --audit-export catp-audit-export.json \
+  --file catp-policy.toml \
   --private-key catp-receipt-private.pem \
   --out catp-authorization-receipt.json
 
 catp receipt verify \
   --receipt catp-authorization-receipt.json \
   --public-key catp-receipt-public.pem \
+  --file catp-policy.toml \
   --audit-export catp-audit-export.json
 ```
 
 Receipts use `catp_authorization_receipt_v1` and Ed25519 signatures. The signed
 payload binds the audit export hash, audit commitment, entry hash, agent id,
-tool, decision, timestamp, and signer public key. Passing `--audit-export`
-checks that the receipt also matches the exported audit evidence, not just that
-the signature is valid.
+tool, decision, timestamp, policy commitment, and signer public key. Passing
+`--audit-export` and `--file` checks that the receipt also matches the exported
+audit evidence and policy, not just that the signature is valid.
 
 `catp anchor` can submit a Merkle root of local audit commitments on-chain.
 Structured authorization proofs use a separate private policy commitment path

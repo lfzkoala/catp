@@ -4,9 +4,12 @@ import {
   signAuthorizationReceipt,
   verifyAuthorizationReceipt,
   verifyReceiptAuditExport,
+  verifyReceiptPolicy,
+  computePolicyCommitment,
   type AuthorizationReceipt,
 } from "../../src/commands/receipt.js";
 import { stableStringify, type AuditExport } from "../../src/commands/log.js";
+import type { CatpPolicy } from "../../src/policy/types.js";
 
 function keyPair(): { privateKeyPem: string; publicKeyPem: string } {
   const { privateKey, publicKey } = generateKeyPairSync("ed25519", {
@@ -36,10 +39,19 @@ function auditExport(): AuditExport {
   };
 }
 
+function policy(): CatpPolicy {
+  return {
+    agent: { id: "receipt-agent", version: "1" },
+    rules: [{ tool: "Bash", allow: true }],
+  };
+}
+
 describe("authorization receipt", () => {
   it("signs and verifies a CATP audit export", () => {
     const { privateKeyPem, publicKeyPem } = keyPair();
-    const receipt = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem, "2026-01-01T00:00:01.000Z");
+    const receipt = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem, {
+      signedAt: "2026-01-01T00:00:01.000Z",
+    });
 
     expect(receipt.receiptVersion).toBe("catp_authorization_receipt_v1");
     expect(receipt.signatureAlgorithm).toBe("Ed25519");
@@ -50,7 +62,9 @@ describe("authorization receipt", () => {
 
   it("rejects a tampered receipt payload", () => {
     const { privateKeyPem, publicKeyPem } = keyPair();
-    const receipt = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem, "2026-01-01T00:00:01.000Z");
+    const receipt = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem, {
+      signedAt: "2026-01-01T00:00:01.000Z",
+    });
     const tampered: AuthorizationReceipt = { ...receipt, decision: "deny" };
 
     expect(() => verifyAuthorizationReceipt(tampered, publicKeyPem)).toThrow("signature is invalid");
@@ -59,7 +73,9 @@ describe("authorization receipt", () => {
   it("checks that a receipt matches its audit export", () => {
     const { privateKeyPem, publicKeyPem } = keyPair();
     const exportedAudit = auditExport();
-    const receipt = signAuthorizationReceipt(exportedAudit, privateKeyPem, publicKeyPem, "2026-01-01T00:00:01.000Z");
+    const receipt = signAuthorizationReceipt(exportedAudit, privateKeyPem, publicKeyPem, {
+      signedAt: "2026-01-01T00:00:01.000Z",
+    });
 
     expect(() => verifyReceiptAuditExport(receipt, exportedAudit)).not.toThrow();
   });
@@ -67,7 +83,9 @@ describe("authorization receipt", () => {
   it("rejects a receipt that does not match the supplied audit export", () => {
     const { privateKeyPem, publicKeyPem } = keyPair();
     const exportedAudit = auditExport();
-    const receipt = signAuthorizationReceipt(exportedAudit, privateKeyPem, publicKeyPem, "2026-01-01T00:00:01.000Z");
+    const receipt = signAuthorizationReceipt(exportedAudit, privateKeyPem, publicKeyPem, {
+      signedAt: "2026-01-01T00:00:01.000Z",
+    });
     const differentExport: AuditExport = {
       ...exportedAudit,
       entry: { ...exportedAudit.entry, tool: "Write" },
@@ -77,10 +95,42 @@ describe("authorization receipt", () => {
     expect(() => verifyReceiptAuditExport(receipt, differentExport)).toThrow("auditExportHash does not match");
   });
 
+  it("binds and verifies a policy commitment", () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const signedPolicy = policy();
+    const receipt = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem, {
+      signedAt: "2026-01-01T00:00:01.000Z",
+      policyCommitment: computePolicyCommitment(signedPolicy),
+    });
+
+    expect(receipt.policyCommitment).toBe(computePolicyCommitment(signedPolicy));
+    expect(() => verifyAuthorizationReceipt(receipt, publicKeyPem)).not.toThrow();
+    expect(() => verifyReceiptPolicy(receipt, signedPolicy)).not.toThrow();
+  });
+
+  it("rejects a receipt policy mismatch", () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const signedPolicy = policy();
+    const receipt = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem, {
+      signedAt: "2026-01-01T00:00:01.000Z",
+      policyCommitment: computePolicyCommitment(signedPolicy),
+    });
+    const differentPolicy: CatpPolicy = {
+      ...signedPolicy,
+      rules: [{ tool: "Write", allow: false }],
+    };
+
+    expect(() => verifyReceiptPolicy(receipt, differentPolicy)).toThrow("policyCommitment does not match");
+  });
+
   it("produces stable receipt JSON for the same payload", () => {
     const { privateKeyPem, publicKeyPem } = keyPair();
-    const first = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem, "2026-01-01T00:00:01.000Z");
-    const second = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem, "2026-01-01T00:00:01.000Z");
+    const first = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem, {
+      signedAt: "2026-01-01T00:00:01.000Z",
+    });
+    const second = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem, {
+      signedAt: "2026-01-01T00:00:01.000Z",
+    });
 
     expect(stableStringify(first)).toBe(stableStringify(second));
   });

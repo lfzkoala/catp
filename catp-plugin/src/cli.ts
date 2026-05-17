@@ -157,6 +157,7 @@ receipt
   .description("Sign a CATP audit export as an authorization receipt")
   .requiredOption("--audit-export <path>", "catp_audit_export_v1 JSON from catp log export")
   .requiredOption("--private-key <path>", "Ed25519 private key PEM")
+  .option("-f, --file <path>", "path to catp-policy.toml to bind into the receipt")
   .option("--out <path>", "write receipt JSON to file instead of stdout")
   .action(cmdReceiptSign);
 
@@ -166,6 +167,7 @@ receipt
   .requiredOption("--receipt <path>", "catp_authorization_receipt_v1 JSON")
   .option("--public-key <path>", "Ed25519 public key PEM; defaults to publicKeyPem embedded in the receipt")
   .option("--audit-export <path>", "also check the receipt against a catp_audit_export_v1 JSON bundle")
+  .option("-f, --file <path>", "also check the receipt against a catp-policy.toml commitment")
   .action(cmdReceiptVerify);
 
 program.parseAsync(process.argv).catch((err) => {
