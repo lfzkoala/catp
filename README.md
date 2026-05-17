@@ -1,174 +1,41 @@
 # CATP - Cryptographic Agent Trust Protocol
 
-CATP is an authorization protocol for AI agents: it enforces local policy
-decisions, records tamper-evident audit trails, and can turn structured agent
-actions into verifiable authorization artifacts.
+CATP is a local-first authorization and audit protocol for AI agents.
 
-The active project has two connected surfaces:
-
-1. **Local enforcement**: a runtime-neutral policy core blocks tool calls outside a project policy and writes a tamper-evident audit log; Claude Code is the first supported adapter.
-2. **Verifiable authorization**: witness and proof manifest tooling link structured actions to committed policies. Groth16/BN254 is the current optional EVM verification backend, not the protocol itself.
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the current system shape and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the active roadmap.
-
----
-
-## Current Scope
+It gives an agent runtime a simple trust boundary:
 
 ```text
-In scope
-Local enforcement core            runtime adapters + TOML policy + SHA-256 audit log
-Signed authorization receipts     audit export + Ed25519 receipt verification
-Authorization proof manifests     audit-linked witness + manifest validation
-Optional EVM verification         authorization_groth16_v1 = Groth16/BN254, Sepolia smoke passed
-
-Future extension space
-Output verification               output commitments + attestor/challenge design
-Encrypted communication           agent-to-agent or principal-to-agent encrypted messages
-Reputation                        privacy-preserving performance properties
-Registry and discovery            capability proofs + discovery records
+policy -> enforcement -> audit log -> signed receipt -> external verification
 ```
 
-The current product is complete enough to stand alone as an enforcement +
-authorization protocol. ZK is not required for local enforcement or audit-log
-integrity. It is an optional backend for privacy-preserving verification when a
-third party, contract, or external system needs a compact authorization proof.
+The current CLI focuses on three things:
 
----
+- **Local enforcement**: evaluate tool calls against `catp-policy.toml`.
+- **Tamper-evident audit**: append SHA-256 chained audit entries.
+- **Signed receipts**: turn committed audit entries into portable evidence.
 
-## Current MVP Flow
+Groth16/EVM verification is available as an optional advanced backend. It is not
+required for the default CATP workflow.
 
-```mermaid
-sequenceDiagram
-  autonumber
-  actor User
-  participant Agent as Agent Runtime
-  participant Adapter as Runtime Adapter
-  participant CATP as CATP CLI / Core
-  participant Policy as catp-policy.toml
-  participant Audit as Local Audit Log
-  participant Export as Audit Export
-  participant Receipt as Signed Receipt
-  participant Verifier as External Verifier
-  participant ZK as Optional Groth16 / EVM
-
-  User->>CATP: catp init / validate
-  CATP->>Policy: load local policy rules
-  Agent->>Adapter: tool call event
-  Adapter->>CATP: CATP ToolAction
-  CATP->>Policy: evaluate allow / deny
-  CATP-->>Agent: allow or block
-  Agent->>Adapter: tool result event
-  Adapter->>CATP: CATP ToolAction
-  CATP->>Audit: append SHA-256 commitment chain entry
-
-  opt External authorization verification
-    User->>CATP: catp receipt issue --latest
-    CATP->>Audit: verify chain and export committed entry
-    CATP->>Export: write catp_audit_export_v1
-    CATP->>Policy: bind policy commitment
-    CATP->>Receipt: sign catp_authorization_receipt_v1
-    Verifier->>CATP: catp receipt verify
-    CATP->>Receipt: verify Ed25519 signature
-    CATP->>Export: match audit export
-    CATP->>Policy: match policy commitment
-  end
-
-  opt Optional ZK / EVM verification
-    User->>CATP: catp witness / prove authorization
-    CATP->>ZK: build authorization_groth16_v1 proof
-    ZK-->>Verifier: compact proof / EVM execution
-  end
-```
-
-The npm CLI covers local enforcement, audit logs, witness generation, and proof
-manifest tooling. Full Groth16 proof generation and Sepolia execution require a
-repository checkout because the prover scripts, circuit assets, and contract
-deployment metadata live in this repo.
-
----
-
-## Package Boundary
-
-CATP intentionally keeps the published npm CLI small:
-
-- `@catp-protocol/cli`: local enforcement, audit logs, witness generation,
-  signed authorization receipts, authorization proof manifests, and artifact
-  validation.
-- Repository checkout: Groth16 proof generation, calldata encoding, Sepolia
-  execution, contracts, circuits, and setup/deployment checks.
-
-The active EVM/testnet proof path is `authorization_groth16_v1`.
-
----
-
-## Authorization Proof Systems
-
-CATP currently contains one active authorization proof backend.
-
-| Path | Role | Status |
-|------|------|--------|
-| `authorization_groth16_v1` | Current EVM verifier path | Works on Sepolia; compact verifier runtime is about 6.4 KB and wrapper runtime is about 1.1 KB |
-
-Groth16 does require a circuit-specific trusted setup. The keys currently checked into `catp-circuits/groth16/keys/` are stable dev/testnet keys, not a mainnet ceremony. A mainnet release must either run and document a proper ceremony or explicitly choose a weaker trust model.
-
-Any change to public inputs, policy encoding, circuit constraints, commitment hash, proof backend, or setup keys should create a new proof version and verifier address.
-
----
-
-## Quick Start - Local Enforcement
-
-`catp-plugin` runs as Claude Code hooks. It evaluates every tool call against a TOML policy file and writes a tamper-evident audit log with a SHA-256 commitment chain.
-
-No blockchain or ZK setup is required for local enforcement.
-
-Claude Code is the first supported runtime adapter, not the protocol boundary.
-The local enforcement core consumes CATP `ToolAction` events:
-
-```text
-runtime adapter -> ToolAction -> policy decision -> audit entry
-```
-
-Future runtimes should plug in by mapping their tool-call events into
-`ToolAction` while leaving the policy engine, audit logger, witness builder, and
-proof manifest flow unchanged.
-
-### Install
-
-For a fuller installation guide, see [docs/INSTALL.md](docs/INSTALL.md).
-
-Option A - npm:
+## Install
 
 ```bash
 npm install -g @catp-protocol/cli@0.3.0
+catp --version
 ```
 
-The npm package covers local enforcement, audit logs, witness generation, and
-proof manifest validation. Full Groth16 proof generation requires cloning the
-repository because the prover scripts and circuit assets are not bundled into
-the CLI package.
+For the full setup guide, see [docs/INSTALL.md](docs/INSTALL.md).
 
-Option B - clone and build:
+## Quick Start
+
+Initialize a project policy:
 
 ```bash
-git clone https://github.com/lfzkoala/catp.git
-cd catp
-bash install.sh
+catp init
+catp validate
 ```
 
-This installs dependencies, compiles the plugin, and symlinks the `catp` binary to `~/.local/bin/`.
-
-If `catp` is not found after install, add `~/.local/bin` to your PATH:
-
-```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
-# or for bash:
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
-```
-
-### Wire Claude Code Hooks
-
-Add to `~/.claude/settings.json`:
+Wire Claude Code hooks in `~/.claude/settings.json`:
 
 ```json
 {
@@ -185,25 +52,20 @@ Add to `~/.claude/settings.json`:
 }
 ```
 
-`--runtime claude-code` is currently the only supported runtime adapter and is
-also the default. It is shown explicitly so future runtime integrations have a
-stable hook boundary.
-
-List supported runtime adapters with:
+Check supported runtime adapters:
 
 ```bash
 catp hook runtimes
 ```
 
-### Configure a Policy
+Today the only built-in adapter is `claude-code`. The enforcement core is
+runtime-neutral; future runtimes should map their tool events into CATP
+`ToolAction` events.
 
-```bash
-cd your-project/
-catp init
-catp validate
-```
+## Policy
 
-Example `catp-policy.toml`:
+CATP policies are TOML files. Rules are evaluated top-to-bottom; first match
+wins. Unmatched tools are allowed by default.
 
 ```toml
 [agent]
@@ -220,7 +82,7 @@ reason = "Destructive or remote-execution commands are blocked"
 tool = "Write"
 allow = false
 path_allowlist = ["src/**", "tests/**"]
-reason = "Deny writes to paths outside src/ and tests/"
+reason = "Deny writes outside src/ and tests/"
 
 [[rules]]
 tool = "WebFetch"
@@ -228,9 +90,15 @@ allow = true
 reason = "Web reads are unrestricted"
 ```
 
-Rules are evaluated top-to-bottom; first match wins. Unmatched tools are allowed by default.
+## Audit Logs
 
-### View the Audit Log
+CATP writes audit entries to:
+
+```text
+${CATP_HOME:-~/.catp}/audit/<agentId>/<YYYY-MM-DD>/actions.jsonl
+```
+
+Each entry chains to the previous commitment.
 
 ```bash
 catp log show
@@ -238,9 +106,7 @@ catp log show --commitments
 catp log verify
 ```
 
-Logs are written to `${CATP_HOME:-~/.catp}/audit/<agentId>/<YYYY-MM-DD>/actions.jsonl`. Each entry chains on the previous commitment hash, forming a tamper-evident sequence.
-
-### Sign an Authorization Receipt
+## Signed Receipts
 
 Signed receipts are the default external verification path. They do not require
 ZK, contracts, or a prover.
@@ -264,350 +130,71 @@ catp receipt verify \
   --audit-export catp-audit-export.json
 ```
 
+`catp receipt issue` verifies the local audit chain before signing. Use
+`--latest` for the newest audit entry, or `--commitment <hex>` for a specific
+entry.
+
 Receipts use `catp_authorization_receipt_v1` and Ed25519 signatures. The signed
 payload binds the audit export hash, audit commitment, entry hash, agent id,
-tool, decision, timestamp, policy commitment, and signer public key. Passing
-`--audit-export` and `--file` checks that the receipt also matches the exported
-audit evidence and policy, not just that the signature is valid.
-`catp receipt issue` verifies the local audit log commitment chain before it
-signs. Use `--latest` for the newest audit entry, or `--commitment <hex>` for a
-specific entry from `catp log show --commitments`.
+tool, decision, timestamp, policy commitment, and signer public key.
 
-If you need the steps separately, `catp log export` writes a deterministic
-`catp_audit_export_v1` bundle and `catp receipt sign` signs that bundle.
+For a minimal fixture, see [examples/receipt-basic](examples/receipt-basic).
 
-### Verification Levels
+## Optional Groth16/EVM Verification
 
-```text
-Level 1: local audit
-  catp log verify
+CATP also includes an optional `authorization_groth16_v1` backend for compact
+EVM verification.
 
-Level 2: signed receipt
-  catp receipt issue / verify
-
-Level 3: optional proof backend
-  catp witness / prove authorization / verify authorization
-```
-
-`catp anchor` can submit a Merkle root of local audit commitments on-chain.
-Structured authorization proofs use a separate private policy commitment path
-verified by `authorization_groth16_v1` on EVM or by the off-chain verifier path.
-
----
-
-## End-to-End Groth16 Authorization
-
-This is the current EVM path. It proves that an action is allowed by a private committed policy, then executes that proof through `AgentAuthorizer.executeAuthorized`.
-
-The proof statement is versioned as:
-
-```text
-authorization_groth16_v1
-```
-
-Public inputs:
-
-- `policyCommitment`
-- `actionType`
-- `protocol[4]`
-- `token[4]`
-- `value`
-- `currentTimestamp`
-- `cumulativeSpend`
-
-The Solidity execution path is:
-
-```text
-AgentAuthorizer
-  -> Groth16AuthorizationVerifier
-    -> Groth16Verifier
-```
-
-### 1. Add Authorization Policy Fields
-
-Add a structured `[authorization]` section to `catp-policy.toml`:
-
-```toml
-[authorization]
-allowed_action = "Swap"
-allowed_protocol = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-allowed_token = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-max_value_per_tx = "1000"
-max_value_total = "10000"
-valid_from = "1778042786"
-valid_until = "1778129246"
-```
-
-### 2. Create Action JSON
-
-```json
-{
-  "actionType": "Swap",
-  "protocol": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "token": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-  "value": "500"
-}
-```
-
-### 3. Generate a Proof Artifact
-
-Use a fresh timestamp near execution time. `AgentAuthorizer` rejects proofs older than five minutes.
-
-```bash
-npm run groth16:prove -- \
-  --action action.json \
-  --current-timestamp 1778042846 \
-  --cumulative-spend 0 \
-  --out authorization_groth16_v1.json
-```
-
-The script builds a witness with `catp witness` and passes it to the Groth16 prover.
-
-You can also build a witness from an audit entry that recorded `tool_input.catp_authorization` or `tool_input.authorization`:
-
-```bash
-catp witness \
-  --audit-commitment <64-char-audit-commitment> \
-  --out witness.json
-```
-
-When `catp witness --out ...` succeeds, the summary includes a ready-to-edit
-`proveCommand=catp prove authorization ...` line using the same action or audit
-commitment source.
-
-To generate a proof artifact and shareable manifest in one command from the
-repository checkout:
-
-```bash
-catp prove authorization \
-  --action action.json \
-  --current-timestamp 1778042846 \
-  --cumulative-spend 0 \
-  --artifact-out authorization_groth16_v1.json \
-  --deployment catp-contracts/deployments/sepolia-groth16.json \
-  --out catp-proof-manifest.json
-```
-
-For an audit-linked action, use the audit commitment directly:
-
-```bash
-catp prove authorization \
-  --audit-commitment <64-char-audit-commitment> \
-  --artifact-out authorization_groth16_v1.json \
-  --deployment catp-contracts/deployments/sepolia-groth16.json \
-  --out catp-proof-manifest.json
-```
-
-### 4. Encode Calldata Without Broadcasting
-
-```bash
-npm run groth16:encode-execute -- \
-  --artifact authorization_groth16_v1.json \
-  --out execute-authorized.calldata.json
-```
-
-This validates the proof artifact and emits calldata for:
-
-- `registerPolicy(bytes32)`
-- `executeAuthorized(bytes32,bytes,uint256,bytes)`
-
-The encoder checks the contract-facing artifact shape before emitting calldata:
-13 public inputs, a 128-byte ABI `actionData` payload, a 256-byte proof, and
-matching policy commitment, action fields, value, timestamp, and cumulative
-spend.
-
-### 5. Dry-Run Execution
-
-```bash
-npm run groth16:execute -- \
-  --artifact authorization_groth16_v1.json \
-  --dry-run
-```
-
-Dry-run does not require RPC credentials and does not broadcast.
-
-### 6. Execute on Sepolia
-
-Load RPC credentials from `catp-contracts/.env` or your shell:
-
-```bash
-set -a
-source catp-contracts/.env
-set +a
-```
-
-Then broadcast:
-
-```bash
-npm run groth16:execute -- \
-  --artifact authorization_groth16_v1.json \
-  --out execute-authorized.receipt.json
-```
-
-The script:
-
-- reads `AgentAuthorizer` from `catp-contracts/deployments/sepolia-groth16.json` unless `--authorizer` is passed
-- registers the policy only if inactive
-- checks that the proof artifact's `cumulativeSpend` matches on-chain state
-- broadcasts `executeAuthorized`
-- writes receipt metadata when `--out` is provided
-
-### 7. Share a Proof Manifest
-
-If you already have a proof artifact, create a portable manifest that links the
-proof, public inputs, verifier/deployment metadata, and optional audit
-commitment:
-
-```bash
-catp prove authorization \
-  --artifact authorization_groth16_v1.json \
-  --deployment catp-contracts/deployments/sepolia-groth16.json \
-  --out catp-proof-manifest.json
-
-catp verify authorization --manifest catp-proof-manifest.json
-```
-
-For audit-linked manifests, verify that the audit commitment exists in the local
-audit log:
-
-```bash
-catp verify authorization \
-  --manifest catp-proof-manifest.json \
-  --check-audit
-```
-
-`catp verify authorization` currently performs structural manifest validation.
-With `--check-audit`, it also checks that the manifest's audit commitment exists
-for the recorded audit agent and that the audit entry's structured
-authorization action matches the manifest action data, value, timestamp, and
-cumulative spend when those audit fields are present. Cryptographic proof
-verification is performed by the EVM verifier or the dedicated off-chain
-verifier path.
-
-See [docs/E2E_GROTH16_SEPOLIA.md](docs/E2E_GROTH16_SEPOLIA.md) for the full
-end-to-end flow and [docs/SECURITY_REVIEW_AUTHORIZATION.md](docs/SECURITY_REVIEW_AUTHORIZATION.md)
-for the authorization proof review checklist.
-
-For a minimal signed receipt fixture, see
-[examples/receipt-basic](examples/receipt-basic). For a minimal Groth16
-policy/action fixture, see [examples/authorization-basic](examples/authorization-basic).
-
----
-
-## Deployment and Verification Commands
-
-Generate or refresh the Groth16 verifier, proof fixture, and setup manifest:
-
-```bash
-npm run groth16:generate
-```
-
-Check the persisted Groth16 setup, verifier source, wrapper source, build artifacts, and Sepolia metadata:
+Use this path when you need a Groth16 proof and on-chain authorization check:
 
 ```bash
 npm run groth16:check
+npm run groth16:prove -- --action action.json --out authorization_groth16_v1.json
+npm run groth16:encode-execute -- --artifact authorization_groth16_v1.json
 ```
 
-Check verifier runtime sizes:
+The checked-in Groth16 proving and verifying keys are deterministic dev/testnet
+keys, not a mainnet ceremony.
 
-```bash
-npm run groth16:size
-```
+For the full Sepolia flow, see
+[docs/E2E_GROTH16_SEPOLIA.md](docs/E2E_GROTH16_SEPOLIA.md). For the security
+review checklist, see
+[docs/SECURITY_REVIEW_AUTHORIZATION.md](docs/SECURITY_REVIEW_AUTHORIZATION.md).
 
-Deploy the compact Groth16 verifier path:
-
-```bash
-scripts/deploy-groth16-sepolia.sh --dry-run
-scripts/deploy-groth16-sepolia.sh
-```
-
-Run the Sepolia smoke script:
-
-```bash
-scripts/smoke-groth16-sepolia.sh
-```
-
-Run the Solidity Groth16 adapter tests:
-
-```bash
-cd catp-contracts
-forge test --match-path test/authorization/Groth16AuthorizationVerifier.t.sol
-```
-
----
-
-## Repository Structure
+## Repository Map
 
 ```text
-catp/
-├── catp-plugin/            # TypeScript — local enforcement plugin
-│   └── src/
-│       ├── policy/         # TOML loader, rule engine
-│       ├── audit/          # Commitment chain logger and verifier
-│       ├── hook/           # pre.ts / post.ts hook handlers
-│       └── commands/       # init, validate, log, witness CLI commands
-├── catp-circuits/          # Go — optional Groth16 circuit and verifier generator
-│   └── groth16/            # gnark Groth16 authorization verifier path
-├── catp-contracts/         # Solidity — verifiers + protocol contracts
-│   └── src/authorization/         # AgentAuthorizer, verifier wrappers, proof adapters
-├── catp-sdk/               # TypeScript — developer-facing SDK
-│   └── src/authorization/         # types, PolicyBuilder, AuthorizerClient, Groth16 adapters
+catp-plugin/            npm CLI: enforcement, audit, receipts, manifests
+catp-sdk/               TypeScript authorization helpers
+catp-circuits/groth16/  optional gnark Groth16 backend
+catp-contracts/         Solidity authorizer and verifier contracts
+scripts/                Groth16 setup, proof, calldata, deploy, smoke helpers
+examples/               small runnable fixtures
+docs/                   install, release, E2E, and security docs
 ```
 
----
-
-## Current Status
-
-| Area | Component | Status |
-|------|-----------|--------|
-| Local enforcement | `catp-plugin` - Claude Code enforcement + audit log | Complete; published as `@catp-protocol/cli` |
-| Authorization | `authorization_groth16_v1` compact EVM verifier | Sepolia smoke passed; real proof execution passing |
-| Authorization | `Groth16Verifier.sol` | Generated verifier runtime about 6.4 KB |
-| Authorization | `Groth16AuthorizationVerifier.sol` | Wrapper runtime about 1.1 KB |
-| Authorization | `AgentAuthorizer.sol` + `ActionData.sol` | Complete |
-| Authorization | Groth16 proof/execution scripts | Complete for testnet flow: prove, encode, dry-run, execute |
-| Authorization | TypeScript SDK proof helpers | Complete locally |
-| Future extensions | output verification, messaging, reputation, registry/discovery | Not active repo surface |
-
-Run the checks in [CONTRIBUTING.md](CONTRIBUTING.md) before changing protocol or verifier code.
-
----
-
-## Prerequisites
-
-Local enforcement only:
-
-| Tool | Version |
-|------|---------|
-| Node.js | >= 20 |
-| npm | >= 10 |
-
-Full stack:
-
-| Tool | Version | Used by |
-|------|---------|---------|
-| Node.js | >= 20 | catp-plugin, catp-sdk |
-| npm | >= 10 | root scripts, catp-plugin |
-| pnpm | >= 9 | catp-sdk |
-| Go | >= 1.23 | gnark Groth16 prover |
-| Foundry | latest | catp-contracts, deploy/smoke scripts |
-| jq | any modern version | shell scripts |
-
-Install Foundry:
+## Development
 
 ```bash
-curl -L https://foundry.paradigm.xyz | bash
+npm install
+npm run typecheck --workspace catp-plugin
+npm test --workspace catp-plugin
+npm run typecheck --workspace catp-sdk
+npm test --workspace catp-sdk
+npm run groth16:check
 ```
 
----
+See [CONTRIBUTING.md](CONTRIBUTING.md) for component-specific setup and
+contribution guidelines.
 
-## Contributing
+## Roadmap
 
-Contributions are welcome. Please open an issue before starting significant work so we can coordinate.
+The active 0.4.0 work is focused on receipt UX: making it easier to issue and
+verify receipts from real agent workflows without manually copying audit
+commitments.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for per-component dev setup, coding conventions, and commit message format.
-
----
+See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the current roadmap and
+[ARCHITECTURE.md](ARCHITECTURE.md) for the system design.
 
 ## License
 
