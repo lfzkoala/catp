@@ -231,12 +231,16 @@ Rules are evaluated top-to-bottom; first match wins. Unmatched tools are allowed
 
 ```bash
 catp log show
+catp log show --commitments
 catp log verify
 ```
 
 Logs are written to `${CATP_HOME:-~/.catp}/audit/<agentId>/<YYYY-MM-DD>/actions.jsonl`. Each entry chains on the previous commitment hash, forming a tamper-evident sequence.
 
 ### Sign an Authorization Receipt
+
+Signed receipts are the default external verification path. They do not require
+ZK, contracts, or a prover.
 
 ```bash
 catp receipt keygen \
@@ -267,6 +271,19 @@ signs.
 
 If you need the steps separately, `catp log export` writes a deterministic
 `catp_audit_export_v1` bundle and `catp receipt sign` signs that bundle.
+
+### Verification Levels
+
+```text
+Level 1: local audit
+  catp log verify
+
+Level 2: signed receipt
+  catp receipt issue / verify
+
+Level 3: optional proof backend
+  catp witness / prove authorization / verify authorization
+```
 
 `catp anchor` can submit a Merkle root of local audit commitments on-chain.
 Structured authorization proofs use a separate private policy commitment path

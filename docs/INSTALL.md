@@ -86,10 +86,12 @@ Check audit logs:
 
 ```bash
 catp log show
+catp log show --commitments
 catp log verify
 ```
 
-Sign and verify a receipt:
+Sign and verify a receipt. This is the default external verification path and
+does not require the Groth16 prover stack:
 
 ```bash
 catp receipt keygen \
@@ -109,6 +111,9 @@ catp receipt verify \
   --file catp-policy.toml \
   --audit-export catp-audit-export.json
 ```
+
+Use Groth16 proof manifests only when you need the optional ZK/EVM verification
+backend.
 
 ### npm CLI Smoke Test
 

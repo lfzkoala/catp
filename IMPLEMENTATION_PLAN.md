@@ -37,7 +37,7 @@ Current verification surfaces:
 |---------|------|--------|
 | Audit log | Tamper-evident local evidence | Active npm CLI path |
 | Authorization witness/manifest | Portable authorization artifact | Active npm CLI path |
-| Signed authorization receipt | Non-ZK external verification | Next 0.3.0 mainline |
+| Signed authorization receipt | Non-ZK external verification | 0.3.0 release candidate |
 | ZK verifier backend | Privacy-preserving compact verification | Optional advanced path |
 
 Current proof backend versions:
@@ -109,6 +109,24 @@ integrity, or the planned signed receipt path.
 - `examples/authorization-basic` remains the first user-facing proof fixture.
 - `npm run groth16:check` remains the canonical setup integrity check.
 
+### Signed Authorization Receipts
+
+- `catp log export` writes deterministic `catp_audit_export_v1` bundles for
+  individual audit commitments.
+- `catp log show --commitments` exposes full commitments for receipt issuance.
+- `catp receipt keygen` creates local Ed25519 signing keys.
+- `catp receipt sign` signs an existing audit export.
+- `catp receipt issue` is the main path: it verifies the local audit chain,
+  exports the audit entry, binds the policy commitment, and signs
+  `catp_authorization_receipt_v1`.
+- `catp receipt verify` validates the signature and can also check the receipt
+  against the audit export and `catp-policy.toml`.
+- Receipt verification has regression tests for tampered signatures, wrong
+  public keys, mismatched audit exports, missing policy commitments, and policy
+  mismatches.
+- `examples/receipt-basic` documents and exercises the default non-ZK external
+  verification path.
+
 ### Universal Agent Runtime Adapters
 
 - Runtime-neutral `ToolAction` and `RuntimeAdapter` contracts are documented in
@@ -137,40 +155,27 @@ integrity, or the planned signed receipt path.
 
 ## Active Milestones
 
-### P0: Signed Authorization Receipt And Audit Export
+### P0: 0.3.0 Release Hygiene
 
-Status: active 0.3.0 mainline.
+Status: active.
 
-Goal: add a non-ZK verification path that lets a third party verify that CATP
-made a policy decision, linked it to a specific audit commitment, and emitted a
-portable receipt.
-
-Planned shape:
-
-```text
-policyHash + actionHash + decision + auditCommitment + timestamp
-  -> signed authorization receipt
-  -> catp receipt verify
-```
+Goal: close the signed receipt mainline as an npm release.
 
 Work:
 
-- Define `catp_authorization_receipt_v1` JSON with stable canonical fields.
-- Add deterministic audit export for one commitment or a date range.
-- Add receipt signing using a local Ed25519 key pair.
-- Add receipt verification by public key.
-- Link receipt fields to the audit entry commitment and policy commitment.
-- Document when to use deterministic replay, signed receipts, and optional ZK
-  proof manifests.
+- Keep README / INSTALL / examples aligned around the three verification levels:
+  local audit, signed receipt, optional ZK proof manifest.
+- Run the npm CLI smoke path for receipt issuance and verification from a clean
+  directory.
+- Bump `@catp-protocol/cli` to `0.3.0`.
+- Run package checks, `npm pack --dry-run`, publish, tag, and verify install.
 
 Exit criteria:
 
-- A fresh npm install can export an audit entry, sign a receipt, and verify that
-  receipt without cloning the repository.
-- Receipt verification fails if the audit commitment, policy commitment, action
-  hash, decision, timestamp, or signature is changed.
-- README and INSTALL show the receipt path as the first external verification
-  flow, with Groth16 kept as an optional advanced backend.
+- Fresh install can run `catp init`, produce an audit entry, issue a receipt,
+  and verify it against audit export and policy.
+- CI is green for the release tag.
+- npm returns `@catp-protocol/cli@0.3.0` and `catp --version` reports `0.3.0`.
 
 ### P0: Authorization Proof Security Hardening
 
