@@ -137,7 +137,7 @@ For a fuller installation guide, see [docs/INSTALL.md](docs/INSTALL.md).
 Option A - npm:
 
 ```bash
-npm install -g @catp-protocol/cli@0.2.2
+npm install -g @catp-protocol/cli@0.3.0
 ```
 
 The npm package covers local enforcement, audit logs, witness generation, and

@@ -27,7 +27,7 @@ For the full proof/development flow:
 Use this path if you want CATP local enforcement and audit-log tooling.
 
 ```bash
-npm install -g @catp-protocol/cli@0.2.2
+npm install -g @catp-protocol/cli@0.3.0
 catp --version
 ```
 
@@ -39,6 +39,9 @@ The npm package includes:
 - `catp hook post`
 - `catp log show`
 - `catp log verify`
+- `catp receipt keygen`
+- `catp receipt issue`
+- `catp receipt verify`
 - `catp witness`
 - `catp prove authorization` for existing proof artifacts
 - `catp verify authorization`
@@ -134,7 +137,7 @@ This confirms the installed CLI is available and the local policy/audit surface
 works without a repository checkout. `CATP_HOME` keeps the smoke test isolated
 from any existing audit logs under `~/.catp`.
 
-The `0.2.2` npm smoke test has been verified with:
+The `0.3.0` npm smoke test should verify:
 
 ```text
 catp --version
@@ -142,6 +145,9 @@ catp hook runtimes
 catp init
 catp validate
 catp log verify
+catp receipt keygen --help
+catp receipt issue --help
+catp receipt verify --help
 catp prove authorization --help
 catp verify authorization --help
 ```
