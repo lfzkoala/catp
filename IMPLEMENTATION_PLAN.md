@@ -101,8 +101,8 @@ path.
   action and audit-linked sources.
 - `catp prove authorization --out` prints a ready-to-run `verifyCommand=...`
   line, including `--check-audit` when applicable.
-- Global npm install smoke path documented and verified for `0.2.2`; `0.3.0`
-  extends that path with receipt issue/verify.
+- Global npm install smoke path documented and verified for `0.3.0`, including
+  receipt issue/verify.
 - Missing repo checkout/prover script errors now explain how to proceed.
 - `examples/authorization-basic` remains the first user-facing proof fixture.
 - `npm run groth16:check` remains the canonical setup integrity check.
