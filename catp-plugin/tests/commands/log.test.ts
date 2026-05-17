@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { computeCommitment } from "../../src/audit/logger.js";
-import { buildAuditExport, stableStringify, cmdLogExport } from "../../src/commands/log.js";
+import { buildAuditExport, stableStringify, cmdLogExport, cmdLogShow } from "../../src/commands/log.js";
 import type { AuditEntry } from "../../src/policy/types.js";
 
 const TEST_HOME = join(tmpdir(), `catp-log-command-test-${Date.now()}`);
@@ -80,5 +80,24 @@ describe("log export", () => {
     expect(parsed.commitment).toBe(commitment);
     expect(writes.join("")).toContain(`Wrote audit export to ${outPath}`);
     expect(writes.join("")).toContain("entrySha256=");
+  });
+
+  it("shows full commitments when requested", () => {
+    const commitment = computeCommitment("Bash", "allow", "2026-01-01T00:00:00.000Z", "0", null, "{\"command\":\"ls\"}");
+    writeEntry(TEST_AGENT, "2026-01-01", makeEntry(commitment));
+
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      cmdLogShow({ agent: TEST_AGENT, lines: "1", commitments: true });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    expect(writes.join("")).toContain(`commitment=${commitment}`);
   });
 });

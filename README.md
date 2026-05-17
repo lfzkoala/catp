@@ -465,8 +465,9 @@ See [docs/E2E_GROTH16_SEPOLIA.md](docs/E2E_GROTH16_SEPOLIA.md) for the full
 end-to-end flow and [docs/SECURITY_REVIEW_AUTHORIZATION.md](docs/SECURITY_REVIEW_AUTHORIZATION.md)
 for the authorization proof review checklist.
 
-For a minimal runnable policy/action fixture, see
-[examples/authorization-basic](examples/authorization-basic).
+For a minimal signed receipt fixture, see
+[examples/receipt-basic](examples/receipt-basic). For a minimal Groth16
+policy/action fixture, see [examples/authorization-basic](examples/authorization-basic).
 
 ---
 

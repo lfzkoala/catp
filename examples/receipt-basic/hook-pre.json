@@ -1,0 +1,7 @@
+{
+  "session_id": "receipt-basic-session",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "echo hello from CATP"
+  }
+}

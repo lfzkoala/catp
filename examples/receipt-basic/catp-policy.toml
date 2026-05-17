@@ -1,0 +1,14 @@
+[agent]
+id = "receipt-basic-agent"
+version = "1"
+
+[[rules]]
+tool = "Bash"
+allow = true
+pattern = ["echo*"]
+reason = "Allow the receipt example command"
+
+[[rules]]
+tool = "Bash"
+allow = false
+reason = "Block other shell commands in this example"

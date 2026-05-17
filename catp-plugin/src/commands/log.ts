@@ -48,7 +48,7 @@ function allLogFiles(agentId: string): AuditLogFile[] {
     .filter(({ file }) => existsSync(file));
 }
 
-export function cmdLogShow(opts: { lines: string; agent?: string }): void {
+export function cmdLogShow(opts: { lines: string; agent?: string; commitments?: boolean }): void {
   const agentId = resolveAgentId(opts);
   const logFile = latestLogFile(agentId);
   if (!logFile || !existsSync(logFile)) {
@@ -66,6 +66,9 @@ export function cmdLogShow(opts: { lines: string; agent?: string }): void {
       const icon = e.decision === "allow" ? "✓" : "✗";
       const rule = e.rule_matched ? ` [${e.rule_matched}]` : "";
       process.stdout.write(`${icon} ${e.ts}  ${e.tool}${rule}\n    ${e.input_summary}\n`);
+      if (opts.commitments) {
+        process.stdout.write(`    commitment=${e.commitment}\n`);
+      }
     } catch {
       process.stdout.write(`? ${line}\n`);
     }
