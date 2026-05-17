@@ -47,9 +47,10 @@ sequenceDiagram
   participant CATP as CATP CLI / Core
   participant Policy as catp-policy.toml
   participant Audit as Local Audit Log
-  participant Prover as Groth16 Prover
-  participant Manifest as Proof Manifest
-  participant EVM as Sepolia Verifier
+  participant Export as Audit Export
+  participant Receipt as Signed Receipt
+  participant Verifier as External Verifier
+  participant ZK as Optional Groth16 / EVM
 
   User->>CATP: catp init / validate
   CATP->>Policy: load local policy rules
@@ -61,15 +62,22 @@ sequenceDiagram
   Adapter->>CATP: CATP ToolAction
   CATP->>Audit: append SHA-256 commitment chain entry
 
-  opt Structured authorization action
-    CATP->>Policy: read private authorization fields
-    CATP->>Audit: optionally load action by auditCommitment
-    CATP->>Prover: build witness for authorization_groth16_v1
-    Prover-->>CATP: Groth16 proof artifact
-    CATP->>Manifest: write catp_authorization_proof_manifest_v1
-    CATP-->>User: catp verify authorization
-    CATP->>EVM: optional executeAuthorized proof check
-    EVM-->>User: verified authorization / updated spend
+  opt External authorization verification
+    User->>CATP: catp receipt issue --commitment ...
+    CATP->>Audit: verify chain and export committed entry
+    CATP->>Export: write catp_audit_export_v1
+    CATP->>Policy: bind policy commitment
+    CATP->>Receipt: sign catp_authorization_receipt_v1
+    Verifier->>CATP: catp receipt verify
+    CATP->>Receipt: verify Ed25519 signature
+    CATP->>Export: match audit export
+    CATP->>Policy: match policy commitment
+  end
+
+  opt Optional ZK / EVM verification
+    User->>CATP: catp witness / prove authorization
+    CATP->>ZK: build authorization_groth16_v1 proof
+    ZK-->>Verifier: compact proof / EVM execution
   end
 ```
 
