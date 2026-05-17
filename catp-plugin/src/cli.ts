@@ -10,7 +10,7 @@ import { cmdLogExport, cmdLogShow, cmdLogVerify } from "./commands/log.js";
 import { cmdAnchor } from "./commands/anchor.js";
 import { cmdWitness } from "./commands/witness.js";
 import { cmdProveAuthorization, cmdVerifyAuthorization } from "./commands/authorization.js";
-import { cmdReceiptKeygen, cmdReceiptSign, cmdReceiptVerify } from "./commands/receipt.js";
+import { cmdReceiptIssue, cmdReceiptKeygen, cmdReceiptSign, cmdReceiptVerify } from "./commands/receipt.js";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json") as { version: string };
@@ -160,6 +160,17 @@ receipt
   .option("-f, --file <path>", "path to catp-policy.toml to bind into the receipt")
   .option("--out <path>", "write receipt JSON to file instead of stdout")
   .action(cmdReceiptSign);
+
+receipt
+  .command("issue")
+  .description("Export an audit entry by commitment and sign it as an authorization receipt")
+  .requiredOption("--commitment <hex>", "audit entry commitment to issue a receipt for")
+  .requiredOption("--private-key <path>", "Ed25519 private key PEM")
+  .option("--agent <id>", "agent id (default: from policy file)")
+  .option("-f, --file <path>", "path to catp-policy.toml to bind into the receipt")
+  .option("--audit-export-out <path>", "also write the generated catp_audit_export_v1 JSON")
+  .option("--out <path>", "write receipt JSON to file instead of stdout")
+  .action(cmdReceiptIssue);
 
 receipt
   .command("verify")

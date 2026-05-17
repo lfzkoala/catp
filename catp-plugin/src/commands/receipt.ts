@@ -1,6 +1,6 @@
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign, verify } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { stableStringify, type AuditExport } from "./log.js";
+import { buildAuditExport, stableStringify, type AuditExport } from "./log.js";
 import { findPolicyFile, loadPolicy } from "../policy/loader.js";
 import type { CatpPolicy } from "../policy/types.js";
 
@@ -55,6 +55,55 @@ export function cmdReceiptSign(opts: { auditExport?: string; privateKey?: string
   if (opts.out) {
     writeFileSync(opts.out, json, "utf8");
     process.stdout.write(`Wrote authorization receipt to ${opts.out}\n`);
+    process.stdout.write(`auditCommitment=${receipt.auditCommitment}\n`);
+    process.stdout.write(`auditExportHash=${receipt.auditExportHash}\n`);
+    process.stdout.write(`policyCommitment=${receipt.policyCommitment ?? "none"}\n`);
+    return;
+  }
+
+  process.stdout.write(json);
+}
+
+export function cmdReceiptIssue(opts: {
+  commitment?: string;
+  agent?: string;
+  privateKey?: string;
+  out?: string;
+  file?: string;
+  auditExportOut?: string;
+}): void {
+  if (!opts.commitment) {
+    throw new Error("missing --commitment <hex>");
+  }
+  if (!opts.privateKey) {
+    throw new Error("missing --private-key <path>");
+  }
+
+  const policyPath = opts.file ?? findPolicyFile();
+  const policy = policyPath ? loadPolicy(policyPath) : null;
+  const agentId = opts.agent ?? policy?.agent.id;
+  if (!agentId) {
+    throw new Error("missing --agent <id>; no catp-policy.toml found");
+  }
+
+  const auditExport = buildAuditExport(agentId, opts.commitment);
+  const privateKeyPem = readFileSync(opts.privateKey, "utf8");
+  const publicKeyPem = derivePublicKeyPem(privateKeyPem);
+  const receipt = signAuthorizationReceipt(auditExport, privateKeyPem, publicKeyPem, {
+    policyCommitment: policy ? computePolicyCommitment(policy) : null,
+  });
+
+  if (opts.auditExportOut) {
+    writeFileSync(opts.auditExportOut, stableStringify(auditExport, 2) + "\n", "utf8");
+  }
+
+  const json = stableStringify(receipt, 2) + "\n";
+  if (opts.out) {
+    writeFileSync(opts.out, json, "utf8");
+    process.stdout.write(`Wrote authorization receipt to ${opts.out}\n`);
+    if (opts.auditExportOut) {
+      process.stdout.write(`Wrote audit export to ${opts.auditExportOut}\n`);
+    }
     process.stdout.write(`auditCommitment=${receipt.auditCommitment}\n`);
     process.stdout.write(`auditExportHash=${receipt.auditExportHash}\n`);
     process.stdout.write(`policyCommitment=${receipt.policyCommitment ?? "none"}\n`);

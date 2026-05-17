@@ -1,6 +1,10 @@
-import { describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it } from "@jest/globals";
 import { createHash, generateKeyPairSync } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
+  cmdReceiptIssue,
   signAuthorizationReceipt,
   verifyAuthorizationReceipt,
   verifyReceiptAuditExport,
@@ -10,6 +14,9 @@ import {
 } from "../../src/commands/receipt.js";
 import { stableStringify, type AuditExport } from "../../src/commands/log.js";
 import type { CatpPolicy } from "../../src/policy/types.js";
+
+const TEST_HOME = join(tmpdir(), `catp-receipt-command-test-${Date.now()}`);
+process.env.CATP_HOME = TEST_HOME;
 
 function keyPair(): { privateKeyPem: string; publicKeyPem: string } {
   const { privateKey, publicKey } = generateKeyPairSync("ed25519", {
@@ -46,7 +53,19 @@ function policy(): CatpPolicy {
   };
 }
 
+function writeAuditEntry(agentId: string, date: string, exportedAudit: AuditExport): void {
+  const dir = join(TEST_HOME, "audit", agentId, date);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "actions.jsonl"), JSON.stringify(exportedAudit.entry) + "\n", "utf8");
+}
+
 describe("authorization receipt", () => {
+  afterEach(() => {
+    if (existsSync(TEST_HOME)) {
+      rmSync(TEST_HOME, { recursive: true, force: true });
+    }
+  });
+
   it("signs and verifies a CATP audit export", () => {
     const { privateKeyPem, publicKeyPem } = keyPair();
     const receipt = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem, {
@@ -133,5 +152,43 @@ describe("authorization receipt", () => {
     });
 
     expect(stableStringify(first)).toBe(stableStringify(second));
+  });
+
+  it("issues a receipt directly from an audit commitment", () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const exportedAudit = auditExport();
+    writeAuditEntry(exportedAudit.agentId, exportedAudit.logDate, exportedAudit);
+
+    const dir = join(TEST_HOME, "issue");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    const receiptPath = join(dir, "receipt.json");
+    const auditExportPath = join(dir, "audit-export.json");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      cmdReceiptIssue({
+        agent: exportedAudit.agentId,
+        commitment: exportedAudit.commitment,
+        privateKey: privateKeyPath,
+        out: receiptPath,
+        auditExportOut: auditExportPath,
+      });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8")) as AuthorizationReceipt;
+    const issuedAuditExport = JSON.parse(readFileSync(auditExportPath, "utf8")) as AuditExport;
+    expect(() => verifyAuthorizationReceipt(receipt, publicKeyPem)).not.toThrow();
+    expect(() => verifyReceiptAuditExport(receipt, issuedAuditExport)).not.toThrow();
+    expect(writes.join("")).toContain(`Wrote authorization receipt to ${receiptPath}`);
+    expect(writes.join("")).toContain(`Wrote audit export to ${auditExportPath}`);
   });
 });
