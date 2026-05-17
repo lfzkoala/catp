@@ -1,6 +1,6 @@
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign, verify } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { auditLogFiles, buildAuditExport, stableStringify, type AuditExport } from "./log.js";
+import { auditLogFiles, buildAuditExport, latestAuditEntry, stableStringify, type AuditExport } from "./log.js";
 import { verifyChain } from "../audit/verifier.js";
 import { findPolicyFile, loadPolicy } from "../policy/loader.js";
 import type { CatpPolicy } from "../policy/types.js";
@@ -72,6 +72,7 @@ export function cmdReceiptIssue(opts: {
   out?: string;
   file?: string;
   auditExportOut?: string;
+  latest?: boolean;
 }): Promise<void> {
   return issueReceipt(opts);
 }
@@ -83,9 +84,13 @@ async function issueReceipt(opts: {
   out?: string;
   file?: string;
   auditExportOut?: string;
+  latest?: boolean;
 }): Promise<void> {
-  if (!opts.commitment) {
-    throw new Error("missing --commitment <hex>");
+  if (opts.latest && opts.commitment) {
+    throw new Error("use either --commitment <hex> or --latest, not both");
+  }
+  if (!opts.latest && !opts.commitment) {
+    throw new Error("missing --commitment <hex> or --latest");
   }
   if (!opts.privateKey) {
     throw new Error("missing --private-key <path>");
@@ -99,7 +104,8 @@ async function issueReceipt(opts: {
   }
 
   await verifyAuditLogIntegrity(agentId);
-  const auditExport = buildAuditExport(agentId, opts.commitment);
+  const commitment = opts.latest ? resolveLatestCommitment(agentId) : opts.commitment!;
+  const auditExport = buildAuditExport(agentId, commitment);
   const privateKeyPem = readFileSync(opts.privateKey, "utf8");
   const publicKeyPem = derivePublicKeyPem(privateKeyPem);
   const receipt = signAuthorizationReceipt(auditExport, privateKeyPem, publicKeyPem, {
@@ -124,6 +130,14 @@ async function issueReceipt(opts: {
   }
 
   process.stdout.write(json);
+}
+
+function resolveLatestCommitment(agentId: string): string {
+  const latest = latestAuditEntry(agentId);
+  if (!latest) {
+    throw new Error(`No audit log entry found for agent "${agentId}"`);
+  }
+  return latest.entry.commitment;
 }
 
 export function cmdReceiptVerify(opts: { receipt?: string; publicKey?: string; auditExport?: string; file?: string }): void {

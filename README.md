@@ -63,7 +63,7 @@ sequenceDiagram
   CATP->>Audit: append SHA-256 commitment chain entry
 
   opt External authorization verification
-    User->>CATP: catp receipt issue --commitment ...
+    User->>CATP: catp receipt issue --latest
     CATP->>Audit: verify chain and export committed entry
     CATP->>Export: write catp_audit_export_v1
     CATP->>Policy: bind policy commitment
@@ -251,7 +251,7 @@ catp receipt keygen \
   --public-key catp-receipt-public.pem
 
 catp receipt issue \
-  --commitment <64-char-audit-commitment> \
+  --latest \
   --file catp-policy.toml \
   --private-key catp-receipt-private.pem \
   --audit-export-out catp-audit-export.json \
@@ -270,7 +270,8 @@ tool, decision, timestamp, policy commitment, and signer public key. Passing
 `--audit-export` and `--file` checks that the receipt also matches the exported
 audit evidence and policy, not just that the signature is valid.
 `catp receipt issue` verifies the local audit log commitment chain before it
-signs.
+signs. Use `--latest` for the newest audit entry, or `--commitment <hex>` for a
+specific entry from `catp log show --commitments`.
 
 If you need the steps separately, `catp log export` writes a deterministic
 `catp_audit_export_v1` bundle and `catp receipt sign` signs that bundle.

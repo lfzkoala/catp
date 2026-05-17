@@ -62,6 +62,12 @@ function writeAuditEntry(agentId: string, date: string, exportedAudit: AuditExpo
   writeFileSync(join(dir, "actions.jsonl"), JSON.stringify(exportedAudit.entry) + "\n", "utf8");
 }
 
+function writeAuditEntries(agentId: string, date: string, entries: AuditExport[]): void {
+  const dir = join(TEST_HOME, "audit", agentId, date);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "actions.jsonl"), entries.map((entry) => JSON.stringify(entry.entry)).join("\n") + "\n", "utf8");
+}
+
 describe("authorization receipt", () => {
   afterEach(() => {
     if (existsSync(TEST_HOME)) {
@@ -233,6 +239,53 @@ describe("authorization receipt", () => {
     expect(() => verifyReceiptAuditExport(receipt, issuedAuditExport)).not.toThrow();
     expect(writes.join("")).toContain(`Wrote authorization receipt to ${receiptPath}`);
     expect(writes.join("")).toContain(`Wrote audit export to ${auditExportPath}`);
+  });
+
+  it("issues a receipt for the latest audit entry", async () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const first = auditExport();
+    const secondEntry = {
+      ts: "2026-01-01T00:01:00.000Z",
+      tool: "Write",
+      decision: "allow" as const,
+      rule_matched: null,
+      commitment: computeCommitment("Write", "allow", "2026-01-01T00:01:00.000Z", first.commitment, null, "{\"file\":\"README.md\"}"),
+      input_summary: "{\"file\":\"README.md\"}",
+    };
+    const second: AuditExport = {
+      exportVersion: "catp_audit_export_v1",
+      agentId: first.agentId,
+      logDate: first.logDate,
+      entryIndex: 1,
+      commitment: secondEntry.commitment,
+      entrySha256: createHash("sha256").update(stableStringify(secondEntry)).digest("hex"),
+      entry: secondEntry,
+    };
+    writeAuditEntries(first.agentId, first.logDate, [first, second]);
+
+    const dir = join(TEST_HOME, "latest-issue");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    const receiptPath = join(dir, "receipt.json");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    try {
+      await cmdReceiptIssue({
+        agent: first.agentId,
+        latest: true,
+        privateKey: privateKeyPath,
+        out: receiptPath,
+      });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8")) as AuthorizationReceipt;
+    expect(() => verifyAuthorizationReceipt(receipt, publicKeyPem)).not.toThrow();
+    expect(receipt.auditCommitment).toBe(second.commitment);
+    expect(receipt.tool).toBe("Write");
   });
 
   it("refuses to issue a receipt from a broken audit log", async () => {

@@ -47,7 +47,7 @@ If your shell does not have a `catp` binary on `PATH`, use the workspace build:
 node ../../catp-plugin/dist/cli.js hook pre --runtime claude-code < hook-pre.json
 ```
 
-Show the audit entry and copy the full commitment:
+Show and verify the audit entry:
 
 ```bash
 catp log show --agent receipt-basic-agent --commitments
@@ -62,12 +62,12 @@ catp receipt keygen \
   --public-key /tmp/catp-receipt-basic-public.pem
 ```
 
-Issue a receipt directly from the audit commitment:
+Issue a receipt for the latest audit entry:
 
 ```bash
 catp receipt issue \
   --agent receipt-basic-agent \
-  --commitment <64-char-audit-commitment> \
+  --latest \
   --file catp-policy.toml \
   --private-key /tmp/catp-receipt-basic-private.pem \
   --audit-export-out /tmp/catp-receipt-basic-audit-export.json \
@@ -75,7 +75,8 @@ catp receipt issue \
 ```
 
 `catp receipt issue` verifies the local audit log commitment chain before it
-signs the receipt.
+signs the receipt. Use `--commitment <64-char-audit-commitment>` when you need
+to issue a receipt for a specific older entry.
 
 Verify the receipt against the signer public key, audit export, and policy:
 

@@ -101,7 +101,7 @@ catp receipt keygen \
   --public-key catp-receipt-public.pem
 
 catp receipt issue \
-  --commitment <64-char-audit-commitment> \
+  --latest \
   --file catp-policy.toml \
   --private-key catp-receipt-private.pem \
   --audit-export-out catp-audit-export.json \

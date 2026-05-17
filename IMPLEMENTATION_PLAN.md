@@ -150,27 +150,26 @@ path.
 
 ## Active Milestones
 
-### P0: 0.3.0 Release Hygiene
+### P0: 0.4.0 Receipt UX
 
 Status: active.
 
-Goal: close the signed receipt mainline as an npm release.
+Goal: make the signed receipt path natural in day-to-day agent workflows.
 
 Work:
 
-- Keep README / INSTALL / examples aligned around the three verification levels:
-  local audit, signed receipt, optional ZK proof manifest.
-- Run the npm CLI smoke path for receipt issuance and verification from a clean
-  directory.
-- Bump `@catp-protocol/cli` to `0.3.0`.
-- Run package checks, `npm pack --dry-run`, publish, tag, and verify install.
+- Let users issue receipts without manually copying commitments.
+- Add focused selectors such as latest entry first, then tool/time filters only
+  when the UX is proven.
+- Keep receipt commands chain-verifying before signing.
+- Keep README / INSTALL / examples aligned around local audit, signed receipt,
+  and optional Groth16 verification.
 
 Exit criteria:
 
-- Fresh install can run `catp init`, produce an audit entry, issue a receipt,
-  and verify it against audit export and policy.
-- CI is green for the release tag.
-- npm returns `@catp-protocol/cli@0.3.0` and `catp --version` reports `0.3.0`.
+- A user can create a receipt for the latest audit entry with one command.
+- Receipt verification against audit export and policy remains covered by tests.
+- The npm CLI help points users to the simplest receipt issuance path.
 
 ### P0: Authorization Proof Security Hardening
 

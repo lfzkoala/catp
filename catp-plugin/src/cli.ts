@@ -165,7 +165,8 @@ receipt
 receipt
   .command("issue")
   .description("Export an audit entry by commitment and sign it as an authorization receipt")
-  .requiredOption("--commitment <hex>", "audit entry commitment to issue a receipt for")
+  .option("--commitment <hex>", "audit entry commitment to issue a receipt for")
+  .option("--latest", "issue a receipt for the latest audit entry")
   .requiredOption("--private-key <path>", "Ed25519 private key PEM")
   .option("--agent <id>", "agent id (default: from policy file)")
   .option("-f, --file <path>", "path to catp-policy.toml to bind into the receipt")
