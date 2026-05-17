@@ -26,7 +26,7 @@ function resolveAgentId(opts: { agent?: string }): string {
   return loadPolicy(policyPath).agent.id;
 }
 
-interface AuditLogFile {
+export interface AuditLogFile {
   date: string;
   file: string;
 }
@@ -39,7 +39,7 @@ function latestLogFile(agentId: string): string | null {
   return join(base, dates[0], "actions.jsonl");
 }
 
-function allLogFiles(agentId: string): AuditLogFile[] {
+export function auditLogFiles(agentId: string): AuditLogFile[] {
   const base = auditRoot(agentId);
   if (!existsSync(base)) return [];
   return readdirSync(base)
@@ -78,7 +78,7 @@ export function cmdLogShow(opts: { lines: string; agent?: string; commitments?: 
 
 export async function cmdLogVerify(opts: { agent?: string }): Promise<void> {
   const agentId = resolveAgentId(opts);
-  const logFiles = allLogFiles(agentId);
+  const logFiles = auditLogFiles(agentId);
   if (logFiles.length === 0) {
     process.stdout.write(`No audit log found for agent "${agentId}"\n`);
     return;
@@ -136,7 +136,7 @@ export function buildAuditExport(agentId: string, commitment: string): AuditExpo
 }
 
 function findAuditEntry(agentId: string, commitment: string): { date: string; index: number; entry: AuditEntry } | null {
-  for (const { date, file } of allLogFiles(agentId)) {
+  for (const { date, file } of auditLogFiles(agentId)) {
     const lines = readFileSync(file, "utf8").split("\n").filter(Boolean);
     for (const [index, line] of lines.entries()) {
       try {

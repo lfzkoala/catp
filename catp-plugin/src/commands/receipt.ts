@@ -1,6 +1,7 @@
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign, verify } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { buildAuditExport, stableStringify, type AuditExport } from "./log.js";
+import { auditLogFiles, buildAuditExport, stableStringify, type AuditExport } from "./log.js";
+import { verifyChain } from "../audit/verifier.js";
 import { findPolicyFile, loadPolicy } from "../policy/loader.js";
 import type { CatpPolicy } from "../policy/types.js";
 
@@ -71,7 +72,18 @@ export function cmdReceiptIssue(opts: {
   out?: string;
   file?: string;
   auditExportOut?: string;
-}): void {
+}): Promise<void> {
+  return issueReceipt(opts);
+}
+
+async function issueReceipt(opts: {
+  commitment?: string;
+  agent?: string;
+  privateKey?: string;
+  out?: string;
+  file?: string;
+  auditExportOut?: string;
+}): Promise<void> {
   if (!opts.commitment) {
     throw new Error("missing --commitment <hex>");
   }
@@ -86,6 +98,7 @@ export function cmdReceiptIssue(opts: {
     throw new Error("missing --agent <id>; no catp-policy.toml found");
   }
 
+  await verifyAuditLogIntegrity(agentId);
   const auditExport = buildAuditExport(agentId, opts.commitment);
   const privateKeyPem = readFileSync(opts.privateKey, "utf8");
   const publicKeyPem = derivePublicKeyPem(privateKeyPem);
@@ -286,6 +299,15 @@ function derivePublicKeyPem(privateKeyPem: string): string {
 function resolvePolicyCommitmentIfPresent(): string | null {
   const policyPath = findPolicyFile();
   return policyPath ? computePolicyCommitment(loadPolicy(policyPath)) : null;
+}
+
+async function verifyAuditLogIntegrity(agentId: string): Promise<void> {
+  for (const { file } of auditLogFiles(agentId)) {
+    const result = await verifyChain(file);
+    if (!result.ok) {
+      throw new Error(`audit log chain is broken in ${file} at entry ${result.broken_at}: ${result.message}`);
+    }
+  }
 }
 
 function assertHex(value: unknown, field: string): void {

@@ -74,6 +74,9 @@ catp receipt issue \
   --out /tmp/catp-receipt-basic-receipt.json
 ```
 
+`catp receipt issue` verifies the local audit log commitment chain before it
+signs the receipt.
+
 Verify the receipt against the signer public key, audit export, and policy:
 
 ```bash

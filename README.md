@@ -262,6 +262,8 @@ payload binds the audit export hash, audit commitment, entry hash, agent id,
 tool, decision, timestamp, policy commitment, and signer public key. Passing
 `--audit-export` and `--file` checks that the receipt also matches the exported
 audit evidence and policy, not just that the signature is valid.
+`catp receipt issue` verifies the local audit log commitment chain before it
+signs.
 
 If you need the steps separately, `catp log export` writes a deterministic
 `catp_audit_export_v1` bundle and `catp receipt sign` signs that bundle.

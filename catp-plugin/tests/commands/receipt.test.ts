@@ -3,6 +3,7 @@ import { createHash, generateKeyPairSync } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { computeCommitment } from "../../src/audit/logger.js";
 import {
   cmdReceiptIssue,
   signAuthorizationReceipt,
@@ -27,13 +28,15 @@ function keyPair(): { privateKeyPem: string; publicKeyPem: string } {
 }
 
 function auditExport(): AuditExport {
+  const ts = "2026-01-01T00:00:00.000Z";
+  const inputSummary = "{\"command\":\"ls\"}";
   const entry = {
-    ts: "2026-01-01T00:00:00.000Z",
+    ts,
     tool: "Bash",
     decision: "allow" as const,
     rule_matched: null,
-    commitment: "a".repeat(64),
-    input_summary: "{\"command\":\"ls\"}",
+    commitment: computeCommitment("Bash", "allow", ts, "0", null, inputSummary),
+    input_summary: inputSummary,
   };
   return {
     exportVersion: "catp_audit_export_v1",
@@ -74,7 +77,7 @@ describe("authorization receipt", () => {
 
     expect(receipt.receiptVersion).toBe("catp_authorization_receipt_v1");
     expect(receipt.signatureAlgorithm).toBe("Ed25519");
-    expect(receipt.auditCommitment).toBe("a".repeat(64));
+    expect(receipt.auditCommitment).toBe(auditExport().commitment);
     expect(receipt.signature).toEqual(expect.any(String));
     expect(() => verifyAuthorizationReceipt(receipt, publicKeyPem)).not.toThrow();
   });
@@ -194,7 +197,7 @@ describe("authorization receipt", () => {
     expect(stableStringify(first)).toBe(stableStringify(second));
   });
 
-  it("issues a receipt directly from an audit commitment", () => {
+  it("issues a receipt directly from an audit commitment", async () => {
     const { privateKeyPem, publicKeyPem } = keyPair();
     const exportedAudit = auditExport();
     writeAuditEntry(exportedAudit.agentId, exportedAudit.logDate, exportedAudit);
@@ -213,7 +216,7 @@ describe("authorization receipt", () => {
       return true;
     }) as typeof process.stdout.write;
     try {
-      cmdReceiptIssue({
+      await cmdReceiptIssue({
         agent: exportedAudit.agentId,
         commitment: exportedAudit.commitment,
         privateKey: privateKeyPath,
@@ -230,5 +233,27 @@ describe("authorization receipt", () => {
     expect(() => verifyReceiptAuditExport(receipt, issuedAuditExport)).not.toThrow();
     expect(writes.join("")).toContain(`Wrote authorization receipt to ${receiptPath}`);
     expect(writes.join("")).toContain(`Wrote audit export to ${auditExportPath}`);
+  });
+
+  it("refuses to issue a receipt from a broken audit log", async () => {
+    const { privateKeyPem } = keyPair();
+    const exportedAudit = auditExport();
+    writeAuditEntry(exportedAudit.agentId, exportedAudit.logDate, {
+      ...exportedAudit,
+      entry: { ...exportedAudit.entry, commitment: "b".repeat(64) },
+    });
+
+    const dir = join(TEST_HOME, "broken-issue");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+
+    await expect(
+      cmdReceiptIssue({
+        agent: exportedAudit.agentId,
+        commitment: "b".repeat(64),
+        privateKey: privateKeyPath,
+      })
+    ).rejects.toThrow("audit log chain is broken");
   });
 });
