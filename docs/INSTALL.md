@@ -87,7 +87,12 @@ Check audit logs:
 ```bash
 catp log show
 catp log verify
+catp log export --commitment <64-char-audit-commitment> --out catp-audit-export.json
 ```
+
+`catp log export` creates a deterministic `catp_audit_export_v1` JSON bundle
+for one audit entry. The bundle is intended as the stable input for the signed
+receipt path.
 
 ### npm CLI Smoke Test
 

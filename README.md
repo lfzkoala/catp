@@ -232,9 +232,13 @@ Rules are evaluated top-to-bottom; first match wins. Unmatched tools are allowed
 ```bash
 catp log show
 catp log verify
+catp log export --commitment <64-char-audit-commitment> --out catp-audit-export.json
 ```
 
 Logs are written to `${CATP_HOME:-~/.catp}/audit/<agentId>/<YYYY-MM-DD>/actions.jsonl`. Each entry chains on the previous commitment hash, forming a tamper-evident sequence.
+`catp log export` writes a deterministic `catp_audit_export_v1` bundle for one
+audit entry. This is the first building block for the 0.3.0 signed receipt
+path.
 
 `catp anchor` can submit a Merkle root of local audit commitments on-chain.
 Structured authorization proofs use a separate private policy commitment path

@@ -6,7 +6,7 @@ import { runPostHook } from "./hook/post.js";
 import { formatSupportedRuntimeAdapters, getRuntimeAdapter, supportedRuntimeAdapters } from "./adapters/index.js";
 import { cmdInit } from "./commands/init.js";
 import { cmdValidate } from "./commands/validate.js";
-import { cmdLogShow, cmdLogVerify } from "./commands/log.js";
+import { cmdLogExport, cmdLogShow, cmdLogVerify } from "./commands/log.js";
 import { cmdAnchor } from "./commands/anchor.js";
 import { cmdWitness } from "./commands/witness.js";
 import { cmdProveAuthorization, cmdVerifyAuthorization } from "./commands/authorization.js";
@@ -81,6 +81,14 @@ log
   .description("Verify commitment chain integrity")
   .option("--agent <id>", "agent id (default: from policy file)")
   .action(cmdLogVerify);
+
+log
+  .command("export")
+  .description("Export a deterministic audit entry bundle by commitment")
+  .requiredOption("--commitment <hex>", "audit entry commitment to export")
+  .option("--agent <id>", "agent id (default: from policy file)")
+  .option("--out <path>", "write audit export JSON to file instead of stdout")
+  .action(cmdLogExport);
 
 program
   .command("anchor")
