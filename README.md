@@ -187,15 +187,6 @@ npm run groth16:check
 See [CONTRIBUTING.md](CONTRIBUTING.md) for component-specific setup and
 contribution guidelines.
 
-## Roadmap
-
-The active 0.4.0 work is focused on receipt UX: making it easier to issue and
-verify receipts from real agent workflows without manually copying audit
-commitments.
-
-See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the current roadmap and
-[ARCHITECTURE.md](ARCHITECTURE.md) for the system design.
-
 ## License
 
 [MIT](LICENSE)
