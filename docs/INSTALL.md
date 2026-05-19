@@ -114,6 +114,9 @@ catp receipt verify \
   --audit-export catp-audit-export.json
 ```
 
+Use `--tool <name>` instead of `--latest` when you want the newest audit entry
+from a specific tool.
+
 Use Groth16 proof manifests only when you need the optional ZK/EVM verification
 backend.
 

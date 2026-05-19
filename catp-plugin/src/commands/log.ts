@@ -135,13 +135,16 @@ export function buildAuditExport(agentId: string, commitment: string): AuditExpo
   };
 }
 
-export function latestAuditEntry(agentId: string): { date: string; index: number; entry: AuditEntry } | null {
+export function latestAuditEntry(agentId: string, opts: { tool?: string } = {}): { date: string; index: number; entry: AuditEntry } | null {
   const files = auditLogFiles(agentId).slice().reverse();
   for (const { date, file } of files) {
     const lines = readFileSync(file, "utf8").split("\n").filter(Boolean);
     for (let index = lines.length - 1; index >= 0; index -= 1) {
       try {
         const entry = JSON.parse(lines[index]) as AuditEntry;
+        if (opts.tool && entry.tool !== opts.tool) {
+          continue;
+        }
         return { date, index, entry };
       } catch {
         // skip malformed audit lines; chain verification reports them separately

@@ -288,6 +288,72 @@ describe("authorization receipt", () => {
     expect(receipt.tool).toBe("Write");
   });
 
+  it("issues a receipt for the latest audit entry matching a tool", async () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const first = auditExport();
+    const secondEntry = {
+      ts: "2026-01-01T00:01:00.000Z",
+      tool: "Write",
+      decision: "allow" as const,
+      rule_matched: null,
+      commitment: computeCommitment("Write", "allow", "2026-01-01T00:01:00.000Z", first.commitment, null, "{\"file\":\"README.md\"}"),
+      input_summary: "{\"file\":\"README.md\"}",
+    };
+    const second: AuditExport = {
+      exportVersion: "catp_audit_export_v1",
+      agentId: first.agentId,
+      logDate: first.logDate,
+      entryIndex: 1,
+      commitment: secondEntry.commitment,
+      entrySha256: createHash("sha256").update(stableStringify(secondEntry)).digest("hex"),
+      entry: secondEntry,
+    };
+    writeAuditEntries(first.agentId, first.logDate, [first, second]);
+
+    const dir = join(TEST_HOME, "tool-issue");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    const receiptPath = join(dir, "receipt.json");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    try {
+      await cmdReceiptIssue({
+        agent: first.agentId,
+        tool: "Bash",
+        privateKey: privateKeyPath,
+        out: receiptPath,
+      });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8")) as AuthorizationReceipt;
+    expect(() => verifyAuthorizationReceipt(receipt, publicKeyPem)).not.toThrow();
+    expect(receipt.auditCommitment).toBe(first.commitment);
+    expect(receipt.tool).toBe("Bash");
+  });
+
+  it("rejects a receipt tool selector with no matching audit entry", async () => {
+    const { privateKeyPem } = keyPair();
+    const exportedAudit = auditExport();
+    writeAuditEntry(exportedAudit.agentId, exportedAudit.logDate, exportedAudit);
+
+    const dir = join(TEST_HOME, "missing-tool-issue");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+
+    await expect(
+      cmdReceiptIssue({
+        agent: exportedAudit.agentId,
+        tool: "Write",
+        privateKey: privateKeyPath,
+      })
+    ).rejects.toThrow('No audit log entry found for agent "receipt-agent" and tool "Write"');
+  });
+
   it("refuses to issue a receipt from a broken audit log", async () => {
     const { privateKeyPem } = keyPair();
     const exportedAudit = auditExport();

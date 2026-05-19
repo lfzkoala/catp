@@ -132,7 +132,7 @@ catp receipt verify \
 
 `catp receipt issue` verifies the local audit chain before signing. Use
 `--latest` for the newest audit entry, or `--commitment <hex>` for a specific
-entry.
+entry. Use `--tool <name>` for the newest entry from a specific tool.
 
 Receipts use `catp_authorization_receipt_v1` and Ed25519 signatures. The signed
 payload binds the audit export hash, audit commitment, entry hash, agent id,

@@ -73,6 +73,7 @@ export function cmdReceiptIssue(opts: {
   file?: string;
   auditExportOut?: string;
   latest?: boolean;
+  tool?: string;
 }): Promise<void> {
   return issueReceipt(opts);
 }
@@ -85,12 +86,14 @@ async function issueReceipt(opts: {
   file?: string;
   auditExportOut?: string;
   latest?: boolean;
+  tool?: string;
 }): Promise<void> {
-  if (opts.latest && opts.commitment) {
-    throw new Error("use either --commitment <hex> or --latest, not both");
+  const selectorCount = [opts.commitment, opts.latest ? "latest" : undefined, opts.tool].filter(Boolean).length;
+  if (selectorCount > 1) {
+    throw new Error("use only one of --commitment <hex>, --latest, or --tool <name>");
   }
-  if (!opts.latest && !opts.commitment) {
-    throw new Error("missing --commitment <hex> or --latest");
+  if (selectorCount === 0) {
+    throw new Error("missing --commitment <hex>, --latest, or --tool <name>");
   }
   if (!opts.privateKey) {
     throw new Error("missing --private-key <path>");
@@ -104,7 +107,7 @@ async function issueReceipt(opts: {
   }
 
   await verifyAuditLogIntegrity(agentId);
-  const commitment = opts.latest ? resolveLatestCommitment(agentId) : opts.commitment!;
+  const commitment = resolveIssueCommitment(agentId, opts);
   const auditExport = buildAuditExport(agentId, commitment);
   const privateKeyPem = readFileSync(opts.privateKey, "utf8");
   const publicKeyPem = derivePublicKeyPem(privateKeyPem);
@@ -132,9 +135,15 @@ async function issueReceipt(opts: {
   process.stdout.write(json);
 }
 
-function resolveLatestCommitment(agentId: string): string {
-  const latest = latestAuditEntry(agentId);
+function resolveIssueCommitment(agentId: string, opts: { commitment?: string; latest?: boolean; tool?: string }): string {
+  if (opts.commitment) {
+    return opts.commitment;
+  }
+  const latest = latestAuditEntry(agentId, opts.tool ? { tool: opts.tool } : {});
   if (!latest) {
+    if (opts.tool) {
+      throw new Error(`No audit log entry found for agent "${agentId}" and tool "${opts.tool}"`);
+    }
     throw new Error(`No audit log entry found for agent "${agentId}"`);
   }
   return latest.entry.commitment;
