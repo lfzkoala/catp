@@ -59,6 +59,10 @@ export function cmdReceiptSign(opts: { auditExport?: string; privateKey?: string
     process.stdout.write(`auditCommitment=${receipt.auditCommitment}\n`);
     process.stdout.write(`auditExportHash=${receipt.auditExportHash}\n`);
     process.stdout.write(`policyCommitment=${receipt.policyCommitment ?? "none"}\n`);
+    process.stdout.write(`selectedTool=${auditExport.entry.tool}\n`);
+    process.stdout.write(`selectedDecision=${auditExport.entry.decision}\n`);
+    process.stdout.write(`selectedTimestamp=${auditExport.entry.ts}\n`);
+    process.stdout.write(`selectedInputSummary=${auditExport.entry.input_summary}\n`);
     return;
   }
 
@@ -129,6 +133,10 @@ async function issueReceipt(opts: {
     process.stdout.write(`auditCommitment=${receipt.auditCommitment}\n`);
     process.stdout.write(`auditExportHash=${receipt.auditExportHash}\n`);
     process.stdout.write(`policyCommitment=${receipt.policyCommitment ?? "none"}\n`);
+    process.stdout.write(`selectedTool=${auditExport.entry.tool}\n`);
+    process.stdout.write(`selectedDecision=${auditExport.entry.decision}\n`);
+    process.stdout.write(`selectedTimestamp=${auditExport.entry.ts}\n`);
+    process.stdout.write(`selectedInputSummary=${auditExport.entry.input_summary}\n`);
     return;
   }
 

@@ -239,6 +239,10 @@ describe("authorization receipt", () => {
     expect(() => verifyReceiptAuditExport(receipt, issuedAuditExport)).not.toThrow();
     expect(writes.join("")).toContain(`Wrote authorization receipt to ${receiptPath}`);
     expect(writes.join("")).toContain(`Wrote audit export to ${auditExportPath}`);
+    expect(writes.join("")).toContain("selectedTool=Bash");
+    expect(writes.join("")).toContain("selectedDecision=allow");
+    expect(writes.join("")).toContain("selectedTimestamp=2026-01-01T00:00:00.000Z");
+    expect(writes.join("")).toContain('selectedInputSummary={"command":"ls"}');
   });
 
   it("issues a receipt for the latest audit entry", async () => {
