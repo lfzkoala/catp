@@ -48,10 +48,14 @@ export function auditLogFiles(agentId: string): AuditLogFile[] {
     .filter(({ file }) => existsSync(file));
 }
 
-export function cmdLogShow(opts: { lines: string; agent?: string; commitments?: boolean }): void {
+export function cmdLogShow(opts: { lines: string; agent?: string; commitments?: boolean; json?: boolean }): void {
   const agentId = resolveAgentId(opts);
   const logFile = latestLogFile(agentId);
   if (!logFile || !existsSync(logFile)) {
+    if (opts.json) {
+      process.stdout.write("[]\n");
+      return;
+    }
     process.stdout.write(`No audit log found for agent "${agentId}"\n`);
     return;
   }
@@ -59,6 +63,19 @@ export function cmdLogShow(opts: { lines: string; agent?: string; commitments?: 
   const lines = readFileSync(logFile, "utf8").trim().split("\n").filter(Boolean);
   const n = Math.min(parseInt(opts.lines, 10) || 50, lines.length);
   const recent = lines.slice(-n);
+
+  if (opts.json) {
+    const entries: AuditEntry[] = [];
+    for (const line of recent) {
+      try {
+        entries.push(JSON.parse(line) as AuditEntry);
+      } catch {
+        // Keep JSON output machine-readable; chain verification reports malformed lines.
+      }
+    }
+    process.stdout.write(stableStringify(entries, 2) + "\n");
+    return;
+  }
 
   for (const line of recent) {
     try {

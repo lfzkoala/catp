@@ -88,6 +88,7 @@ Check audit logs:
 
 ```bash
 catp log show
+catp log show --json
 catp log show --commitments
 catp log verify
 ```

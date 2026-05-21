@@ -100,4 +100,49 @@ describe("log export", () => {
 
     expect(writes.join("")).toContain(`commitment=${commitment}`);
   });
+
+  it("shows recent audit entries as JSON", () => {
+    const firstCommitment = computeCommitment("Bash", "allow", "2026-01-01T00:00:00.000Z", "0", null, "{\"command\":\"ls\"}");
+    const secondCommitment = computeCommitment("Read", "allow", "2026-01-01T00:00:01.000Z", firstCommitment, null, "{\"file_path\":\"README.md\"}");
+    writeEntry(TEST_AGENT, "2026-01-01", makeEntry(firstCommitment));
+    writeEntry(TEST_AGENT, "2026-01-01", {
+      ...makeEntry(secondCommitment),
+      ts: "2026-01-01T00:00:01.000Z",
+      tool: "Read",
+      input_summary: "{\"file_path\":\"README.md\"}",
+    });
+
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      cmdLogShow({ agent: TEST_AGENT, lines: "1", json: true });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const parsed = JSON.parse(writes.join("")) as AuditEntry[];
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].commitment).toBe(secondCommitment);
+    expect(parsed[0].tool).toBe("Read");
+  });
+
+  it("shows an empty JSON array when no audit log exists", () => {
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      cmdLogShow({ agent: TEST_AGENT, lines: "1", json: true });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    expect(writes.join("")).toBe("[]\n");
+  });
 });

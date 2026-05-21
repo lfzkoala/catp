@@ -76,6 +76,7 @@ log
   .option("-n, --lines <n>", "number of lines to show", "50")
   .option("--agent <id>", "agent id (default: from policy file)")
   .option("--commitments", "show full audit entry commitments")
+  .option("--json", "write recent audit entries as JSON")
   .action(cmdLogShow);
 
 log
