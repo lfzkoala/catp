@@ -86,16 +86,22 @@ catp receipt verify \
   --receipt /tmp/catp-receipt-basic-receipt.json \
   --public-key /tmp/catp-receipt-basic-public.pem \
   --audit-export /tmp/catp-receipt-basic-audit-export.json \
-  --file catp-policy.toml
+  --file catp-policy.toml \
+  --json
 ```
 
 Expected verification summary:
 
-```text
-authorizationReceipt=valid
-auditExport=matched
-policy=matched
+```json
+{
+  "auditExport": "matched",
+  "authorizationReceipt": "valid",
+  "policy": "matched"
+}
 ```
+
+The JSON summary also includes receipt identity fields such as commitment,
+policy commitment, tool, decision, timestamp, and signing time.
 
 ## Tamper Checks
 

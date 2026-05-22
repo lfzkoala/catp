@@ -128,7 +128,8 @@ catp receipt verify \
   --receipt catp-authorization-receipt.json \
   --public-key catp-receipt-public.pem \
   --file catp-policy.toml \
-  --audit-export catp-audit-export.json
+  --audit-export catp-audit-export.json \
+  --json
 ```
 
 `catp receipt issue` verifies the local audit chain before signing. Use

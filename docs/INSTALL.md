@@ -112,7 +112,8 @@ catp receipt verify \
   --receipt catp-authorization-receipt.json \
   --public-key catp-receipt-public.pem \
   --file catp-policy.toml \
-  --audit-export catp-audit-export.json
+  --audit-export catp-audit-export.json \
+  --json
 ```
 
 Use `--tool <name>` instead of `--latest` when you want the newest audit entry

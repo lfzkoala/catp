@@ -184,6 +184,7 @@ receipt
   .option("--public-key <path>", "Ed25519 public key PEM; defaults to publicKeyPem embedded in the receipt")
   .option("--audit-export <path>", "also check the receipt against a catp_audit_export_v1 JSON bundle")
   .option("-f, --file <path>", "also check the receipt against a catp-policy.toml commitment")
+  .option("--json", "write verification summary as JSON")
   .action(cmdReceiptVerify);
 
 program.parseAsync(process.argv).catch((err) => {

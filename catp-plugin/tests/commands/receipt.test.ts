@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { computeCommitment } from "../../src/audit/logger.js";
 import {
   cmdReceiptIssue,
+  cmdReceiptVerify,
   signAuthorizationReceipt,
   verifyAuthorizationReceipt,
   verifyReceiptAuditExport,
@@ -211,6 +212,58 @@ describe("authorization receipt", () => {
     });
 
     expect(() => verifyReceiptPolicy(receipt, policy())).toThrow("receipt has no policyCommitment");
+  });
+
+  it("writes a JSON receipt verification summary", () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const signedPolicy = policy();
+    const exportedAudit = auditExport();
+    const receipt = signAuthorizationReceipt(exportedAudit, privateKeyPem, publicKeyPem, {
+      signedAt: "2026-01-01T00:00:01.000Z",
+      policyCommitment: computePolicyCommitment(signedPolicy),
+    });
+
+    const dir = join(TEST_HOME, "verify-json");
+    mkdirSync(dir, { recursive: true });
+    const receiptPath = join(dir, "receipt.json");
+    const publicKeyPath = join(dir, "public.pem");
+    const auditExportPath = join(dir, "audit-export.json");
+    const policyPath = join(dir, "catp-policy.toml");
+    writeFileSync(receiptPath, stableStringify(receipt, 2) + "\n", "utf8");
+    writeFileSync(publicKeyPath, publicKeyPem, "utf8");
+    writeFileSync(auditExportPath, stableStringify(exportedAudit, 2) + "\n", "utf8");
+    writeFileSync(policyPath, 'agent = { id = "receipt-agent", version = "1" }\n\n[[rules]]\ntool = "Bash"\nallow = true\n', "utf8");
+
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      cmdReceiptVerify({
+        receipt: receiptPath,
+        publicKey: publicKeyPath,
+        auditExport: auditExportPath,
+        file: policyPath,
+        json: true,
+      });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const summary = JSON.parse(writes.join("")) as Record<string, unknown>;
+    expect(summary.authorizationReceipt).toBe("valid");
+    expect(summary.auditExport).toBe("matched");
+    expect(summary.policy).toBe("matched");
+    expect(summary.auditCommitment).toBe(exportedAudit.commitment);
+    expect(summary.auditExportHash).toBe(receipt.auditExportHash);
+    expect(summary.policyCommitment).toBe(computePolicyCommitment(signedPolicy));
+    expect(summary.agentId).toBe("receipt-agent");
+    expect(summary.tool).toBe("Bash");
+    expect(summary.decision).toBe("allow");
+    expect(summary.timestamp).toBe("2026-01-01T00:00:00.000Z");
+    expect(summary.signedAt).toBe("2026-01-01T00:00:01.000Z");
   });
 
   it("produces stable receipt JSON for the same payload", () => {

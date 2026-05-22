@@ -24,6 +24,20 @@ export interface AuthorizationReceipt extends AuthorizationReceiptPayload {
   signature: string;
 }
 
+export interface ReceiptVerificationSummary {
+  authorizationReceipt: "valid";
+  auditExport: "matched" | null;
+  policy: "matched" | null;
+  auditCommitment: string;
+  auditExportHash: string;
+  policyCommitment: string | null;
+  agentId: string;
+  tool: string;
+  decision: "allow" | "deny";
+  timestamp: string;
+  signedAt: string;
+}
+
 export function cmdReceiptKeygen(opts: { privateKey?: string; publicKey?: string }): void {
   const privateKeyPath = opts.privateKey ?? "catp-receipt-private.pem";
   const publicKeyPath = opts.publicKey ?? "catp-receipt-public.pem";
@@ -174,7 +188,7 @@ function resolveIssueCommitment(agentId: string, opts: { commitment?: string; la
   return latest.entry.commitment;
 }
 
-export function cmdReceiptVerify(opts: { receipt?: string; publicKey?: string; auditExport?: string; file?: string }): void {
+export function cmdReceiptVerify(opts: { receipt?: string; publicKey?: string; auditExport?: string; file?: string; json?: boolean }): void {
   if (!opts.receipt) {
     throw new Error("missing --receipt <path>");
   }
@@ -188,6 +202,14 @@ export function cmdReceiptVerify(opts: { receipt?: string; publicKey?: string; a
   if (opts.file) {
     verifyReceiptPolicy(receipt, loadPolicy(opts.file));
   }
+  const summary = receiptVerificationSummary(receipt, {
+    auditExportMatched: Boolean(opts.auditExport),
+    policyMatched: Boolean(opts.file),
+  });
+  if (opts.json) {
+    process.stdout.write(stableStringify(summary, 2) + "\n");
+    return;
+  }
   process.stdout.write("authorizationReceipt=valid\n");
   if (opts.auditExport) {
     process.stdout.write("auditExport=matched\n");
@@ -195,9 +217,9 @@ export function cmdReceiptVerify(opts: { receipt?: string; publicKey?: string; a
   if (opts.file) {
     process.stdout.write("policy=matched\n");
   }
-  process.stdout.write(`auditCommitment=${receipt.auditCommitment}\n`);
-  process.stdout.write(`auditExportHash=${receipt.auditExportHash}\n`);
-  process.stdout.write(`policyCommitment=${receipt.policyCommitment ?? "none"}\n`);
+  process.stdout.write(`auditCommitment=${summary.auditCommitment}\n`);
+  process.stdout.write(`auditExportHash=${summary.auditExportHash}\n`);
+  process.stdout.write(`policyCommitment=${summary.policyCommitment ?? "none"}\n`);
 }
 
 export function signAuthorizationReceipt(
@@ -277,6 +299,25 @@ export function verifyReceiptPolicy(receipt: AuthorizationReceipt, policy: CatpP
 
 export function computePolicyCommitment(policy: CatpPolicy): string {
   return sha256Hex(stableStringify(policy));
+}
+
+function receiptVerificationSummary(
+  receipt: AuthorizationReceipt,
+  opts: { auditExportMatched: boolean; policyMatched: boolean }
+): ReceiptVerificationSummary {
+  return {
+    authorizationReceipt: "valid",
+    auditExport: opts.auditExportMatched ? "matched" : null,
+    policy: opts.policyMatched ? "matched" : null,
+    auditCommitment: receipt.auditCommitment,
+    auditExportHash: receipt.auditExportHash,
+    policyCommitment: receipt.policyCommitment,
+    agentId: receipt.agentId,
+    tool: receipt.tool,
+    decision: receipt.decision,
+    timestamp: receipt.timestamp,
+    signedAt: receipt.signedAt,
+  };
 }
 
 function readAuditExport(path: string): AuditExport {
