@@ -14,7 +14,7 @@ import {
   type AuthorizationReceipt,
 } from "../../src/commands/receipt.js";
 import { stableStringify, type AuditExport } from "../../src/commands/log.js";
-import type { CatpPolicy } from "../../src/policy/types.js";
+import type { AuditEntry, CatpPolicy } from "../../src/policy/types.js";
 
 const TEST_HOME = join(tmpdir(), `catp-receipt-command-test-${Date.now()}`);
 process.env.CATP_HOME = TEST_HOME;
@@ -38,14 +38,36 @@ function auditExport(): AuditExport {
     commitment: computeCommitment("Bash", "allow", ts, "0", null, inputSummary),
     input_summary: inputSummary,
   };
+  return auditExportFrom(entry);
+}
+
+function auditExportFrom(entry: AuditEntry, entryIndex = 0, agentId = "receipt-agent", logDate = "2026-01-01"): AuditExport {
   return {
     exportVersion: "catp_audit_export_v1",
-    agentId: "receipt-agent",
-    logDate: "2026-01-01",
-    entryIndex: 0,
+    agentId,
+    logDate,
+    entryIndex,
     commitment: entry.commitment,
     entrySha256: createHash("sha256").update(stableStringify(entry)).digest("hex"),
     entry,
+  };
+}
+
+function auditEntry(
+  tool: string,
+  decision: "allow" | "deny",
+  ts: string,
+  previousCommitment: string,
+  inputSummary: string,
+  ruleMatched: string | null = null
+): AuditEntry {
+  return {
+    ts,
+    tool,
+    decision,
+    rule_matched: ruleMatched,
+    commitment: computeCommitment(tool, decision, ts, previousCommitment, ruleMatched, inputSummary),
+    input_summary: inputSummary,
   };
 }
 
@@ -248,23 +270,7 @@ describe("authorization receipt", () => {
   it("issues a receipt for the latest audit entry", async () => {
     const { privateKeyPem, publicKeyPem } = keyPair();
     const first = auditExport();
-    const secondEntry = {
-      ts: "2026-01-01T00:01:00.000Z",
-      tool: "Write",
-      decision: "allow" as const,
-      rule_matched: null,
-      commitment: computeCommitment("Write", "allow", "2026-01-01T00:01:00.000Z", first.commitment, null, "{\"file\":\"README.md\"}"),
-      input_summary: "{\"file\":\"README.md\"}",
-    };
-    const second: AuditExport = {
-      exportVersion: "catp_audit_export_v1",
-      agentId: first.agentId,
-      logDate: first.logDate,
-      entryIndex: 1,
-      commitment: secondEntry.commitment,
-      entrySha256: createHash("sha256").update(stableStringify(secondEntry)).digest("hex"),
-      entry: secondEntry,
-    };
+    const second = auditExportFrom(auditEntry("Write", "allow", "2026-01-01T00:01:00.000Z", first.commitment, "{\"file\":\"README.md\"}"), 1);
     writeAuditEntries(first.agentId, first.logDate, [first, second]);
 
     const dir = join(TEST_HOME, "latest-issue");
@@ -295,23 +301,7 @@ describe("authorization receipt", () => {
   it("issues a receipt for the latest audit entry matching a tool", async () => {
     const { privateKeyPem, publicKeyPem } = keyPair();
     const first = auditExport();
-    const secondEntry = {
-      ts: "2026-01-01T00:01:00.000Z",
-      tool: "Write",
-      decision: "allow" as const,
-      rule_matched: null,
-      commitment: computeCommitment("Write", "allow", "2026-01-01T00:01:00.000Z", first.commitment, null, "{\"file\":\"README.md\"}"),
-      input_summary: "{\"file\":\"README.md\"}",
-    };
-    const second: AuditExport = {
-      exportVersion: "catp_audit_export_v1",
-      agentId: first.agentId,
-      logDate: first.logDate,
-      entryIndex: 1,
-      commitment: secondEntry.commitment,
-      entrySha256: createHash("sha256").update(stableStringify(secondEntry)).digest("hex"),
-      entry: secondEntry,
-    };
+    const second = auditExportFrom(auditEntry("Write", "allow", "2026-01-01T00:01:00.000Z", first.commitment, "{\"file\":\"README.md\"}"), 1);
     writeAuditEntries(first.agentId, first.logDate, [first, second]);
 
     const dir = join(TEST_HOME, "tool-issue");
@@ -339,6 +329,79 @@ describe("authorization receipt", () => {
     expect(receipt.tool).toBe("Bash");
   });
 
+  it("issues a receipt for the latest audit entry matching a decision", async () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const first = auditExport();
+    const denied = auditExportFrom(
+      auditEntry("Write", "deny", "2026-01-01T00:01:00.000Z", first.commitment, "{\"file\":\"README.md\"}", "deny-write"),
+      1
+    );
+    writeAuditEntries(first.agentId, first.logDate, [first, denied]);
+
+    const dir = join(TEST_HOME, "decision-issue");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    const receiptPath = join(dir, "receipt.json");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    try {
+      await cmdReceiptIssue({
+        agent: first.agentId,
+        latest: true,
+        decision: "deny",
+        privateKey: privateKeyPath,
+        out: receiptPath,
+      });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8")) as AuthorizationReceipt;
+    expect(() => verifyAuthorizationReceipt(receipt, publicKeyPem)).not.toThrow();
+    expect(receipt.auditCommitment).toBe(denied.commitment);
+    expect(receipt.decision).toBe("deny");
+  });
+
+  it("issues a receipt for the latest audit entry matching a tool and decision", async () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const first = auditExport();
+    const writeAllow = auditExportFrom(auditEntry("Write", "allow", "2026-01-01T00:01:00.000Z", first.commitment, "{\"file\":\"README.md\"}"), 1);
+    const writeDeny = auditExportFrom(
+      auditEntry("Write", "deny", "2026-01-01T00:02:00.000Z", writeAllow.commitment, "{\"file\":\"README.md\"}", "deny-write"),
+      2
+    );
+    writeAuditEntries(first.agentId, first.logDate, [first, writeAllow, writeDeny]);
+
+    const dir = join(TEST_HOME, "tool-decision-issue");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    const receiptPath = join(dir, "receipt.json");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    try {
+      await cmdReceiptIssue({
+        agent: first.agentId,
+        tool: "Write",
+        decision: "allow",
+        privateKey: privateKeyPath,
+        out: receiptPath,
+      });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8")) as AuthorizationReceipt;
+    expect(() => verifyAuthorizationReceipt(receipt, publicKeyPem)).not.toThrow();
+    expect(receipt.auditCommitment).toBe(writeAllow.commitment);
+    expect(receipt.auditCommitment).not.toBe(writeDeny.commitment);
+    expect(receipt.tool).toBe("Write");
+    expect(receipt.decision).toBe("allow");
+  });
+
   it("rejects a receipt tool selector with no matching audit entry", async () => {
     const { privateKeyPem } = keyPair();
     const exportedAudit = auditExport();
@@ -356,6 +419,46 @@ describe("authorization receipt", () => {
         privateKey: privateKeyPath,
       })
     ).rejects.toThrow('No audit log entry found for agent "receipt-agent" and tool "Write"');
+  });
+
+  it("rejects a receipt decision selector with no matching audit entry", async () => {
+    const { privateKeyPem } = keyPair();
+    const exportedAudit = auditExport();
+    writeAuditEntry(exportedAudit.agentId, exportedAudit.logDate, exportedAudit);
+
+    const dir = join(TEST_HOME, "missing-decision-issue");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+
+    await expect(
+      cmdReceiptIssue({
+        agent: exportedAudit.agentId,
+        latest: true,
+        decision: "deny",
+        privateKey: privateKeyPath,
+      })
+    ).rejects.toThrow('No audit log entry found for agent "receipt-agent" and decision "deny"');
+  });
+
+  it("rejects a decision filter with an explicit commitment", async () => {
+    const { privateKeyPem } = keyPair();
+    const exportedAudit = auditExport();
+    writeAuditEntry(exportedAudit.agentId, exportedAudit.logDate, exportedAudit);
+
+    const dir = join(TEST_HOME, "commitment-decision-issue");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+
+    await expect(
+      cmdReceiptIssue({
+        agent: exportedAudit.agentId,
+        commitment: exportedAudit.commitment,
+        decision: "allow",
+        privateKey: privateKeyPath,
+      })
+    ).rejects.toThrow("--decision can only be used with --latest or --tool");
   });
 
   it("refuses to issue a receipt from a broken audit log", async () => {

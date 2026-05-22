@@ -76,7 +76,8 @@ catp receipt issue \
 
 `catp receipt issue` verifies the local audit log commitment chain before it
 signs the receipt. Use `--commitment <64-char-audit-commitment>` when you need
-to issue a receipt for a specific older entry.
+to issue a receipt for a specific older entry. Use `--decision allow|deny` with
+`--latest` when you want the newest matching allow/deny entry.
 
 Verify the receipt against the signer public key, audit export, and policy:
 

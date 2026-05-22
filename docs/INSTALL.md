@@ -116,7 +116,8 @@ catp receipt verify \
 ```
 
 Use `--tool <name>` instead of `--latest` when you want the newest audit entry
-from a specific tool.
+from a specific tool. Add `--decision allow|deny` with `--latest` or `--tool`
+when you want the newest matching allow/deny entry.
 
 Use Groth16 proof manifests only when you need the optional ZK/EVM verification
 backend.

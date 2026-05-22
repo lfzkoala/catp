@@ -152,7 +152,10 @@ export function buildAuditExport(agentId: string, commitment: string): AuditExpo
   };
 }
 
-export function latestAuditEntry(agentId: string, opts: { tool?: string } = {}): { date: string; index: number; entry: AuditEntry } | null {
+export function latestAuditEntry(
+  agentId: string,
+  opts: { tool?: string; decision?: "allow" | "deny" } = {}
+): { date: string; index: number; entry: AuditEntry } | null {
   const files = auditLogFiles(agentId).slice().reverse();
   for (const { date, file } of files) {
     const lines = readFileSync(file, "utf8").split("\n").filter(Boolean);
@@ -160,6 +163,9 @@ export function latestAuditEntry(agentId: string, opts: { tool?: string } = {}):
       try {
         const entry = JSON.parse(lines[index]) as AuditEntry;
         if (opts.tool && entry.tool !== opts.tool) {
+          continue;
+        }
+        if (opts.decision && entry.decision !== opts.decision) {
           continue;
         }
         return { date, index, entry };
