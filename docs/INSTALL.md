@@ -90,6 +90,7 @@ Check audit logs:
 catp log show
 catp log show --json
 catp log show --tool Write --decision deny
+catp log export --latest --out catp-audit-export.json
 catp log show --commitments
 catp log verify
 ```

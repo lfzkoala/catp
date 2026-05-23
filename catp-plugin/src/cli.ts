@@ -89,8 +89,11 @@ log
 
 log
   .command("export")
-  .description("Export a deterministic audit entry bundle by commitment")
-  .requiredOption("--commitment <hex>", "audit entry commitment to export")
+  .description("Export a deterministic audit entry bundle")
+  .option("--commitment <hex>", "audit entry commitment to export")
+  .option("--latest", "export the latest audit entry")
+  .option("--tool <name>", "export the latest audit entry matching a tool name")
+  .option("--decision <allow|deny>", "filter --latest or --tool by decision")
   .option("--agent <id>", "agent id (default: from policy file)")
   .option("--out <path>", "write audit export JSON to file instead of stdout")
   .action(cmdLogExport);

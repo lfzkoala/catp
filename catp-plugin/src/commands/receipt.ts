@@ -1,6 +1,6 @@
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign, verify } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { auditLogFiles, buildAuditExport, latestAuditEntry, stableStringify, type AuditExport } from "./log.js";
+import { auditLogFiles, buildAuditExport, latestAuditCommitment, stableStringify, type AuditExport } from "./log.js";
 import { verifyChain } from "../audit/verifier.js";
 import { findPolicyFile, loadPolicy } from "../policy/loader.js";
 import type { CatpPolicy } from "../policy/types.js";
@@ -169,23 +169,10 @@ function resolveIssueCommitment(agentId: string, opts: { commitment?: string; la
   if (opts.commitment) {
     return opts.commitment;
   }
-  const latest = latestAuditEntry(agentId, {
+  return latestAuditCommitment(agentId, {
     ...(opts.tool ? { tool: opts.tool } : {}),
     ...(opts.decision ? { decision: opts.decision } : {}),
   });
-  if (!latest) {
-    if (opts.tool && opts.decision) {
-      throw new Error(`No audit log entry found for agent "${agentId}", tool "${opts.tool}", and decision "${opts.decision}"`);
-    }
-    if (opts.tool) {
-      throw new Error(`No audit log entry found for agent "${agentId}" and tool "${opts.tool}"`);
-    }
-    if (opts.decision) {
-      throw new Error(`No audit log entry found for agent "${agentId}" and decision "${opts.decision}"`);
-    }
-    throw new Error(`No audit log entry found for agent "${agentId}"`);
-  }
-  return latest.entry.commitment;
 }
 
 export function cmdReceiptVerify(opts: { receipt?: string; publicKey?: string; auditExport?: string; file?: string; json?: boolean }): void {

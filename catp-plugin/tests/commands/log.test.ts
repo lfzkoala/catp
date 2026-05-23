@@ -85,6 +85,91 @@ describe("log export", () => {
     expect(writes.join("")).toContain("entrySha256=");
   });
 
+  it("exports the latest audit entry without copying a commitment", () => {
+    const firstCommitment = computeCommitment("Bash", "allow", "2026-01-01T00:00:00.000Z", "0", null, "{\"command\":\"ls\"}");
+    const secondCommitment = computeCommitment("Read", "allow", "2026-01-01T00:00:01.000Z", firstCommitment, null, "{\"file_path\":\"README.md\"}");
+    writeEntry(TEST_AGENT, "2026-01-01", makeEntry(firstCommitment));
+    writeEntry(
+      TEST_AGENT,
+      "2026-01-01",
+      makeEntry(secondCommitment, {
+        ts: "2026-01-01T00:00:01.000Z",
+        tool: "Read",
+        input_summary: "{\"file_path\":\"README.md\"}",
+      })
+    );
+
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      cmdLogExport({ agent: TEST_AGENT, latest: true });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const parsed = JSON.parse(writes.join("")) as ReturnType<typeof buildAuditExport>;
+    expect(parsed.commitment).toBe(secondCommitment);
+    expect(parsed.entry.tool).toBe("Read");
+  });
+
+  it("exports the latest audit entry matching a tool and decision", () => {
+    const bashCommitment = computeCommitment("Bash", "allow", "2026-01-01T00:00:00.000Z", "0", null, "{\"command\":\"ls\"}");
+    const writeAllowCommitment = computeCommitment("Write", "allow", "2026-01-01T00:00:01.000Z", bashCommitment, null, "{\"file_path\":\"README.md\"}");
+    const writeDenyCommitment = computeCommitment("Write", "deny", "2026-01-01T00:00:02.000Z", writeAllowCommitment, "deny-write", "{\"file_path\":\"README.md\"}");
+    writeEntry(TEST_AGENT, "2026-01-01", makeEntry(bashCommitment));
+    writeEntry(
+      TEST_AGENT,
+      "2026-01-01",
+      makeEntry(writeAllowCommitment, {
+        ts: "2026-01-01T00:00:01.000Z",
+        tool: "Write",
+        input_summary: "{\"file_path\":\"README.md\"}",
+      })
+    );
+    writeEntry(
+      TEST_AGENT,
+      "2026-01-01",
+      makeEntry(writeDenyCommitment, {
+        ts: "2026-01-01T00:00:02.000Z",
+        tool: "Write",
+        decision: "deny",
+        rule_matched: "deny-write",
+        input_summary: "{\"file_path\":\"README.md\"}",
+      })
+    );
+
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      cmdLogExport({ agent: TEST_AGENT, tool: "Write", decision: "allow" });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const parsed = JSON.parse(writes.join("")) as ReturnType<typeof buildAuditExport>;
+    expect(parsed.commitment).toBe(writeAllowCommitment);
+    expect(parsed.commitment).not.toBe(writeDenyCommitment);
+    expect(parsed.entry.tool).toBe("Write");
+    expect(parsed.entry.decision).toBe("allow");
+  });
+
+  it("rejects ambiguous audit export selectors", () => {
+    expect(() => cmdLogExport({ agent: TEST_AGENT, latest: true, tool: "Write" })).toThrow("use only one of");
+  });
+
+  it("rejects a decision filter with an explicit export commitment", () => {
+    const commitment = computeCommitment("Bash", "allow", "2026-01-01T00:00:00.000Z", "0", null, "{\"command\":\"ls\"}");
+    expect(() => cmdLogExport({ agent: TEST_AGENT, commitment, decision: "allow" })).toThrow("--decision can only be used with --latest or --tool");
+  });
+
   it("shows full commitments when requested", () => {
     const commitment = computeCommitment("Bash", "allow", "2026-01-01T00:00:00.000Z", "0", null, "{\"command\":\"ls\"}");
     writeEntry(TEST_AGENT, "2026-01-01", makeEntry(commitment));

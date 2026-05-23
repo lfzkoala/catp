@@ -159,14 +159,31 @@ export async function cmdLogVerify(opts: { agent?: string }): Promise<void> {
   process.stdout.write(`✓ Chain intact — ${checked} entries verified across ${logFiles.length} log file(s)\n`);
 }
 
-export function cmdLogExport(opts: { commitment?: string; agent?: string; out?: string }): void {
-  if (!opts.commitment) {
-    throw new Error("missing --commitment <hex>");
+export function cmdLogExport(opts: {
+  commitment?: string;
+  agent?: string;
+  out?: string;
+  latest?: boolean;
+  tool?: string;
+  decision?: "allow" | "deny";
+}): void {
+  const selectorCount = [opts.commitment, opts.latest ? "latest" : undefined, opts.tool].filter(Boolean).length;
+  if (selectorCount > 1) {
+    throw new Error("use only one of --commitment <hex>, --latest, or --tool <name>");
   }
-  assertCommitment(opts.commitment);
+  if (selectorCount === 0) {
+    throw new Error("missing --commitment <hex>, --latest, or --tool <name>");
+  }
+  if (opts.decision !== undefined && opts.decision !== "allow" && opts.decision !== "deny") {
+    throw new Error("--decision must be allow or deny");
+  }
+  if (opts.commitment && opts.decision) {
+    throw new Error("--decision can only be used with --latest or --tool");
+  }
 
   const agentId = resolveAgentId(opts);
-  const auditExport = buildAuditExport(agentId, opts.commitment);
+  const commitment = resolveLogExportCommitment(agentId, opts);
+  const auditExport = buildAuditExport(agentId, commitment);
   const json = stableStringify(auditExport, 2) + "\n";
 
   if (opts.out) {
@@ -178,6 +195,17 @@ export function cmdLogExport(opts: { commitment?: string; agent?: string; out?: 
   }
 
   process.stdout.write(json);
+}
+
+function resolveLogExportCommitment(agentId: string, opts: { commitment?: string; latest?: boolean; tool?: string; decision?: "allow" | "deny" }): string {
+  if (opts.commitment) {
+    assertCommitment(opts.commitment);
+    return opts.commitment;
+  }
+  return latestAuditCommitment(agentId, {
+    ...(opts.tool ? { tool: opts.tool } : {}),
+    ...(opts.decision ? { decision: opts.decision } : {}),
+  });
 }
 
 export function buildAuditExport(agentId: string, commitment: string): AuditExport {
@@ -221,6 +249,23 @@ export function latestAuditEntry(
     }
   }
   return null;
+}
+
+export function latestAuditCommitment(agentId: string, opts: { tool?: string; decision?: "allow" | "deny" } = {}): string {
+  const latest = latestAuditEntry(agentId, opts);
+  if (!latest) {
+    if (opts.tool && opts.decision) {
+      throw new Error(`No audit log entry found for agent "${agentId}", tool "${opts.tool}", and decision "${opts.decision}"`);
+    }
+    if (opts.tool) {
+      throw new Error(`No audit log entry found for agent "${agentId}" and tool "${opts.tool}"`);
+    }
+    if (opts.decision) {
+      throw new Error(`No audit log entry found for agent "${agentId}" and decision "${opts.decision}"`);
+    }
+    throw new Error(`No audit log entry found for agent "${agentId}"`);
+  }
+  return latest.entry.commitment;
 }
 
 function findAuditEntry(agentId: string, commitment: string): { date: string; index: number; entry: AuditEntry } | null {
