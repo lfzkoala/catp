@@ -103,6 +103,7 @@ Each entry chains to the previous commitment.
 ```bash
 catp log show
 catp log show --json
+catp log show --tool Write --decision deny
 catp log show --commitments
 catp log verify
 ```

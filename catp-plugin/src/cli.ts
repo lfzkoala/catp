@@ -77,6 +77,8 @@ log
   .option("--agent <id>", "agent id (default: from policy file)")
   .option("--commitments", "show full audit entry commitments")
   .option("--json", "write recent audit entries as JSON")
+  .option("--tool <name>", "show only entries matching a tool name")
+  .option("--decision <allow|deny>", "show only entries matching a decision")
   .action(cmdLogShow);
 
 log

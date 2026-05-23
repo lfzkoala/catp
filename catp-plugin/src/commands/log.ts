@@ -48,7 +48,17 @@ export function auditLogFiles(agentId: string): AuditLogFile[] {
     .filter(({ file }) => existsSync(file));
 }
 
-export function cmdLogShow(opts: { lines: string; agent?: string; commitments?: boolean; json?: boolean }): void {
+export function cmdLogShow(opts: {
+  lines: string;
+  agent?: string;
+  commitments?: boolean;
+  json?: boolean;
+  tool?: string;
+  decision?: "allow" | "deny";
+}): void {
+  if (opts.decision !== undefined && opts.decision !== "allow" && opts.decision !== "deny") {
+    throw new Error("--decision must be allow or deny");
+  }
   const agentId = resolveAgentId(opts);
   const logFile = latestLogFile(agentId);
   if (!logFile || !existsSync(logFile)) {
@@ -62,35 +72,66 @@ export function cmdLogShow(opts: { lines: string; agent?: string; commitments?: 
 
   const lines = readFileSync(logFile, "utf8").trim().split("\n").filter(Boolean);
   const n = Math.min(parseInt(opts.lines, 10) || 50, lines.length);
-  const recent = lines.slice(-n);
+  const filteredEntries = opts.tool || opts.decision ? filterAuditEntries(lines, opts).slice(-n) : null;
 
   if (opts.json) {
-    const entries: AuditEntry[] = [];
-    for (const line of recent) {
-      try {
-        entries.push(JSON.parse(line) as AuditEntry);
-      } catch {
-        // Keep JSON output machine-readable; chain verification reports malformed lines.
-      }
-    }
+    const recent = filteredEntries ?? parseAuditEntries(lines.slice(-n));
+    const entries = recent.map((entry) => entry.entry);
     process.stdout.write(stableStringify(entries, 2) + "\n");
     return;
   }
 
+  if (filteredEntries) {
+    for (const { entry } of filteredEntries) {
+      writeAuditEntrySummary(entry, opts);
+    }
+    process.stdout.write(`\n${filteredEntries.length} matching entries from ${logFile}\n`);
+    return;
+  }
+
+  const recent = lines.slice(-n);
   for (const line of recent) {
     try {
       const e = JSON.parse(line) as AuditEntry;
-      const icon = e.decision === "allow" ? "✓" : "✗";
-      const rule = e.rule_matched ? ` [${e.rule_matched}]` : "";
-      process.stdout.write(`${icon} ${e.ts}  ${e.tool}${rule}\n    ${e.input_summary}\n`);
-      if (opts.commitments) {
-        process.stdout.write(`    commitment=${e.commitment}\n`);
-      }
+      writeAuditEntrySummary(e, opts);
     } catch {
       process.stdout.write(`? ${line}\n`);
     }
   }
   process.stdout.write(`\n${recent.length} entries from ${logFile}\n`);
+}
+
+function parseAuditEntries(lines: string[]): Array<{ index: number; entry: AuditEntry }> {
+  const entries: Array<{ index: number; entry: AuditEntry }> = [];
+  for (const [index, line] of lines.entries()) {
+    try {
+      entries.push({ index, entry: JSON.parse(line) as AuditEntry });
+    } catch {
+      // Keep machine-readable output parseable; chain verification reports malformed lines.
+    }
+  }
+  return entries;
+}
+
+function filterAuditEntries(lines: string[], opts: { tool?: string; decision?: "allow" | "deny" }): Array<{ index: number; entry: AuditEntry }> {
+  return parseAuditEntries(lines).filter(({ entry }) => {
+    if (opts.tool && entry.tool !== opts.tool) {
+      return false;
+    }
+    if (opts.decision && entry.decision !== opts.decision) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function writeAuditEntrySummary(e: AuditEntry, opts: { commitments?: boolean }): void {
+  const icon = e.decision === "allow" ? "✓" : "✗";
+  const rule = e.rule_matched ? ` [${e.rule_matched}]` : "";
+  process.stdout.write(`${icon} ${e.ts}  ${e.tool}${rule}\n    ${e.input_summary}\n`);
+  if (opts.commitments) {
+    process.stdout.write(`    commitment=${e.commitment}\n`);
+  }
 }
 
 export async function cmdLogVerify(opts: { agent?: string }): Promise<void> {
