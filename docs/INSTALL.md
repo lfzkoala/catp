@@ -159,6 +159,20 @@ catp prove authorization --help
 catp verify authorization --help
 ```
 
+From a repository checkout, the receipt smoke test runs the default non-ZK
+verification path end-to-end:
+
+```bash
+npm run build --workspace catp-plugin
+npm run smoke:receipt
+```
+
+To smoke-test a globally installed CLI instead of the workspace build:
+
+```bash
+CATP_BIN=catp npm run smoke:receipt
+```
+
 ## Option B: Repository Checkout
 
 Use this path if you want the full authorization proof flow or you are developing

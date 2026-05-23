@@ -185,6 +185,7 @@ docs/                   install, release, E2E, and security docs
 npm install
 npm run typecheck --workspace catp-plugin
 npm test --workspace catp-plugin
+npm run smoke:receipt
 npm run typecheck --workspace catp-sdk
 npm test --workspace catp-sdk
 npm run groth16:check
