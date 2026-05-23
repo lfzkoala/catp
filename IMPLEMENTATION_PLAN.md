@@ -37,7 +37,7 @@ Current verification surfaces:
 |---------|------|--------|
 | Audit log | Tamper-evident local evidence | Active npm CLI path |
 | Authorization witness/manifest | Portable authorization artifact | Active npm CLI path |
-| Signed authorization receipt | Non-ZK external verification | 0.3.0 release candidate |
+| Signed authorization receipt | Non-ZK external verification | Active npm CLI path |
 | ZK verifier backend | Privacy-preserving compact verification | Optional advanced path |
 
 Current proof backend versions:
@@ -111,19 +111,26 @@ path.
 
 - `catp log export` writes deterministic `catp_audit_export_v1` bundles for
   individual audit commitments.
-- `catp log show --commitments` exposes full commitments for receipt issuance.
+- `catp log show --json`, `--tool`, and `--decision` make audit inspection
+  scriptable and selector-aligned with receipt issuance.
+- `catp log export --latest`, `--tool`, and `--decision` export audit evidence
+  without manually copying commitments.
 - `catp receipt keygen` creates local Ed25519 signing keys.
 - `catp receipt sign` signs an existing audit export.
 - `catp receipt issue` is the main path: it verifies the local audit chain,
   exports the audit entry, binds the policy commitment, and signs
   `catp_authorization_receipt_v1`.
+- `catp receipt issue --latest`, `--tool`, and `--decision` let users select
+  audit entries without manually copying commitments.
 - `catp receipt verify` validates the signature and can also check the receipt
   against the audit export and `catp-policy.toml`.
+- `catp receipt verify --json` emits a machine-readable verification summary.
 - Receipt verification has regression tests for tampered signatures, wrong
   public keys, mismatched audit exports, missing policy commitments, and policy
   mismatches.
 - `examples/receipt-basic` documents and exercises the default non-ZK external
   verification path.
+- `npm run smoke:receipt` validates the default receipt path end-to-end.
 
 ### Universal Agent Runtime Adapters
 
@@ -149,27 +156,6 @@ path.
 ---
 
 ## Active Milestones
-
-### P0: 0.4.0 Receipt UX
-
-Status: active.
-
-Goal: make the signed receipt path natural in day-to-day agent workflows.
-
-Work:
-
-- Let users issue receipts without manually copying commitments.
-- Add focused selectors such as latest entry first, then tool/time filters only
-  when the UX is proven.
-- Keep receipt commands chain-verifying before signing.
-- Keep README / INSTALL / examples aligned around local audit, signed receipt,
-  and optional Groth16 verification.
-
-Exit criteria:
-
-- A user can create a receipt for the latest audit entry with one command.
-- Receipt verification against audit export and policy remains covered by tests.
-- The npm CLI help points users to the simplest receipt issuance path.
 
 ### P0: Authorization Proof Security Hardening
 
