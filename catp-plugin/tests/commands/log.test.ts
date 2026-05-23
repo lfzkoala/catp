@@ -178,6 +178,45 @@ describe("log export", () => {
     expect(parsed[0].decision).toBe("deny");
   });
 
+  it("shows filtered entries across audit log dates", () => {
+    const oldCommitment = computeCommitment("Write", "deny", "2026-01-01T00:00:00.000Z", "0", "deny-write", "{\"file_path\":\"README.md\"}");
+    const newCommitment = computeCommitment("Bash", "allow", "2026-01-02T00:00:00.000Z", oldCommitment, null, "{\"command\":\"ls\"}");
+    writeEntry(
+      TEST_AGENT,
+      "2026-01-01",
+      makeEntry(oldCommitment, {
+        tool: "Write",
+        decision: "deny",
+        rule_matched: "deny-write",
+        input_summary: "{\"file_path\":\"README.md\"}",
+      })
+    );
+    writeEntry(
+      TEST_AGENT,
+      "2026-01-02",
+      makeEntry(newCommitment, {
+        ts: "2026-01-02T00:00:00.000Z",
+        tool: "Bash",
+      })
+    );
+
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      cmdLogShow({ agent: TEST_AGENT, lines: "10", tool: "Write", decision: "deny", json: true });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const parsed = JSON.parse(writes.join("")) as AuditEntry[];
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].commitment).toBe(oldCommitment);
+  });
+
   it("rejects an invalid log decision filter", () => {
     expect(() => cmdLogShow({ agent: TEST_AGENT, lines: "1", decision: "block" as unknown as "allow" })).toThrow("--decision must be allow or deny");
   });

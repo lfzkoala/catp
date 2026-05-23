@@ -31,12 +31,8 @@ export interface AuditLogFile {
   file: string;
 }
 
-function latestLogFile(agentId: string): string | null {
-  const base = auditRoot(agentId);
-  if (!existsSync(base)) return null;
-  const dates = readdirSync(base).sort().reverse();
-  if (dates.length === 0) return null;
-  return join(base, dates[0], "actions.jsonl");
+interface AuditLineRecord {
+  line: string;
 }
 
 export function auditLogFiles(agentId: string): AuditLogFile[] {
@@ -60,8 +56,9 @@ export function cmdLogShow(opts: {
     throw new Error("--decision must be allow or deny");
   }
   const agentId = resolveAgentId(opts);
-  const logFile = latestLogFile(agentId);
-  if (!logFile || !existsSync(logFile)) {
+  const logFiles = auditLogFiles(agentId);
+  const records = auditLineRecords(logFiles);
+  if (records.length === 0) {
     if (opts.json) {
       process.stdout.write("[]\n");
       return;
@@ -70,13 +67,12 @@ export function cmdLogShow(opts: {
     return;
   }
 
-  const lines = readFileSync(logFile, "utf8").trim().split("\n").filter(Boolean);
-  const n = Math.min(parseInt(opts.lines, 10) || 50, lines.length);
-  const filteredEntries = opts.tool || opts.decision ? filterAuditEntries(lines, opts).slice(-n) : null;
+  const n = Math.min(parseInt(opts.lines, 10) || 50, records.length);
+  const filteredEntries = opts.tool || opts.decision ? filterAuditRecords(records, opts).slice(-n) : null;
 
   if (opts.json) {
-    const recent = filteredEntries ?? parseAuditEntries(lines.slice(-n));
-    const entries = recent.map((entry) => entry.entry);
+    const recent = filteredEntries ?? parseAuditRecords(records.slice(-n));
+    const entries = recent.map((record) => record.entry);
     process.stdout.write(stableStringify(entries, 2) + "\n");
     return;
   }
@@ -85,27 +81,36 @@ export function cmdLogShow(opts: {
     for (const { entry } of filteredEntries) {
       writeAuditEntrySummary(entry, opts);
     }
-    process.stdout.write(`\n${filteredEntries.length} matching entries from ${logFile}\n`);
+    process.stdout.write(`\n${filteredEntries.length} matching entries from ${logFiles.length} log file(s)\n`);
     return;
   }
 
-  const recent = lines.slice(-n);
-  for (const line of recent) {
+  const recent = records.slice(-n);
+  for (const record of recent) {
     try {
-      const e = JSON.parse(line) as AuditEntry;
+      const e = JSON.parse(record.line) as AuditEntry;
       writeAuditEntrySummary(e, opts);
     } catch {
-      process.stdout.write(`? ${line}\n`);
+      process.stdout.write(`? ${record.line}\n`);
     }
   }
-  process.stdout.write(`\n${recent.length} entries from ${logFile}\n`);
+  process.stdout.write(`\n${recent.length} entries from ${logFiles.length} log file(s)\n`);
 }
 
-function parseAuditEntries(lines: string[]): Array<{ index: number; entry: AuditEntry }> {
-  const entries: Array<{ index: number; entry: AuditEntry }> = [];
-  for (const [index, line] of lines.entries()) {
+function auditLineRecords(logFiles: AuditLogFile[]): AuditLineRecord[] {
+  return logFiles.flatMap(({ file }) =>
+    readFileSync(file, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => ({ line }))
+  );
+}
+
+function parseAuditRecords(records: AuditLineRecord[]): Array<{ record: AuditLineRecord; entry: AuditEntry }> {
+  const entries: Array<{ record: AuditLineRecord; entry: AuditEntry }> = [];
+  for (const record of records) {
     try {
-      entries.push({ index, entry: JSON.parse(line) as AuditEntry });
+      entries.push({ record, entry: JSON.parse(record.line) as AuditEntry });
     } catch {
       // Keep machine-readable output parseable; chain verification reports malformed lines.
     }
@@ -113,8 +118,8 @@ function parseAuditEntries(lines: string[]): Array<{ index: number; entry: Audit
   return entries;
 }
 
-function filterAuditEntries(lines: string[], opts: { tool?: string; decision?: "allow" | "deny" }): Array<{ index: number; entry: AuditEntry }> {
-  return parseAuditEntries(lines).filter(({ entry }) => {
+function filterAuditRecords(records: AuditLineRecord[], opts: { tool?: string; decision?: "allow" | "deny" }): Array<{ record: AuditLineRecord; entry: AuditEntry }> {
+  return parseAuditRecords(records).filter(({ entry }) => {
     if (opts.tool && entry.tool !== opts.tool) {
       return false;
     }
