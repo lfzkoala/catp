@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { computeCommitment } from "../../src/audit/logger.js";
 import {
   cmdReceiptIssue,
+  cmdReceiptKeygen,
+  cmdReceiptSign,
   cmdReceiptVerify,
   signAuthorizationReceipt,
   verifyAuthorizationReceipt,
@@ -214,6 +216,98 @@ describe("authorization receipt", () => {
     expect(() => verifyReceiptPolicy(receipt, policy())).toThrow("receipt has no policyCommitment");
   });
 
+  it("generates receipt signing keys", () => {
+    const dir = join(TEST_HOME, "keygen");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    const publicKeyPath = join(dir, "public.pem");
+
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      cmdReceiptKeygen({ privateKey: privateKeyPath, publicKey: publicKeyPath });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    expect(readFileSync(privateKeyPath, "utf8")).toContain("PRIVATE KEY");
+    expect(readFileSync(publicKeyPath, "utf8")).toContain("PUBLIC KEY");
+    expect(writes.join("")).toContain(`Wrote private key to ${privateKeyPath}`);
+    expect(writes.join("")).toContain(`Wrote public key to ${publicKeyPath}`);
+  });
+
+  it("signs an audit export from files and writes a receipt file", () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const exportedAudit = auditExport();
+    const dir = join(TEST_HOME, "sign-file");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    const auditExportPath = join(dir, "audit-export.json");
+    const receiptPath = join(dir, "receipt.json");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+    writeFileSync(auditExportPath, stableStringify(exportedAudit, 2) + "\n", "utf8");
+
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      cmdReceiptSign({
+        auditExport: auditExportPath,
+        privateKey: privateKeyPath,
+        out: receiptPath,
+      });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8")) as AuthorizationReceipt;
+    expect(() => verifyAuthorizationReceipt(receipt, publicKeyPem)).not.toThrow();
+    expect(writes.join("")).toContain(`Wrote authorization receipt to ${receiptPath}`);
+    expect(writes.join("")).toContain("selectedTool=Bash");
+  });
+
+  it("signs an audit export to stdout with policy discovery fallback", () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const exportedAudit = auditExport();
+    const dir = join(TEST_HOME, "sign-stdout");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    const auditExportPath = join(dir, "audit-export.json");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+    writeFileSync(auditExportPath, stableStringify(exportedAudit, 2) + "\n", "utf8");
+
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      cmdReceiptSign({
+        auditExport: auditExportPath,
+        privateKey: privateKeyPath,
+      });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const receipt = JSON.parse(writes.join("")) as AuthorizationReceipt;
+    expect(() => verifyAuthorizationReceipt(receipt, publicKeyPem)).not.toThrow();
+    expect(receipt.policyCommitment).toBeNull();
+  });
+
+  it("rejects missing receipt sign inputs", () => {
+    expect(() => cmdReceiptSign({ privateKey: "private.pem" })).toThrow("missing --audit-export");
+    expect(() => cmdReceiptSign({ auditExport: "audit-export.json" })).toThrow("missing --private-key");
+  });
+
   it("writes a JSON receipt verification summary", () => {
     const { privateKeyPem, publicKeyPem } = keyPair();
     const signedPolicy = policy();
@@ -264,6 +358,39 @@ describe("authorization receipt", () => {
     expect(summary.decision).toBe("allow");
     expect(summary.timestamp).toBe("2026-01-01T00:00:00.000Z");
     expect(summary.signedAt).toBe("2026-01-01T00:00:01.000Z");
+  });
+
+  it("writes a text receipt verification summary", () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const exportedAudit = auditExport();
+    const receipt = signAuthorizationReceipt(exportedAudit, privateKeyPem, publicKeyPem, {
+      signedAt: "2026-01-01T00:00:01.000Z",
+    });
+    const dir = join(TEST_HOME, "verify-text");
+    mkdirSync(dir, { recursive: true });
+    const receiptPath = join(dir, "receipt.json");
+    const publicKeyPath = join(dir, "public.pem");
+    writeFileSync(receiptPath, stableStringify(receipt, 2) + "\n", "utf8");
+    writeFileSync(publicKeyPath, publicKeyPem, "utf8");
+
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      cmdReceiptVerify({
+        receipt: receiptPath,
+        publicKey: publicKeyPath,
+      });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    expect(writes.join("")).toContain("authorizationReceipt=valid");
+    expect(writes.join("")).toContain(`auditCommitment=${receipt.auditCommitment}`);
+    expect(writes.join("")).toContain("policyCommitment=none");
   });
 
   it("produces stable receipt JSON for the same payload", () => {
@@ -318,6 +445,68 @@ describe("authorization receipt", () => {
     expect(writes.join("")).toContain("selectedDecision=allow");
     expect(writes.join("")).toContain("selectedTimestamp=2026-01-01T00:00:00.000Z");
     expect(writes.join("")).toContain('selectedInputSummary={"command":"ls"}');
+  });
+
+  it("issues a receipt to stdout with no policy file", async () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const exportedAudit = auditExport();
+    writeAuditEntry(exportedAudit.agentId, exportedAudit.logDate, exportedAudit);
+
+    const dir = join(TEST_HOME, "issue-stdout");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await cmdReceiptIssue({
+        agent: exportedAudit.agentId,
+        commitment: exportedAudit.commitment,
+        privateKey: privateKeyPath,
+      });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const receipt = JSON.parse(writes.join("")) as AuthorizationReceipt;
+    expect(() => verifyAuthorizationReceipt(receipt, publicKeyPem)).not.toThrow();
+    expect(receipt.policyCommitment).toBeNull();
+  });
+
+  it("rejects invalid receipt issue inputs", async () => {
+    const { privateKeyPem } = keyPair();
+    const dir = join(TEST_HOME, "invalid-issue");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+
+    await expect(cmdReceiptIssue({ privateKey: privateKeyPath })).rejects.toThrow("missing --commitment");
+    await expect(cmdReceiptIssue({ latest: true })).rejects.toThrow("missing --private-key");
+    await expect(
+      cmdReceiptIssue({
+        latest: true,
+        privateKey: privateKeyPath,
+        decision: "block" as unknown as "allow",
+      })
+    ).rejects.toThrow("--decision must be allow or deny");
+    await expect(
+      cmdReceiptIssue({
+        latest: true,
+        tool: "Bash",
+        privateKey: privateKeyPath,
+      })
+    ).rejects.toThrow("use only one of");
+    await expect(
+      cmdReceiptIssue({
+        latest: true,
+        privateKey: privateKeyPath,
+      })
+    ).rejects.toThrow("missing --agent");
   });
 
   it("issues a receipt for the latest audit entry", async () => {
