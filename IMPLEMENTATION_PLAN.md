@@ -92,7 +92,7 @@ path.
 
 ### Release Hygiene And Proof UX
 
-- README, INSTALL, ARCHITECTURE, examples, and security review docs aligned to
+- README, INSTALL, ARCHITECTURE, examples, and authorization security notes aligned to
   the current enforcement + authorization scope.
 - npm CLI package boundary documented: local enforcement, audit logs, witness
   generation, proof manifest tooling, and artifact validation are in npm; full
@@ -166,7 +166,8 @@ from its documented public input schema.
 
 Work:
 
-- Keep `docs/SECURITY_REVIEW_AUTHORIZATION.md` current as the living review.
+- Keep `docs/AUTHORIZATION_SECURITY_NOTES.md` current as the living security
+  notes for `authorization_groth16_v1`.
 - Add regression tests for any new issue found in policy encoding, witness
   generation, proof artifact validation, calldata encoding, or contract state
   checks.

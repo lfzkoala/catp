@@ -132,7 +132,7 @@ This is an artifact-consumption bridge, not an embedded browser/node Groth16
 prover. Packaging the gnark prover as a service, CLI, or native module is a
 separate production decision.
 
-## Security Review Notes
+## Security Notes
 
 Current review decision: keep `authorization_groth16_v1` as the testnet EVM
 proof version without rotating the verifier.

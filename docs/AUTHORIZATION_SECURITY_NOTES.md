@@ -1,15 +1,16 @@
-# CATP Authorization Security Review
+# CATP Authorization Security Notes
 
-Status: initial living review for `authorization_groth16_v1`.
+Status: living security notes for `authorization_groth16_v1`.
 
-This document records the current security posture of the CATP authorization
-authorization path. It is not a third-party audit. It is the repository-owned
-checklist that must stay current whenever public inputs, circuit constraints,
-policy encoding, verifier generation, or contract state transitions change.
+This document records the current security model, assumptions, known caveats,
+and regression checks for the CATP authorization path. It is not a third-party
+audit, certification, or mainnet readiness statement. It must stay current
+whenever public inputs, circuit constraints, policy encoding, verifier
+generation, or contract state transitions change.
 
 ## Scope
 
-Reviewed components:
+Covered components:
 
 - `catp-circuits/groth16`: `authorization_groth16_v1` Groth16/BN254 circuit,
   persisted dev/testnet proving and verifying keys, proof artifact generation.
@@ -22,7 +23,7 @@ Reviewed components:
 - `scripts`: setup checks, proof generation, calldata encoding, broadcast
   execution, and Sepolia deployment metadata.
 
-Out of scope for this review:
+Out of scope for this document:
 
 - Mainnet trusted setup ceremony.
 - Future output attestation/challenge security.
@@ -62,7 +63,7 @@ Out of scope for this review:
   deployment.
 - The EVM path uses MiMC policy commitment version `2`.
 
-## Review Matrix
+## Security Matrix
 
 | Area | Status | Notes |
 |------|--------|-------|

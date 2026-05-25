@@ -163,9 +163,9 @@ The checked-in Groth16 proving and verifying keys are deterministic dev/testnet
 keys, not a mainnet ceremony.
 
 For the full Sepolia flow, see
-[docs/E2E_GROTH16_SEPOLIA.md](docs/E2E_GROTH16_SEPOLIA.md). For the security
-review checklist, see
-[docs/SECURITY_REVIEW_AUTHORIZATION.md](docs/SECURITY_REVIEW_AUTHORIZATION.md).
+[docs/E2E_GROTH16_SEPOLIA.md](docs/E2E_GROTH16_SEPOLIA.md). For authorization
+security assumptions and caveats, see
+[docs/AUTHORIZATION_SECURITY_NOTES.md](docs/AUTHORIZATION_SECURITY_NOTES.md).
 
 ## Repository Map
 
