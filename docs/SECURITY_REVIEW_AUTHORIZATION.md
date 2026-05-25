@@ -119,8 +119,9 @@ consistency between `actionData` and the public action fields. With
 manifest's audit commitment exists in the local audit log for the recorded audit
 agent and that the audit entry's structured authorization action matches the
 manifest action data, value, timestamp, and cumulative spend when those audit
-fields are present. It does not perform cryptographic proof verification
-locally.
+fields are present. If the manifest records `auditAgent`, `--audit-agent` must
+match it and cannot silently override it. It does not perform cryptographic
+proof verification locally.
 
 Decision: acceptable for the first proof-sharing manifest. Cryptographic
 verification remains the responsibility of the EVM verifier or dedicated

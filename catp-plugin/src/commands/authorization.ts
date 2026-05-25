@@ -229,10 +229,13 @@ export function cmdVerifyAuthorization(opts: { manifest?: string; checkAudit?: b
   validateAuthorizationProofManifest(manifest);
   const extraLines: string[] = [];
   if (opts.checkAudit) {
-    const auditAgent = opts.auditAgent ?? manifest.auditAgent;
     if (!manifest.auditCommitment) {
       throw new Error("manifest has no auditCommitment to check");
     }
+    if (opts.auditAgent && manifest.auditAgent && opts.auditAgent !== manifest.auditAgent) {
+      throw new Error("audit agent mismatch: --audit-agent does not match manifest auditAgent");
+    }
+    const auditAgent = manifest.auditAgent ?? opts.auditAgent;
     if (!auditAgent) {
       throw new Error("missing --audit-agent <id>; manifest does not include auditAgent");
     }

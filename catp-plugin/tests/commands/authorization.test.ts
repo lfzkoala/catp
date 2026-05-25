@@ -295,6 +295,22 @@ describe("authorization proof manifest", () => {
     ).toThrow("manifest not found");
   });
 
+  it("rejects audit-agent overrides that conflict with the manifest", () => {
+    const manifestPath = join(tmpBase, "audit-agent-mismatch-manifest.json");
+    writeFileSync(manifestPath, JSON.stringify(buildAuthorizationProofManifest(artifact, {
+      auditCommitment: "aa".repeat(32),
+      auditAgent: "manifest-agent",
+    })), "utf8");
+
+    expect(() =>
+      cmdVerifyAuthorization({
+        manifest: manifestPath,
+        checkAudit: true,
+        auditAgent: "other-agent",
+      }),
+    ).toThrow("audit agent mismatch");
+  });
+
   it("uses deployment metadata when writing a manifest", () => {
     const artifactPath = join(tmpBase, "artifact-with-deployment.json");
     const deploymentPath = join(tmpBase, "manifest-deployment.json");
