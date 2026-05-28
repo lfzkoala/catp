@@ -66,6 +66,7 @@ export function buildAuthorizationProofManifest(
   if (opts.auditAgent !== undefined) {
     assertNonEmptyString(opts.auditAgent, "auditAgent");
   }
+  validateAuditLink(opts.auditCommitment ?? null, opts.auditAgent ?? null);
   if (opts.verifier !== undefined) {
     assertAddress(opts.verifier, "verifier");
   }
@@ -119,6 +120,7 @@ export function validateAuthorizationProofManifest(manifest: AuthorizationProofM
   if (manifest.auditAgent !== null) {
     assertNonEmptyString(manifest.auditAgent, "auditAgent");
   }
+  validateAuditLink(manifest.auditCommitment, manifest.auditAgent);
   if (manifest.verifier !== null) {
     assertAddress(manifest.verifier, "verifier");
   }
@@ -232,13 +234,13 @@ export function cmdVerifyAuthorization(opts: { manifest?: string; checkAudit?: b
     if (!manifest.auditCommitment) {
       throw new Error("manifest has no auditCommitment to check");
     }
-    if (opts.auditAgent && manifest.auditAgent && opts.auditAgent !== manifest.auditAgent) {
+    if (!manifest.auditAgent) {
+      throw new Error("manifest has no auditAgent to check");
+    }
+    if (opts.auditAgent && opts.auditAgent !== manifest.auditAgent) {
       throw new Error("audit agent mismatch: --audit-agent does not match manifest auditAgent");
     }
-    const auditAgent = manifest.auditAgent ?? opts.auditAgent;
-    if (!auditAgent) {
-      throw new Error("missing --audit-agent <id>; manifest does not include auditAgent");
-    }
+    const auditAgent = manifest.auditAgent;
     const entry = findAuditEntry(auditAgent, manifest.auditCommitment);
     if (!entry) {
       throw new Error(`No audit entry found for commitment ${manifest.auditCommitment}`);
@@ -584,6 +586,15 @@ function assertCommitment(value: string, field: string): void {
 function assertNonEmptyString(value: string, field: string): void {
   if (value.length === 0) {
     throw new Error(`${field} must be a non-empty string`);
+  }
+}
+
+function validateAuditLink(auditCommitment: string | null, auditAgent: string | null): void {
+  if (auditCommitment && !auditAgent) {
+    throw new Error("auditAgent is required when auditCommitment is set");
+  }
+  if (auditAgent && !auditCommitment) {
+    throw new Error("auditCommitment is required when auditAgent is set");
   }
 }
 

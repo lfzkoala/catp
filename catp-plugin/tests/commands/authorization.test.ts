@@ -78,6 +78,7 @@ describe("authorization proof manifest", () => {
   it("builds and validates a manifest from a Groth16 artifact", () => {
     const manifest = buildAuthorizationProofManifest(artifact, {
       auditCommitment: "cd".repeat(32),
+      auditAgent: "manifest-agent",
       verifier: `0x${"12".repeat(20)}`,
       agentAuthorizer: `0x${"34".repeat(20)}`,
       chainId: "11155111",
@@ -88,7 +89,7 @@ describe("authorization proof manifest", () => {
       manifestVersion: "catp_authorization_proof_manifest_v1",
       proofVersion: "authorization_groth16_v1",
       auditCommitment: "cd".repeat(32),
-      auditAgent: null,
+      auditAgent: "manifest-agent",
       policyCommitment: artifact.policyCommitment,
       currentTimestamp: "1778042846",
       cumulativeSpend: "25",
@@ -161,11 +162,27 @@ describe("authorization proof manifest", () => {
     ).toThrow("proofUrl must use https, ipfs, ar, or localhost http");
 
     expect(() =>
+      buildAuthorizationProofManifest(artifact, { auditCommitment: "cd".repeat(32) }),
+    ).toThrow("auditAgent is required when auditCommitment is set");
+
+    expect(() =>
+      buildAuthorizationProofManifest(artifact, { auditAgent: "manifest-agent" }),
+    ).toThrow("auditCommitment is required when auditAgent is set");
+
+    expect(() =>
       validateAuthorizationProofManifest({
         ...buildAuthorizationProofManifest(artifact),
         proofUrl: "not-a-url",
       }),
     ).toThrow("proofUrl must be a valid URL");
+
+    expect(() =>
+      validateAuthorizationProofManifest({
+        ...buildAuthorizationProofManifest(artifact),
+        auditCommitment: "cd".repeat(32),
+        auditAgent: null,
+      }),
+    ).toThrow("auditAgent is required when auditCommitment is set");
   });
 
   it("accepts supported proofUrl schemes", () => {
@@ -192,6 +209,7 @@ describe("authorization proof manifest", () => {
       cmdProveAuthorization({
         artifact: artifactPath,
         auditCommitment: "ef".repeat(32),
+        agent: "manifest-agent",
         chainId: "11155111",
         out: outPath,
       });
@@ -203,6 +221,7 @@ describe("authorization proof manifest", () => {
     expect(JSON.parse(readFileSync(outPath, "utf8"))).toMatchObject({
       manifestVersion: "catp_authorization_proof_manifest_v1",
       auditCommitment: "ef".repeat(32),
+      auditAgent: "manifest-agent",
       sourceArtifact: artifactPath,
     });
     expect(output).toContain(`Wrote authorization proof manifest to ${outPath}`);
