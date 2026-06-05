@@ -273,7 +273,7 @@ describe("authorization proof manifest", () => {
     );
   });
 
-  it("rejects invalid prove and verify command inputs", () => {
+  it("rejects invalid prove and verify command inputs", async () => {
     const artifactPath = join(tmpBase, "command-input-artifact.json");
     const manifestPath = join(tmpBase, "command-input-manifest.json");
     writeFileSync(artifactPath, JSON.stringify(artifact), "utf8");
@@ -300,34 +300,34 @@ describe("authorization proof manifest", () => {
       }),
     ).toThrow("Full Groth16 proof generation requires a CATP repository checkout");
 
-    expect(() =>
+    await expect(
       cmdVerifyAuthorization({
         manifest: manifestPath,
         checkAudit: true,
       }),
-    ).toThrow("manifest has no auditCommitment");
+    ).rejects.toThrow("manifest has no auditCommitment");
 
-    expect(() =>
+    await expect(
       cmdVerifyAuthorization({
         manifest: join(tmpBase, "missing-manifest.json"),
       }),
-    ).toThrow("manifest not found");
+    ).rejects.toThrow("manifest not found");
   });
 
-  it("rejects audit-agent overrides that conflict with the manifest", () => {
+  it("rejects audit-agent overrides that conflict with the manifest", async () => {
     const manifestPath = join(tmpBase, "audit-agent-mismatch-manifest.json");
     writeFileSync(manifestPath, JSON.stringify(buildAuthorizationProofManifest(artifact, {
       auditCommitment: "aa".repeat(32),
       auditAgent: "manifest-agent",
     })), "utf8");
 
-    expect(() =>
+    await expect(
       cmdVerifyAuthorization({
         manifest: manifestPath,
         checkAudit: true,
         auditAgent: "other-agent",
       }),
-    ).toThrow("audit agent mismatch");
+    ).rejects.toThrow("audit agent mismatch");
   });
 
   it("uses deployment metadata when writing a manifest", () => {
@@ -360,7 +360,7 @@ describe("authorization proof manifest", () => {
     });
   });
 
-  it("builds a manifest from an audit commitment through the prover bridge", () => {
+  it("builds a manifest from an audit commitment through the prover bridge", async () => {
     const policyPath = join(tmpBase, "audit-policy.toml");
     const manifestPath = join(tmpBase, "audit-manifest.json");
     const fakeProverPath = join(tmpBase, "fake-groth16-prover.sh");
@@ -458,7 +458,7 @@ JSON
       return true;
     }) as typeof process.stdout.write;
     try {
-      cmdVerifyAuthorization({
+      await cmdVerifyAuthorization({
         manifest: manifestPath,
         checkAudit: true,
       });
@@ -473,7 +473,58 @@ JSON
     expect(output).toContain("cryptographicVerification=external:EVM-or-offchain-verifier");
   });
 
-  it("rejects audit-linked manifests when action data differs from the audit entry", () => {
+  it("rejects audit-linked manifests when the local audit chain is broken", async () => {
+    const manifestPath = join(tmpBase, "audit-broken-chain-manifest.json");
+    const firstCommitment = computeCommitment("Bash", "allow", "2026-01-03T00:00:00.000Z", "0", null, "{}");
+    const brokenCommitment = computeCommitment("Bash", "allow", "2026-01-03T00:00:01.000Z", "0", null, "{}");
+
+    appendAuditEntry("manifest-broken-chain-agent", {
+      ts: "2026-01-03T00:00:00.000Z",
+      tool: "Bash",
+      decision: "allow",
+      rule_matched: null,
+      commitment: firstCommitment,
+      input_summary: "{}",
+      authorization: {
+        actionType: "Swap",
+        protocol: artifactProtocol,
+        token: artifactToken,
+        value: "500",
+        currentTimestamp: "150",
+        cumulativeSpend: "0",
+      },
+    });
+    appendAuditEntry("manifest-broken-chain-agent", {
+      ts: "2026-01-03T00:00:01.000Z",
+      tool: "Bash",
+      decision: "allow",
+      rule_matched: null,
+      commitment: brokenCommitment,
+      input_summary: "{}",
+      authorization: {
+        actionType: "Swap",
+        protocol: artifactProtocol,
+        token: artifactToken,
+        value: "500",
+        currentTimestamp: "150",
+        cumulativeSpend: "0",
+      },
+    });
+
+    writeFileSync(manifestPath, JSON.stringify(buildAuthorizationProofManifest(artifact, {
+      auditCommitment: brokenCommitment,
+      auditAgent: "manifest-broken-chain-agent",
+    })), "utf8");
+
+    await expect(
+      cmdVerifyAuthorization({
+        manifest: manifestPath,
+        checkAudit: true,
+      }),
+    ).rejects.toThrow("audit log chain is broken");
+  });
+
+  it("rejects audit-linked manifests when action data differs from the audit entry", async () => {
     const policyPath = join(tmpBase, "audit-mismatch-policy.toml");
     const manifestPath = join(tmpBase, "audit-mismatch-manifest.json");
     const commitment = computeCommitment("Bash", "allow", "2026-01-02T00:00:00.000Z", "0", null, "{}");
@@ -510,12 +561,12 @@ allow = true
       auditAgent: "manifest-mismatch-agent",
     })), "utf8");
 
-    expect(() =>
+    await expect(
       cmdVerifyAuthorization({
         manifest: manifestPath,
         checkAudit: true,
       }),
-    ).toThrow("manifest actionData does not match audit authorization action");
+    ).rejects.toThrow("manifest actionData does not match audit authorization action");
   });
 
   it("formats a useful manifest summary", () => {

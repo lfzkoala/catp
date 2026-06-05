@@ -251,12 +251,12 @@ catp witness --audit-commitment <commitment> --out witness.json
 The witness summary prints a ready-to-edit `proveCommand=catp prove
 authorization ...` line that preserves the same audit source.
 
-`--check-audit` verifies that the audit commitment exists for the recorded audit
-agent and that the audit entry's structured authorization action matches the
-manifest action data, value, timestamp, and cumulative spend when those fields
-were recorded in the audit entry. Audit-linked manifests must include both
-`auditCommitment` and `auditAgent`; `--audit-agent` is only an optional guard
-that must match the manifest.
+`--check-audit` verifies that the recorded audit agent's local audit chain is
+intact, the audit commitment exists in that log, and the audit entry's structured
+authorization action matches the manifest action data, value, timestamp, and
+cumulative spend when those fields were recorded in the audit entry.
+Audit-linked manifests must include both `auditCommitment` and `auditAgent`;
+`--audit-agent` is only an optional guard that must match the manifest.
 
 For the complete Sepolia flow, see
 [`docs/E2E_GROTH16_SEPOLIA.md`](E2E_GROTH16_SEPOLIA.md).

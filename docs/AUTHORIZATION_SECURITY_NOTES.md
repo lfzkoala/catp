@@ -116,13 +116,13 @@ Regression/guard:
 shape. The CLI, SDK, and calldata encoder check the contract-facing shape,
 including 13 public inputs, 128-byte ABI `actionData`, 256-byte proof bytes, and
 consistency between `actionData` and the public action fields. With
-`--check-audit`, it also checks that the
-manifest's audit commitment exists in the local audit log for the recorded audit
-agent and that the audit entry's structured authorization action matches the
-manifest action data, value, timestamp, and cumulative spend when those audit
-fields are present. Audit-linked manifests must bind both `auditCommitment` and
-`auditAgent`; the optional `--audit-agent` flag is only a guard and must match
-the manifest. It does not perform cryptographic proof verification locally.
+`--check-audit`, it also checks that the recorded audit agent's local audit
+chain is intact, the manifest's audit commitment exists in that log, and the
+audit entry's structured authorization action matches the manifest action data,
+value, timestamp, and cumulative spend when those audit fields are present.
+Audit-linked manifests must bind both `auditCommitment` and `auditAgent`; the
+optional `--audit-agent` flag is only a guard and must match the manifest. It
+does not perform cryptographic proof verification locally.
 
 Decision: acceptable for the first proof-sharing manifest. Cryptographic
 verification remains the responsibility of the EVM verifier or dedicated

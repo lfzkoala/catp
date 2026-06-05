@@ -77,8 +77,8 @@ path.
 - `examples/authorization-basic`
 - Manifest validation checks proof version, 13 public inputs, 128-byte
   `actionData`, 256-byte proof bytes, and public input mirrors.
-- Audit-linked manifest validation checks audit entry presence and structured
-  authorization action consistency.
+- Audit-linked manifest validation checks local audit chain integrity, audit
+  entry presence, and structured authorization action consistency.
 - Calldata encoder validates the contract-facing artifact shape before emitting
   `registerPolicy` / `executeAuthorized` calldata.
 

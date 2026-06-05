@@ -3,7 +3,9 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildGroth16WitnessFromSources } from "./witness.js";
+import { auditLogFiles } from "./log.js";
 import { auditRoot } from "../audit/paths.js";
+import { verifyChain } from "../audit/verifier.js";
 import { findPolicyFile, loadPolicy } from "../policy/loader.js";
 import type { AuditEntry, AuthorizationAction } from "../policy/types.js";
 
@@ -219,7 +221,7 @@ export function readDeploymentMetadata(path: string): {
   return { verifier, agentAuthorizer, chainId };
 }
 
-export function cmdVerifyAuthorization(opts: { manifest?: string; checkAudit?: boolean; auditAgent?: string }): void {
+export async function cmdVerifyAuthorization(opts: { manifest?: string; checkAudit?: boolean; auditAgent?: string }): Promise<void> {
   if (!opts.manifest) {
     throw new Error("missing --manifest <path>");
   }
@@ -241,6 +243,7 @@ export function cmdVerifyAuthorization(opts: { manifest?: string; checkAudit?: b
       throw new Error("audit agent mismatch: --audit-agent does not match manifest auditAgent");
     }
     const auditAgent = manifest.auditAgent;
+    await verifyAuditLogIntegrity(auditAgent);
     const entry = findAuditEntry(auditAgent, manifest.auditCommitment);
     if (!entry) {
       throw new Error(`No audit entry found for commitment ${manifest.auditCommitment}`);
@@ -407,6 +410,15 @@ function findAuditEntry(agentId: string, commitment: string): AuditEntry | null 
     }
   }
   return null;
+}
+
+async function verifyAuditLogIntegrity(agentId: string): Promise<void> {
+  for (const { file } of auditLogFiles(agentId)) {
+    const result = await verifyChain(file);
+    if (!result.ok) {
+      throw new Error(`audit log chain is broken in ${file} at entry ${result.broken_at}: ${result.message}`);
+    }
+  }
 }
 
 function validateAuditEntryMatchesManifest(entry: AuditEntry, manifest: AuthorizationProofManifest): void {
