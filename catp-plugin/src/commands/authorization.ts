@@ -453,6 +453,7 @@ function validateAuditEntryMatchesManifest(entry: AuditEntry, manifest: Authoriz
 
 function validateActionDataMatchesPublicInputs(actionData: string, publicInputs: string[]): void {
   const decoded = decodeActionData(actionData);
+  normalizeAuthorizationActionType(decoded.actionType, "actionData actionType");
   if (decoded.actionType !== normalizeU64(publicInputs[1], "publicInputs[1]")) {
     throw new Error("actionData actionType must equal publicInputs[1]");
   }

@@ -150,6 +150,19 @@ describe("authorization proof manifest", () => {
     ).toThrow("actionData actionType must equal publicInputs[1]");
 
     expect(() =>
+      buildAuthorizationProofManifest({
+        ...artifact,
+        publicInputs: artifact.publicInputs.map((input, index) => index === 1 ? u64Input(4) : input),
+        actionData: actionData({
+          actionType: 4,
+          protocol: artifactProtocol,
+          token: artifactToken,
+          value: 500,
+        }),
+      }),
+    ).toThrow("actionData actionType must be Swap, Transfer, Deposit, Withdraw, or 0..3");
+
+    expect(() =>
       buildAuthorizationProofManifest(artifact, { chainId: "sepolia" }),
     ).toThrow("chainId must be a decimal integer string");
 

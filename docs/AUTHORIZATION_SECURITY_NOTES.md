@@ -100,13 +100,14 @@ The circuit range-checks `actionType` and `allowedAction` to `u64` and enforces
 equality. It does not independently constrain action enum values to `0..3`.
 
 Decision: accepted for the current EVM path because Solidity ABI enum decoding,
-the Go prover input parser, SDK, and plugin witness builder reject invalid enum
-values before proof use. Adding in-circuit enum bounds would require new setup,
-verifier deployment, and proof-version decision.
+the Go prover input parser, SDK, plugin witness builder, and CLI manifest
+validator reject invalid enum values before proof use. Adding in-circuit enum
+bounds would require new setup, verifier deployment, and proof-version decision.
 
 Regression/guard:
 
 - `catp-plugin/tests/commands/witness.test.ts`
+- `catp-plugin/tests/commands/authorization.test.ts`
 - `catp-sdk/tests/authorization/Groth16ProofArtifact.test.ts`
 - Solidity action-data decoding tests under `catp-contracts/test/authorization`
 
