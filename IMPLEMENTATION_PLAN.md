@@ -159,7 +159,7 @@ path.
 
 ### P0: Authorization Proof Security Hardening
 
-Status: ongoing guardrail work.
+Status: complete for `0.5.0`; retained as an ongoing release guardrail.
 
 Goal: keep `authorization_groth16_v1` from accepting invalid actions or drifting
 from its documented public input schema.
