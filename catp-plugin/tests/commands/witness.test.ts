@@ -3,7 +3,12 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { appendAuditEntry, computeCommitment } from "../../src/audit/logger.js";
-import { buildGroth16Witness, cmdWitness, formatGroth16WitnessSummary } from "../../src/commands/witness.js";
+import {
+  buildGroth16Witness,
+  buildGroth16WitnessFromSources,
+  cmdWitness,
+  formatGroth16WitnessSummary,
+} from "../../src/commands/witness.js";
 import type { CatpPolicy } from "../../src/policy/types.js";
 
 const tmpBase = join(tmpdir(), `catp-witness-test-${Date.now()}`);
@@ -80,6 +85,74 @@ describe("buildGroth16Witness", () => {
         value: "500",
       }),
     ).toThrow("protocol must match");
+
+    expect(() =>
+      buildGroth16Witness(policy, {
+        actionType: "Swap",
+        protocol: PROTOCOL,
+        token: `0x${"dd".repeat(32)}`,
+        value: "500",
+      }),
+    ).toThrow("token must match");
+  });
+
+  it("accepts numeric action types within 0..3 and rejects others", () => {
+    const depositPolicy: CatpPolicy = {
+      ...policy,
+      authorization: { ...policy.authorization!, allowed_action: "Deposit" },
+    };
+    const witness = buildGroth16Witness(
+      depositPolicy,
+      { actionType: "Deposit", protocol: PROTOCOL, token: TOKEN, value: "500" },
+      { currentTimestamp: "150" },
+    );
+    expect(witness.actionType).toBe("2");
+
+    expect(() =>
+      buildGroth16Witness(policy, {
+        actionType: "9",
+        protocol: PROTOCOL,
+        token: TOKEN,
+        value: "500",
+      }),
+    ).toThrow(/must be Swap, Transfer, Deposit, Withdraw, or 0\.\.3/);
+  });
+
+  it("rejects malformed encoding values", () => {
+    expect(() =>
+      buildGroth16Witness(policy, {
+        actionType: "Swap",
+        protocol: "0x123",
+        token: TOKEN,
+        value: "500",
+      }),
+    ).toThrow("protocol must be a 0x-prefixed 32-byte hex string");
+
+    expect(() =>
+      buildGroth16Witness(policy, {
+        actionType: "Swap",
+        protocol: PROTOCOL,
+        token: TOKEN,
+        value: "abc",
+      }),
+    ).toThrow("value must be an integer string");
+
+    expect(() =>
+      buildGroth16Witness(policy, {
+        actionType: "Swap",
+        protocol: PROTOCOL,
+        token: TOKEN,
+        value: "18446744073709551616",
+      }),
+    ).toThrow("value must fit in u64");
+
+    expect(() =>
+      buildGroth16Witness(
+        policy,
+        { actionType: "Swap", protocol: PROTOCOL, token: TOKEN, value: "500" },
+        { currentTimestamp: Number.MAX_SAFE_INTEGER + 1 },
+      ),
+    ).toThrow("currentTimestamp must be a safe integer");
   });
 
   it("rejects missing authorization config", () => {
@@ -230,6 +303,80 @@ allow = true
     );
   });
 
+  it("prints witness JSON to stdout when --out is omitted", () => {
+    const policyPath = join(tmpBase, "catp-policy.toml");
+    const actionPath = join(tmpBase, "action.json");
+
+    const originalWrite = process.stdout.write.bind(process.stdout);
+    let output = "";
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      output += chunk.toString();
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      cmdWitness({ file: policyPath, action: actionPath, currentTimestamp: "150" });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    expect(JSON.parse(output)).toMatchObject({ actionType: "0", value: "500" });
+  });
+});
+
+describe("buildGroth16WitnessFromSources", () => {
+  const policyPath = join(tmpBase, "catp-policy.toml");
+  const actionPath = join(tmpBase, "action.json");
+
+  it("requires exactly one of --action or --audit-commitment", () => {
+    expect(() => buildGroth16WitnessFromSources({ file: policyPath })).toThrow(
+      "missing --action",
+    );
+    expect(() =>
+      buildGroth16WitnessFromSources({
+        file: policyPath,
+        action: actionPath,
+        auditCommitment: "aa".repeat(32),
+      }),
+    ).toThrow("use only one of");
+  });
+
+  it("throws when no policy file can be found", () => {
+    expect(() => buildGroth16WitnessFromSources({ action: actionPath })).toThrow(
+      "Could not find catp-policy.toml",
+    );
+  });
+
+  it("rejects malformed or unknown audit commitments", () => {
+    expect(() =>
+      buildGroth16WitnessFromSources({ file: policyPath, auditCommitment: "not-hex" }),
+    ).toThrow("must be a 64-character hex commitment");
+
+    expect(() =>
+      buildGroth16WitnessFromSources({
+        file: policyPath,
+        auditCommitment: "ee".repeat(32),
+      }),
+    ).toThrow("No audit entry found for commitment");
+  });
+
+  it("rejects audit entries without authorization action data", () => {
+    const commitment = computeCommitment("Bash", "allow", "2026-01-02T00:00:00.000Z", "0", null, "{}");
+    appendAuditEntry("test-agent", {
+      ts: "2026-01-02T00:00:00.000Z",
+      tool: "Bash",
+      decision: "allow",
+      rule_matched: null,
+      commitment,
+      input_summary: "{}",
+    });
+
+    expect(() =>
+      buildGroth16WitnessFromSources({ file: policyPath, auditCommitment: commitment }),
+    ).toThrow("does not contain authorization action data");
+  });
+});
+
+describe("formatGroth16WitnessSummary", () => {
   it("formats a useful witness summary", () => {
     const witness = buildGroth16Witness(
       policy,

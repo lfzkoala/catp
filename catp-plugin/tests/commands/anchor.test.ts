@@ -1,8 +1,25 @@
-import { describe, it, expect, afterEach, beforeEach } from "@jest/globals";
+import { describe, it, expect, afterEach, beforeEach, jest } from "@jest/globals";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { readCommitments, merkleRoot, cmdAnchor } from "../../src/commands/anchor.js";
+
+// anchor.ts imports viem lazily inside submitOnChain, so register the mocks
+// before cmdAnchor triggers the dynamic import.
+jest.unstable_mockModule("viem", () => ({
+  createPublicClient: () => ({
+    getChainId: async () => 11155111,
+    waitForTransactionReceipt: async () => ({}),
+  }),
+  createWalletClient: () => ({
+    writeContract: async () => `0x${"ab".repeat(32)}`,
+  }),
+  http: () => ({}),
+  defineChain: (config: unknown) => config,
+}));
+jest.unstable_mockModule("viem/accounts", () => ({
+  privateKeyToAccount: () => ({}),
+}));
 
 const TEST_AGENT = `__test_anchor__${Date.now()}`;
 const TEST_HOME = join(tmpdir(), `catp-plugin-anchor-test-${Date.now()}`);
@@ -155,5 +172,51 @@ describe("cmdAnchor", () => {
 
   it("throws when agent id cannot be resolved and no policy file is present", async () => {
     await expect(cmdAnchor({ dryRun: true })).rejects.toThrow(/agent ID/i);
+  });
+
+  it("resolves agent id from catp-policy.toml when --agent is omitted", async () => {
+    const policyDir = join(TEST_HOME, "policy-cwd");
+    mkdirSync(policyDir, { recursive: true });
+    writeFileSync(
+      join(policyDir, "catp-policy.toml"),
+      'rules = []\n\n[agent]\nid = "policy-agent"\nversion = "1"\n',
+      "utf8",
+    );
+    const prevCwd = process.cwd();
+    process.chdir(policyDir);
+    try {
+      await cmdAnchor({ dryRun: true });
+      expect(output).toContain("policy-agent");
+      expect(output).toContain("No audit entries");
+    } finally {
+      process.chdir(prevCwd);
+    }
+  });
+
+  it("falls through to an error when catp-policy.toml is invalid", async () => {
+    const policyDir = join(TEST_HOME, "policy-bad-cwd");
+    mkdirSync(policyDir, { recursive: true });
+    writeFileSync(
+      join(policyDir, "catp-policy.toml"),
+      'rules = []\n\n[agent]\nid = ""\nversion = "1"\n',
+      "utf8",
+    );
+    const prevCwd = process.cwd();
+    process.chdir(policyDir);
+    try {
+      await expect(cmdAnchor({ dryRun: true })).rejects.toThrow(/agent ID/i);
+    } finally {
+      process.chdir(prevCwd);
+    }
+  });
+
+  it("submits the merkle root on-chain when env vars are set", async () => {
+    writeEntries(TEST_AGENT, "2026-01-01", ["a".repeat(64)]);
+    process.env.CATP_RPC_URL = "http://localhost:8545";
+    process.env.CATP_PRIVATE_KEY = `0x${"11".repeat(32)}`;
+    process.env.CATP_CONTRACT_ADDRESS = `0x${"22".repeat(20)}`;
+    await cmdAnchor({ agent: TEST_AGENT, dryRun: false });
+    expect(output).toContain("Submitting to chain...");
+    expect(output).toContain(`Transaction: 0x${"ab".repeat(32)}`);
   });
 });
