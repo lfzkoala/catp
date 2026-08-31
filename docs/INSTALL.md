@@ -118,6 +118,10 @@ catp receipt verify \
   --json
 ```
 
+`--public-key` must point to a trusted public key obtained separately from the
+receipt. CATP does not treat the public key embedded in a receipt as a trust
+anchor.
+
 Use `--tool <name>` instead of `--latest` when you want the newest audit entry
 from a specific tool. Add `--decision allow|deny` with `--latest` or `--tool`
 when you want the newest matching allow/deny entry.

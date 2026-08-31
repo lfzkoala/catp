@@ -186,7 +186,7 @@ receipt
   .command("verify")
   .description("Verify a signed CATP authorization receipt")
   .requiredOption("--receipt <path>", "catp_authorization_receipt_v1 JSON")
-  .option("--public-key <path>", "Ed25519 public key PEM; defaults to publicKeyPem embedded in the receipt")
+  .requiredOption("--public-key <path>", "trusted Ed25519 public key PEM")
   .option("--audit-export <path>", "also check the receipt against a catp_audit_export_v1 JSON bundle")
   .option("-f, --file <path>", "also check the receipt against a catp-policy.toml commitment")
   .option("--json", "write verification summary as JSON")

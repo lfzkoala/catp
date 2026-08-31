@@ -179,8 +179,11 @@ export function cmdReceiptVerify(opts: { receipt?: string; publicKey?: string; a
   if (!opts.receipt) {
     throw new Error("missing --receipt <path>");
   }
+  if (!opts.publicKey) {
+    throw new Error("missing --public-key <path>; receipt verification requires a trusted external public key");
+  }
   const receipt = readAuthorizationReceipt(opts.receipt);
-  const publicKeyPem = opts.publicKey ? readFileSync(opts.publicKey, "utf8") : receipt.publicKeyPem;
+  const publicKeyPem = readFileSync(opts.publicKey, "utf8");
   verifyAuthorizationReceipt(receipt, publicKeyPem);
   if (opts.auditExport) {
     const auditExport = readAuditExport(opts.auditExport);

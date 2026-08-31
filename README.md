@@ -143,6 +143,8 @@ allow/deny entry.
 Receipts use `catp_authorization_receipt_v1` and Ed25519 signatures. The signed
 payload binds the audit export hash, audit commitment, entry hash, agent id,
 tool, decision, timestamp, policy commitment, and signer public key.
+Verification requires a separately obtained trusted public key; the key embedded
+in a receipt is signed data, not a trust anchor.
 
 For a minimal fixture, see [examples/receipt-basic](examples/receipt-basic).
 

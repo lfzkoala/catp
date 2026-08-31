@@ -360,6 +360,19 @@ describe("authorization receipt", () => {
     expect(summary.signedAt).toBe("2026-01-01T00:00:01.000Z");
   });
 
+  it("requires an external public key when verifying a receipt", () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const receipt = signAuthorizationReceipt(auditExport(), privateKeyPem, publicKeyPem);
+    const dir = join(TEST_HOME, "verify-without-key");
+    mkdirSync(dir, { recursive: true });
+    const receiptPath = join(dir, "receipt.json");
+    writeFileSync(receiptPath, stableStringify(receipt, 2) + "\n", "utf8");
+
+    expect(() => cmdReceiptVerify({ receipt: receiptPath })).toThrow(
+      "missing --public-key <path>",
+    );
+  });
+
   it("writes a text receipt verification summary", () => {
     const { privateKeyPem, publicKeyPem } = keyPair();
     const exportedAudit = auditExport();
