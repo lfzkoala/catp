@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { auditDirForDate } from "./paths.js";
 import type { AuditEntry, AuthorizationAction } from "../policy/types.js";
 import type { ToolAction } from "../runtime/types.js";
+import type { RuntimePhase } from "../runtime/types.js";
 
 // Phase 0: SHA-256 audit commitment.
 // Chains on fields stored in the log (tool, decision, ts, prev) so the chain
@@ -17,9 +18,12 @@ export function computeCommitment(
   ruleMatched: string | null = null,
   inputSummary: string = "",
   authorization?: AuthorizationAction,
-  commitmentVersion: 1 | 2 = 1,
+  commitmentVersion: 1 | 2 | 3 = 1,
+  phase?: RuntimePhase,
 ): string {
-  const payload = commitmentVersion === 2
+  const payload = commitmentVersion === 3
+    ? { commitmentVersion, phase, tool, decision, ts, ruleMatched, inputSummary, authorization: authorization ?? null, prev }
+    : commitmentVersion === 2
     ? { commitmentVersion, tool, decision, ts, ruleMatched, inputSummary, authorization: authorization ?? null, prev }
     : { tool, decision, ts, ruleMatched, inputSummary, prev };
   return createHash("sha256")
@@ -67,7 +71,8 @@ export function buildEntry(
   const inputSummary = summarizeInput(input);
   const authorization = extractAuthorizationAction(input);
   const entry: AuditEntry = {
-    commitment_version: 2,
+    commitment_version: 3,
+    phase: input.phase,
     ts,
     tool: input.toolName,
     decision,
@@ -80,7 +85,8 @@ export function buildEntry(
       ruleMatched,
       inputSummary,
       authorization,
-      2,
+      3,
+      input.phase,
     ),
     input_summary: inputSummary,
   };

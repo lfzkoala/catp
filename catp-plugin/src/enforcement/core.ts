@@ -24,7 +24,7 @@ export function evaluatePreAction(
     allow: decision.allow,
     reason: decision.reason,
     auditEntry: buildEntry(
-      action,
+      { ...action, phase: "pre" },
       decision.allow ? "allow" : "deny",
       ruleName,
       prevCommitment
@@ -39,6 +39,6 @@ export function recordPostAction(
   return {
     allow: true,
     reason: "post-action audit record",
-    auditEntry: buildEntry(action, "allow", null, prevCommitment),
+    auditEntry: buildEntry({ ...action, phase: "post" }, "allow", null, prevCommitment),
   };
 }

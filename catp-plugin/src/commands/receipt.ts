@@ -61,6 +61,7 @@ export function cmdReceiptSign(opts: { auditExport?: string; privateKey?: string
   }
 
   const auditExport = readAuditExport(opts.auditExport);
+  assertPreEnforcementAuditExport(auditExport);
   const privateKeyPem = readFileSync(opts.privateKey, "utf8");
   const publicKeyPem = derivePublicKeyPem(privateKeyPem);
   const policyCommitment = opts.file ? computePolicyCommitment(loadPolicy(opts.file)) : resolvePolicyCommitmentIfPresent();
@@ -135,6 +136,7 @@ async function issueReceipt(opts: {
   await verifyAuditLogIntegrity(agentId);
   const commitment = resolveIssueCommitment(agentId, opts);
   const auditExport = buildAuditExport(agentId, commitment);
+  assertPreEnforcementAuditExport(auditExport);
   const privateKeyPem = readFileSync(opts.privateKey, "utf8");
   const publicKeyPem = derivePublicKeyPem(privateKeyPem);
   const receipt = signAuthorizationReceipt(auditExport, privateKeyPem, publicKeyPem, {
@@ -170,6 +172,7 @@ function resolveIssueCommitment(agentId: string, opts: { commitment?: string; la
     return opts.commitment;
   }
   return latestAuditCommitment(agentId, {
+    phase: "pre",
     ...(opts.tool ? { tool: opts.tool } : {}),
     ...(opts.decision ? { decision: opts.decision } : {}),
   });
@@ -341,6 +344,12 @@ function validateAuditExport(value: unknown): asserts value is AuditExport {
   const expectedEntryHash = sha256Hex(stableStringify(auditExport.entry));
   if (auditExport.entrySha256 !== expectedEntryHash) {
     throw new Error("audit export entrySha256 does not match entry");
+  }
+}
+
+function assertPreEnforcementAuditExport(auditExport: AuditExport): void {
+  if (auditExport.entry.phase === "post") {
+    throw new Error("authorization receipts require a pre-enforcement audit entry");
   }
 }
 

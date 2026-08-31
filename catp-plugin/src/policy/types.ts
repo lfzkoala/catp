@@ -18,8 +18,11 @@ export interface CatpPolicy {
   authorization?: AuthorizationConfig;
 }
 
+import type { RuntimePhase } from "../runtime/types.js";
+
 export interface AuditEntry {
-  commitment_version?: 1 | 2;
+  commitment_version?: 1 | 2 | 3;
+  phase?: RuntimePhase;
   ts: string;
   tool: string;
   decision: "allow" | "deny";

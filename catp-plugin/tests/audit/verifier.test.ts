@@ -115,6 +115,21 @@ describe('verifyChain', () => {
     expect(result.message).toContain('commitment mismatch');
   });
 
+  it('detects tampering with the runtime phase', async () => {
+    const entry = buildEntry({
+      runtime: 'test-runtime',
+      phase: 'pre',
+      toolName: 'Bash',
+      toolInput: { command: 'echo ok' },
+    }, 'allow', null);
+    const path = writeLog('tampered-phase.jsonl', [{ ...entry, phase: 'post' }]);
+
+    const result = await verifyChain(path);
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('commitment mismatch');
+  });
+
   it('reports invalid JSON with broken_at pointing to the bad line', async () => {
     const e1 = makeEntry('Bash', 'allow', '2026-01-01T00:00:00.000Z');
     const path = join(tmpBase, 'badjson.jsonl');

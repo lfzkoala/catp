@@ -228,7 +228,7 @@ export function buildAuditExport(agentId: string, commitment: string): AuditExpo
 
 export function latestAuditEntry(
   agentId: string,
-  opts: { tool?: string; decision?: "allow" | "deny" } = {}
+  opts: { tool?: string; decision?: "allow" | "deny"; phase?: "pre" | "post" } = {}
 ): { date: string; index: number; entry: AuditEntry } | null {
   const files = auditLogFiles(agentId).slice().reverse();
   for (const { date, file } of files) {
@@ -242,6 +242,9 @@ export function latestAuditEntry(
         if (opts.decision && entry.decision !== opts.decision) {
           continue;
         }
+        if (opts.phase && entry.phase !== undefined && entry.phase !== opts.phase) {
+          continue;
+        }
         return { date, index, entry };
       } catch {
         // skip malformed audit lines; chain verification reports them separately
@@ -251,7 +254,10 @@ export function latestAuditEntry(
   return null;
 }
 
-export function latestAuditCommitment(agentId: string, opts: { tool?: string; decision?: "allow" | "deny" } = {}): string {
+export function latestAuditCommitment(
+  agentId: string,
+  opts: { tool?: string; decision?: "allow" | "deny"; phase?: "pre" | "post" } = {},
+): string {
   const latest = latestAuditEntry(agentId, opts);
   if (!latest) {
     if (opts.tool && opts.decision) {

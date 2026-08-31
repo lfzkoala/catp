@@ -3,7 +3,7 @@ import { createHash, generateKeyPairSync } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { computeCommitment } from "../../src/audit/logger.js";
+import { buildEntry, computeCommitment } from "../../src/audit/logger.js";
 import {
   cmdReceiptIssue,
   cmdReceiptKeygen,
@@ -308,6 +308,27 @@ describe("authorization receipt", () => {
     expect(() => cmdReceiptSign({ auditExport: "audit-export.json" })).toThrow("missing --private-key");
   });
 
+  it("rejects signing a post-action audit export", () => {
+    const { privateKeyPem } = keyPair();
+    const post = buildEntry({
+      runtime: "test-runtime",
+      phase: "post",
+      toolName: "Bash",
+      toolInput: { command: "echo ok" },
+    }, "allow", null);
+    const dir = join(TEST_HOME, "sign-post");
+    mkdirSync(dir, { recursive: true });
+    const auditExportPath = join(dir, "audit-export.json");
+    const privateKeyPath = join(dir, "private.pem");
+    writeFileSync(auditExportPath, stableStringify(auditExportFrom(post), 2) + "\n", "utf8");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+
+    expect(() => cmdReceiptSign({
+      auditExport: auditExportPath,
+      privateKey: privateKeyPath,
+    })).toThrow("pre-enforcement audit entry");
+  });
+
   it("writes a JSON receipt verification summary", () => {
     const { privateKeyPem, publicKeyPem } = keyPair();
     const signedPolicy = policy();
@@ -551,6 +572,69 @@ describe("authorization receipt", () => {
     expect(() => verifyAuthorizationReceipt(receipt, publicKeyPem)).not.toThrow();
     expect(receipt.auditCommitment).toBe(second.commitment);
     expect(receipt.tool).toBe("Write");
+  });
+
+  it("issues the latest pre-enforcement decision instead of a post-action record", async () => {
+    const { privateKeyPem } = keyPair();
+    const action = {
+      runtime: "test-runtime",
+      phase: "pre" as const,
+      toolName: "Bash",
+      toolInput: { command: "echo ok" },
+    };
+    const pre = buildEntry(action, "allow", "Bash:allow");
+    const post = buildEntry({ ...action, phase: "post" }, "allow", null, pre.commitment);
+    writeAuditEntries("receipt-agent", "2026-01-01", [
+      auditExportFrom(pre, 0),
+      auditExportFrom(post, 1),
+    ]);
+    const dir = join(TEST_HOME, "latest-pre-issue");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    const receiptPath = join(dir, "receipt.json");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    try {
+      await cmdReceiptIssue({
+        agent: "receipt-agent",
+        latest: true,
+        privateKey: privateKeyPath,
+        out: receiptPath,
+      });
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8")) as AuthorizationReceipt;
+    expect(receipt.auditCommitment).toBe(pre.commitment);
+  });
+
+  it("rejects issuing a receipt for an explicit post-action commitment", async () => {
+    const { privateKeyPem } = keyPair();
+    const action = {
+      runtime: "test-runtime",
+      phase: "pre" as const,
+      toolName: "Bash",
+      toolInput: { command: "echo ok" },
+    };
+    const pre = buildEntry(action, "allow", "Bash:allow");
+    const post = buildEntry({ ...action, phase: "post" }, "allow", null, pre.commitment);
+    writeAuditEntries("receipt-agent", "2026-01-01", [
+      auditExportFrom(pre, 0),
+      auditExportFrom(post, 1),
+    ]);
+    const dir = join(TEST_HOME, "explicit-post-issue");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+
+    await expect(cmdReceiptIssue({
+      agent: "receipt-agent",
+      commitment: post.commitment,
+      privateKey: privateKeyPath,
+    })).rejects.toThrow("pre-enforcement audit entry");
   });
 
   it("issues a receipt for the latest audit entry matching a tool", async () => {

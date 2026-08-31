@@ -26,6 +26,7 @@ describe('evaluatePreAction', () => {
     expect(result.allow).toBe(true);
     expect(result.reason).toBe('ok');
     expect(result.auditEntry.tool).toBe('Bash');
+    expect(result.auditEntry).toMatchObject({ phase: 'pre' });
     expect(result.auditEntry.decision).toBe('allow');
     expect(result.auditEntry.rule_matched).toBe('Bash:allow');
     expect(result.auditEntry.commitment).toMatch(/^[0-9a-f]{64}$/);
@@ -50,6 +51,7 @@ describe('recordPostAction', () => {
 
     expect(result.allow).toBe(true);
     expect(result.auditEntry.tool).toBe('Write');
+    expect(result.auditEntry).toMatchObject({ phase: 'post' });
     expect(result.auditEntry.decision).toBe('allow');
     expect(result.auditEntry.rule_matched).toBeNull();
   });

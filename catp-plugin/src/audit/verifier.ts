@@ -26,7 +26,12 @@ export async function verifyChain(logFile: string): Promise<VerifyResult> {
     }
 
     const decision = entry.decision as "allow" | "deny";
-    if (entry.commitment_version !== undefined && entry.commitment_version !== 1 && entry.commitment_version !== 2) {
+    if (
+      entry.commitment_version !== undefined &&
+      entry.commitment_version !== 1 &&
+      entry.commitment_version !== 2 &&
+      entry.commitment_version !== 3
+    ) {
       return {
         ok: false,
         checked: i,
@@ -35,6 +40,14 @@ export async function verifyChain(logFile: string): Promise<VerifyResult> {
       };
     }
     const commitmentVersion = entry.commitment_version ?? 1;
+    if (commitmentVersion === 3 && entry.phase !== "pre" && entry.phase !== "post") {
+      return {
+        ok: false,
+        checked: i,
+        broken_at: i,
+        message: `line ${i + 1}: commitment version 3 requires a valid phase`,
+      };
+    }
     const expected = computeCommitment(
       entry.tool,
       decision,
@@ -44,6 +57,7 @@ export async function verifyChain(logFile: string): Promise<VerifyResult> {
       entry.input_summary,
       entry.authorization,
       commitmentVersion,
+      entry.phase,
     );
     if (entry.commitment !== expected) {
       return {

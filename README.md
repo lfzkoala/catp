@@ -135,8 +135,9 @@ catp receipt verify \
 ```
 
 `catp receipt issue` verifies the local audit chain before signing. Use
-`--latest` for the newest audit entry, or `--commitment <hex>` for a specific
-entry. Use `--tool <name>` for the newest entry from a specific tool, and
+`--latest` for the newest pre-enforcement decision, or `--commitment <hex>` for
+a specific pre-enforcement decision. Use `--tool <name>` for the newest entry
+from a specific tool, and
 `--decision allow|deny` with `--latest` or `--tool` when you want a matching
 allow/deny entry.
 
