@@ -334,6 +334,7 @@ Key files:
 ```text
 catp-sdk/src/authorization/Groth16ProofArtifact.ts
 catp-sdk/src/authorization/AuthorizerClient.ts
+catp-sdk/src/authorization/PolicyBuilder.ts
 ```
 
 Main adapter flow:

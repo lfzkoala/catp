@@ -1,5 +1,8 @@
 # CATP CLI 0.4.0 Release Checklist
 
+Status: released. `@catp-protocol/cli@0.4.0` is published on npm and tagged
+as `v0.4.0`.
+
 Package:
 
 ```text
