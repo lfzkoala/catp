@@ -196,6 +196,10 @@ Runtime hook writers hold a per-agent, per-day cross-process lock while reading
 the previous commitment, constructing the next entry, and appending it. This
 prevents concurrent pre/post hook processes from creating sibling chain heads.
 
+`catp anchor` verifies these chains and exports a `catp_audit_anchor_v1`
+Merkle-root bundle. Authorization policy registration is a separate contract
+operation; audit roots must not be submitted through `registerPolicy`.
+
 ---
 
 ## Authorization Policy Schema

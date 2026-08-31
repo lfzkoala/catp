@@ -60,7 +60,7 @@ path.
 - Runtime-neutral `ToolAction` enforcement core with a Claude Code adapter
 - `PreToolUse` / `PostToolUse` hook handlers
 - Local audit log with commitment-chain verification
-- CLI commands: `init`, `validate`, `hook`, `log`, `anchor`
+- CLI commands: `init`, `validate`, `hook`, `log`, and audit-root bundle export via `anchor`
 - npm package: `@catp-protocol/cli`
 - install documentation and smoke-test flow
 

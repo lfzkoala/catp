@@ -111,7 +111,12 @@ catp log show --tool Write --decision deny
 catp log export --latest --out catp-audit-export.json
 catp log show --commitments
 catp log verify
+catp anchor --out catp-audit-anchor.json
 ```
+
+`catp anchor` verifies the local chains and exports a Merkle-root bundle for an
+external anchoring system. It does not register the audit root as an
+authorization policy or submit a transaction itself.
 
 ## Signed Receipts
 

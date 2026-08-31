@@ -1,19 +1,18 @@
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { auditRoot } from "../audit/paths.js";
+import { verifyChain } from "../audit/verifier.js";
+import { auditLogFiles } from "./log.js";
 import { findPolicyFile, loadPolicy } from "../policy/loader.js";
 import type { AuditEntry } from "../policy/types.js";
 
-const REGISTER_POLICY_ABI = [
-  {
-    name: "registerPolicy",
-    type: "function",
-    inputs: [{ name: "policyCommitment", type: "bytes32" }],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-] as const;
+export interface AuditAnchorBundle {
+  anchorVersion: "catp_audit_anchor_v1";
+  agentId: string;
+  commitmentCount: number;
+  merkleRoot: `0x${string}`;
+}
 
 function resolveAgentId(opts: { agent?: string }): string {
   if (opts.agent) return opts.agent;
@@ -40,13 +39,17 @@ export function readCommitments(agentId: string): string[] {
     const file = join(baseDir, date, "actions.jsonl");
     if (!existsSync(file)) continue;
     const lines = readFileSync(file, "utf8").trimEnd().split("\n").filter(Boolean);
-    for (const line of lines) {
+    for (let index = 0; index < lines.length; index++) {
+      let entry: AuditEntry;
       try {
-        const entry = JSON.parse(line) as AuditEntry;
-        if (entry.commitment) commitments.push(entry.commitment);
+        entry = JSON.parse(lines[index]) as AuditEntry;
       } catch {
-        // skip malformed lines
+        throw new Error(`invalid JSON in ${file} at line ${index + 1}`);
       }
+      if (typeof entry.commitment !== "string" || !/^[0-9a-f]{64}$/i.test(entry.commitment)) {
+        throw new Error(`invalid commitment in ${file} at line ${index + 1}`);
+      }
+      commitments.push(entry.commitment);
     }
   }
   return commitments;
@@ -78,44 +81,19 @@ export function merkleRoot(commitments: string[]): `0x${string}` {
   return `0x${level[0].toString("hex")}`;
 }
 
-async function submitOnChain(
-  root: `0x${string}`,
-  rpcUrl: string,
-  privateKey: string,
-  contractAddress: string,
-): Promise<string> {
-  const { createPublicClient, createWalletClient, http, defineChain } = await import("viem");
-  const { privateKeyToAccount } = await import("viem/accounts");
-
-  const publicClient = createPublicClient({ transport: http(rpcUrl) });
-  const chainId = await publicClient.getChainId();
-
-  const chain = defineChain({
-    id: chainId,
-    name: "catp-network",
-    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-    rpcUrls: { default: { http: [rpcUrl] } },
-  });
-
-  const account = privateKeyToAccount(privateKey as `0x${string}`);
-  const walletClient = createWalletClient({ account, chain, transport: http(rpcUrl) });
-
-  const hash = await walletClient.writeContract({
-    address: contractAddress as `0x${string}`,
-    abi: REGISTER_POLICY_ABI,
-    functionName: "registerPolicy",
-    args: [root],
-  });
-
-  await publicClient.waitForTransactionReceipt({ hash });
-  return hash;
-}
-
 export async function cmdAnchor(opts: {
   agent?: string;
-  dryRun?: boolean;
+  out?: string;
 }): Promise<void> {
   const agentId = resolveAgentId(opts);
+  const logFiles = auditLogFiles(agentId);
+  for (const { file } of logFiles) {
+    const result = await verifyChain(file);
+    if (!result.ok) {
+      throw new Error(`audit chain broken in ${file}: ${result.message}`);
+    }
+  }
+
   const commitments = readCommitments(agentId);
   const root = merkleRoot(commitments);
 
@@ -128,22 +106,15 @@ export async function cmdAnchor(opts: {
     return;
   }
 
-  const rpcUrl = process.env.CATP_RPC_URL;
-  const privateKey = process.env.CATP_PRIVATE_KEY;
-  const contractAddress = process.env.CATP_CONTRACT_ADDRESS;
-
-  if (opts.dryRun || !rpcUrl || !privateKey || !contractAddress) {
-    if (!opts.dryRun) {
-      process.stdout.write(
-        "\nSet CATP_RPC_URL, CATP_PRIVATE_KEY, and CATP_CONTRACT_ADDRESS to submit on-chain.\n",
-      );
-    } else {
-      process.stdout.write("\nDry run — skipping on-chain submission.\n");
-    }
-    return;
+  if (opts.out) {
+    const bundle: AuditAnchorBundle = {
+      anchorVersion: "catp_audit_anchor_v1",
+      agentId,
+      commitmentCount: commitments.length,
+      merkleRoot: root,
+    };
+    mkdirSync(dirname(opts.out), { recursive: true });
+    writeFileSync(opts.out, JSON.stringify(bundle, null, 2) + "\n", "utf8");
+    process.stdout.write(`Anchor bundle written to ${opts.out}\n`);
   }
-
-  process.stdout.write("Submitting to chain...\n");
-  const txHash = await submitOnChain(root, rpcUrl, privateKey, contractAddress);
-  process.stdout.write(`Transaction: ${txHash}\n`);
 }

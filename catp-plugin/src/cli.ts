@@ -105,9 +105,9 @@ log
 
 program
   .command("anchor")
-  .description("Batch audit commitments into a Merkle root and submit on-chain")
+  .description("Verify audit logs and compute a Merkle root bundle for external anchoring")
   .option("--agent <id>", "agent id (default: from policy file)")
-  .option("--dry-run", "compute and print the Merkle root without submitting")
+  .option("--out <path>", "write catp_audit_anchor_v1 JSON to file")
   .action(cmdAnchor);
 
 program

@@ -97,7 +97,12 @@ catp log show --tool Write --decision deny
 catp log export --latest --out catp-audit-export.json
 catp log show --commitments
 catp log verify
+catp anchor --out catp-audit-anchor.json
 ```
+
+The anchor command verifies each local log chain before writing a
+`catp_audit_anchor_v1` Merkle-root bundle. CATP does not currently ship a
+dedicated on-chain audit anchor contract, so this command does not broadcast.
 
 Sign and verify a receipt. This is the default external verification path and
 does not require the Groth16 prover stack:

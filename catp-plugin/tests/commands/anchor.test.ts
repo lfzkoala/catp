@@ -1,25 +1,9 @@
-import { describe, it, expect, afterEach, beforeEach, jest } from "@jest/globals";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { describe, it, expect, afterEach, beforeEach } from "@jest/globals";
+import { mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { readCommitments, merkleRoot, cmdAnchor } from "../../src/commands/anchor.js";
-
-// anchor.ts imports viem lazily inside submitOnChain, so register the mocks
-// before cmdAnchor triggers the dynamic import.
-jest.unstable_mockModule("viem", () => ({
-  createPublicClient: () => ({
-    getChainId: async () => 11155111,
-    waitForTransactionReceipt: async () => ({}),
-  }),
-  createWalletClient: () => ({
-    writeContract: async () => `0x${"ab".repeat(32)}`,
-  }),
-  http: () => ({}),
-  defineChain: (config: unknown) => config,
-}));
-jest.unstable_mockModule("viem/accounts", () => ({
-  privateKeyToAccount: () => ({}),
-}));
+import { computeCommitment } from "../../src/audit/logger.js";
 
 const TEST_AGENT = `__test_anchor__${Date.now()}`;
 const TEST_HOME = join(tmpdir(), `catp-plugin-anchor-test-${Date.now()}`);
@@ -48,6 +32,25 @@ function writeEntries(agentId: string, date: string, commitments: string[]): voi
   writeFileSync(join(dir, "actions.jsonl"), lines + "\n", "utf8");
 }
 
+function writeValidEntries(agentId: string, count: number): string[] {
+  const commitments: string[] = [];
+  let prev = "0";
+  for (let index = 0; index < count; index++) {
+    const commitment = computeCommitment(
+      "Bash",
+      "allow",
+      "2026-01-01T00:00:00.000Z",
+      prev,
+      null,
+      "test",
+    );
+    commitments.push(commitment);
+    prev = commitment;
+  }
+  writeEntries(agentId, "2026-01-01", commitments);
+  return commitments;
+}
+
 afterEach(() => {
   const base = join(TEST_HOME, "audit", TEST_AGENT);
   if (existsSync(base)) rmSync(base, { recursive: true, force: true });
@@ -71,7 +74,7 @@ describe("readCommitments", () => {
     expect(readCommitments(TEST_AGENT)).toEqual(["a".repeat(64), "b".repeat(64)]);
   });
 
-  it("skips malformed JSONL lines without throwing", () => {
+  it("rejects malformed JSONL instead of omitting it from the root", () => {
     const dir = auditDir(TEST_AGENT, "2026-01-01");
     mkdirSync(dir, { recursive: true });
     writeFileSync(
@@ -79,7 +82,7 @@ describe("readCommitments", () => {
       `not-json\n${JSON.stringify({ ts: "t", tool: "Bash", decision: "allow", rule_matched: null, commitment: "c".repeat(64), input_summary: "" })}\n`,
       "utf8",
     );
-    expect(readCommitments(TEST_AGENT)).toEqual(["c".repeat(64)]);
+    expect(() => readCommitments(TEST_AGENT)).toThrow(/invalid JSON/i);
   });
 
   it("returns empty array when actions.jsonl is empty", () => {
@@ -145,33 +148,23 @@ describe("cmdAnchor", () => {
 
   afterEach(() => {
     process.stdout.write = origWrite;
-    delete process.env.CATP_RPC_URL;
-    delete process.env.CATP_PRIVATE_KEY;
-    delete process.env.CATP_CONTRACT_ADDRESS;
   });
 
   it("prints 'No audit entries' when the agent has no log files", async () => {
-    await cmdAnchor({ agent: TEST_AGENT, dryRun: true });
+    await cmdAnchor({ agent: TEST_AGENT });
     expect(output).toContain("No audit entries");
   });
 
-  it("prints agent id, commitment count, and merkle root for dry-run with entries", async () => {
-    writeEntries(TEST_AGENT, "2026-01-01", ["a".repeat(64), "b".repeat(64)]);
-    await cmdAnchor({ agent: TEST_AGENT, dryRun: true });
+  it("prints agent id, commitment count, and merkle root", async () => {
+    writeValidEntries(TEST_AGENT, 2);
+    await cmdAnchor({ agent: TEST_AGENT });
     expect(output).toContain(TEST_AGENT);
     expect(output).toContain("2");
     expect(output).toMatch(/0x[0-9a-f]{64}/);
-    expect(output).toContain("Dry run");
-  });
-
-  it("prompts to set env vars when not dry-run and env vars are missing", async () => {
-    writeEntries(TEST_AGENT, "2026-01-01", ["a".repeat(64)]);
-    await cmdAnchor({ agent: TEST_AGENT, dryRun: false });
-    expect(output).toContain("CATP_RPC_URL");
   });
 
   it("throws when agent id cannot be resolved and no policy file is present", async () => {
-    await expect(cmdAnchor({ dryRun: true })).rejects.toThrow(/agent ID/i);
+    await expect(cmdAnchor({})).rejects.toThrow(/agent ID/i);
   });
 
   it("resolves agent id from catp-policy.toml when --agent is omitted", async () => {
@@ -185,7 +178,7 @@ describe("cmdAnchor", () => {
     const prevCwd = process.cwd();
     process.chdir(policyDir);
     try {
-      await cmdAnchor({ dryRun: true });
+      await cmdAnchor({});
       expect(output).toContain("policy-agent");
       expect(output).toContain("No audit entries");
     } finally {
@@ -204,19 +197,22 @@ describe("cmdAnchor", () => {
     const prevCwd = process.cwd();
     process.chdir(policyDir);
     try {
-      await expect(cmdAnchor({ dryRun: true })).rejects.toThrow(/agent ID/i);
+      await expect(cmdAnchor({})).rejects.toThrow(/agent ID/i);
     } finally {
       process.chdir(prevCwd);
     }
   });
 
-  it("submits the merkle root on-chain when env vars are set", async () => {
-    writeEntries(TEST_AGENT, "2026-01-01", ["a".repeat(64)]);
-    process.env.CATP_RPC_URL = "http://localhost:8545";
-    process.env.CATP_PRIVATE_KEY = `0x${"11".repeat(32)}`;
-    process.env.CATP_CONTRACT_ADDRESS = `0x${"22".repeat(20)}`;
-    await cmdAnchor({ agent: TEST_AGENT, dryRun: false });
-    expect(output).toContain("Submitting to chain...");
-    expect(output).toContain(`Transaction: 0x${"ab".repeat(32)}`);
+  it("writes a portable audit anchor bundle", async () => {
+    const [commitment] = writeValidEntries(TEST_AGENT, 1);
+    const out = join(TEST_HOME, "anchor.json");
+    await cmdAnchor({ agent: TEST_AGENT, out });
+
+    expect(JSON.parse(readFileSync(out, "utf8"))).toEqual({
+      anchorVersion: "catp_audit_anchor_v1",
+      agentId: TEST_AGENT,
+      commitmentCount: 1,
+      merkleRoot: `0x${commitment}`,
+    });
   });
 });
