@@ -77,6 +77,10 @@ catp init
 catp validate
 ```
 
+CATP only enforces projects where it discovers a `catp-policy.toml`. In those
+projects the pre-hook fails closed: invalid runtime input, an invalid policy,
+or an audit-chain read/write failure blocks the action until the error is fixed.
+
 For a starter policy that also includes authorization proof fields:
 
 ```bash

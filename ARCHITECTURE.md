@@ -168,6 +168,11 @@ Core responsibilities:
 - Extract optional `toolInput.catp_authorization` or `toolInput.authorization`
   data for the authorization proof flow.
 
+Policy discovery is the enforcement boundary. Without a discovered policy the
+pre-hook is inactive. With a discovered policy, malformed runtime input,
+policy validation failures, and audit-chain read/write failures block the
+action rather than bypassing enforcement.
+
 Adding a new runtime should not change the policy engine, audit logger, witness
 builder, or proof manifest commands. It should add an adapter and focused tests
 for that adapter's payload shape.

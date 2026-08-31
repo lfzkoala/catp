@@ -62,6 +62,10 @@ Today the only built-in adapter is `claude-code`. The enforcement core is
 runtime-neutral; future runtimes should map their tool events into CATP
 `ToolAction` events.
 
+The pre-hook is inactive when no `catp-policy.toml` is found. Once a policy is
+discovered, CATP blocks the action if the hook payload or policy is invalid, or
+if the audit decision cannot be appended safely.
+
 ## Policy
 
 CATP policies are TOML files. Rules are evaluated top-to-bottom; first match

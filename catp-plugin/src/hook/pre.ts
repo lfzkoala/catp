@@ -7,40 +7,78 @@ import { parseHookAction, readStdin } from "./runtime.js";
 
 export interface HookOptions {
   adapter?: RuntimeAdapter;
+  startDir?: string;
 }
 
-export async function runPreHook(opts: HookOptions = {}): Promise<void> {
+export interface PreHookOutcome {
+  exitCode: 0 | 2;
+  policyFound: boolean;
+  auditRecorded: boolean;
+  reason: string;
+}
+
+export function evaluatePreHookInput(raw: string, opts: HookOptions = {}): PreHookOutcome {
   const adapter = opts.adapter ?? claudeCodeAdapter;
-  const raw = await readStdin();
-  const action = parseHookAction(raw, adapter, "pre");
-  if (!action) {
-    process.exit(0);
+  const policyPath = findPolicyFile(opts.startDir);
+  if (!policyPath) {
+    return {
+      exitCode: 0,
+      policyFound: false,
+      auditRecorded: false,
+      reason: "CATP policy not found",
+    };
   }
 
-  const policyPath = findPolicyFile();
-  if (!policyPath) {
-    process.exit(0);
+  const action = parseHookAction(raw, adapter, "pre");
+  if (!action) {
+    return {
+      exitCode: 2,
+      policyFound: true,
+      auditRecorded: false,
+      reason: "invalid pre-hook input",
+    };
   }
 
   let policy;
   try {
     policy = loadPolicy(policyPath);
   } catch (err) {
-    process.stderr.write(`catp: policy error: ${(err as Error).message}\n`);
-    process.exit(0);
+    return {
+      exitCode: 2,
+      policyFound: true,
+      auditRecorded: false,
+      reason: `policy error: ${(err as Error).message}`,
+    };
   }
 
-  const prev = getLastCommitment(policy.agent.id);
-  const result = evaluatePreAction(policy, action, prev);
   try {
+    const prev = getLastCommitment(policy.agent.id);
+    const result = evaluatePreAction(policy, action, prev);
     appendAuditEntry(policy.agent.id, result.auditEntry);
-  } catch {
-    // Audit log failure must not block the agent
-  }
 
-  if (!result.allow) {
+    return {
+      exitCode: result.allow ? 0 : 2,
+      policyFound: true,
+      auditRecorded: true,
+      reason: result.reason,
+    };
+  } catch (err) {
+    return {
+      exitCode: 2,
+      policyFound: true,
+      auditRecorded: false,
+      reason: `audit error: ${(err as Error).message}`,
+    };
+  }
+}
+
+export async function runPreHook(opts: HookOptions = {}): Promise<void> {
+  const raw = await readStdin();
+  const outcome = evaluatePreHookInput(raw, opts);
+
+  if (outcome.exitCode === 2) {
     process.stdout.write(
-      JSON.stringify({ decision: "block", reason: result.reason }) + "\n"
+      JSON.stringify({ decision: "block", reason: outcome.reason }) + "\n"
     );
     process.exit(2);
   }

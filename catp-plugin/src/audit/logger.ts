@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { auditDirForDate } from "./paths.js";
 import type { AuditEntry, AuthorizationAction } from "../policy/types.js";
@@ -44,15 +44,16 @@ export function auditDir(agentId: string): string {
 export function getLastCommitment(agentId: string): string {
   const dir = auditDir(agentId);
   const file = join(dir, "actions.jsonl");
-  try {
-    const content = readFileSync(file, "utf8").trimEnd();
-    if (!content) return "0";
-    const lastLine = content.split("\n").pop() ?? "";
-    const entry = JSON.parse(lastLine) as AuditEntry;
-    return entry.commitment;
-  } catch {
-    return "0";
+  if (!existsSync(file)) return "0";
+
+  const content = readFileSync(file, "utf8").trimEnd();
+  if (!content) return "0";
+  const lastLine = content.split("\n").pop() ?? "";
+  const entry = JSON.parse(lastLine) as AuditEntry;
+  if (typeof entry.commitment !== "string" || !/^[0-9a-f]{64}$/i.test(entry.commitment)) {
+    throw new Error(`invalid audit log tail in ${file}`);
   }
+  return entry.commitment;
 }
 
 export function appendAuditEntry(agentId: string, entry: AuditEntry): void {

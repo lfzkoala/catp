@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from '@jest/globals';
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -115,6 +115,14 @@ describe('auditDir', () => {
 describe('getLastCommitment', () => {
   it('returns "0" when the log file does not exist', () => {
     expect(getLastCommitment(TEST_AGENT)).toBe('0');
+  });
+
+  it('throws when the existing log tail is malformed', () => {
+    const dir = auditDir(TEST_AGENT);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'actions.jsonl'), 'not-json\n', 'utf8');
+
+    expect(() => getLastCommitment(TEST_AGENT)).toThrow();
   });
 });
 

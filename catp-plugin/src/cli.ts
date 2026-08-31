@@ -36,11 +36,11 @@ program
 
 const hook = program.command("hook").description("Hook handlers called by agent frameworks");
 
-function resolveHookAdapter(runtime: string) {
+function resolveHookAdapter(runtime: string, failureExitCode: 0 | 2 = 0) {
   const adapter = getRuntimeAdapter(runtime);
   if (!adapter) {
     process.stderr.write(`catp: unsupported runtime adapter "${runtime}". Supported: ${supportedRuntimeAdapters().join(", ")}\n`);
-    process.exit(0);
+    process.exit(failureExitCode);
   }
   return adapter;
 }
@@ -57,7 +57,12 @@ hook
   .description("PreToolUse handler — reads stdin JSON, allows or blocks")
   .option("--runtime <id>", "runtime adapter id", "claude-code")
   .action((opts: { runtime: string }) => {
-    runPreHook({ adapter: resolveHookAdapter(opts.runtime) }).catch(() => process.exit(0));
+    runPreHook({ adapter: resolveHookAdapter(opts.runtime, 2) }).catch((err: unknown) => {
+      const reason = `pre-hook error: ${(err as Error).message}`;
+      process.stderr.write(`catp: ${reason}\n`);
+      process.stdout.write(JSON.stringify({ decision: "block", reason }) + "\n");
+      process.exit(2);
+    });
   });
 
 hook
