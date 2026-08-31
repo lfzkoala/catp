@@ -57,9 +57,9 @@ function validate(raw: unknown, path: string): CatpPolicy {
     return {
       tool: rule.tool as string,
       allow: rule.allow as boolean,
-      pattern: toStringArray(rule.pattern),
-      path_allowlist: toStringArray(rule.path_allowlist),
-      path_denylist: toStringArray(rule.path_denylist),
+      pattern: toStringArray(rule.pattern, `${path}: rules[${i}].pattern`),
+      path_allowlist: toStringArray(rule.path_allowlist, `${path}: rules[${i}].path_allowlist`),
+      path_denylist: toStringArray(rule.path_denylist, `${path}: rules[${i}].path_denylist`),
       reason: typeof rule.reason === "string" ? rule.reason : undefined,
     };
   });
@@ -71,10 +71,12 @@ function validate(raw: unknown, path: string): CatpPolicy {
   };
 }
 
-function toStringArray(v: unknown): string[] | undefined {
+function toStringArray(v: unknown, field: string): string[] | undefined {
   if (v === undefined || v === null) return undefined;
-  if (!Array.isArray(v)) return undefined;
-  return v.filter((x): x is string => typeof x === "string");
+  if (!Array.isArray(v) || v.some((x) => typeof x !== "string")) {
+    throw new Error(`${field} must be an array of strings`);
+  }
+  return v as string[];
 }
 
 function validateAuthorization(raw: unknown, path: string): AuthorizationConfig | undefined {

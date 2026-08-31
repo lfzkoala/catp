@@ -133,6 +133,11 @@ Outputs:
 - audit log entry after tool execution or denial
 - SHA-256 commitment chain for audit-log integrity
 
+New audit entries use commitment version `2`. The commitment covers the stored
+decision fields, input summary, previous commitment, and any structured
+authorization action. Entries without `commitment_version` are treated as
+legacy version `1` entries so existing audit logs remain verifiable.
+
 Policy rules are evaluated top-to-bottom. The first matching rule determines whether the tool call is allowed. Unmatched tools are allowed by default.
 
 ### Runtime Adapter Model

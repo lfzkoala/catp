@@ -15,10 +15,15 @@ export function computeCommitment(
   ts: string,
   prev: string = "0",
   ruleMatched: string | null = null,
-  inputSummary: string = ""
+  inputSummary: string = "",
+  authorization?: AuthorizationAction,
+  commitmentVersion: 1 | 2 = 1,
 ): string {
+  const payload = commitmentVersion === 2
+    ? { commitmentVersion, tool, decision, ts, ruleMatched, inputSummary, authorization: authorization ?? null, prev }
+    : { tool, decision, ts, ruleMatched, inputSummary, prev };
   return createHash("sha256")
-    .update(JSON.stringify({ tool, decision, ts, ruleMatched, inputSummary, prev }))
+    .update(JSON.stringify(payload))
     .digest("hex");
 }
 
@@ -60,15 +65,25 @@ export function buildEntry(
 ): AuditEntry {
   const ts = new Date().toISOString();
   const inputSummary = summarizeInput(input);
+  const authorization = extractAuthorizationAction(input);
   const entry: AuditEntry = {
+    commitment_version: 2,
     ts,
     tool: input.toolName,
     decision,
     rule_matched: ruleMatched,
-    commitment: computeCommitment(input.toolName, decision, ts, prevCommitment, ruleMatched, inputSummary),
+    commitment: computeCommitment(
+      input.toolName,
+      decision,
+      ts,
+      prevCommitment,
+      ruleMatched,
+      inputSummary,
+      authorization,
+      2,
+    ),
     input_summary: inputSummary,
   };
-  const authorization = extractAuthorizationAction(input);
   if (authorization) {
     entry.authorization = authorization;
   }

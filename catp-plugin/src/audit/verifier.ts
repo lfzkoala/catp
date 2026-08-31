@@ -26,13 +26,24 @@ export async function verifyChain(logFile: string): Promise<VerifyResult> {
     }
 
     const decision = entry.decision as "allow" | "deny";
+    if (entry.commitment_version !== undefined && entry.commitment_version !== 1 && entry.commitment_version !== 2) {
+      return {
+        ok: false,
+        checked: i,
+        broken_at: i,
+        message: `line ${i + 1}: unsupported commitment version`,
+      };
+    }
+    const commitmentVersion = entry.commitment_version ?? 1;
     const expected = computeCommitment(
       entry.tool,
       decision,
       entry.ts,
       prev,
       entry.rule_matched,
-      entry.input_summary
+      entry.input_summary,
+      entry.authorization,
+      commitmentVersion,
     );
     if (entry.commitment !== expected) {
       return {

@@ -153,13 +153,14 @@ describe('buildEntry', () => {
   it('chains on the provided prev commitment', () => {
     const prev = 'a'.repeat(64);
     const entry = buildEntry(makeInput('Bash', {}), 'allow', null, prev);
-    const expected = computeCommitment('Bash', 'allow', entry.ts, prev, null, '{}');
+    const expected = computeCommitment('Bash', 'allow', entry.ts, prev, null, '{}', undefined, 2);
     expect(entry.commitment).toBe(expected);
+    expect(entry.commitment_version).toBe(2);
   });
 
   it('defaults prev to "0" when not provided', () => {
     const entry = buildEntry(makeInput('Bash', {}), 'deny', null);
-    const expected = computeCommitment('Bash', 'deny', entry.ts, '0', null, '{}');
+    const expected = computeCommitment('Bash', 'deny', entry.ts, '0', null, '{}', undefined, 2);
     expect(entry.commitment).toBe(expected);
   });
 

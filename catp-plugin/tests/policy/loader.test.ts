@@ -89,6 +89,41 @@ reason = "custom"
     expect(rule.reason).toBe('custom');
   });
 
+  it.each(['pattern', 'path_allowlist', 'path_denylist'])(
+    'rejects a non-array %s rule field',
+    (field) => {
+      const path = join(tmpBase, `invalid-${field}.toml`);
+      writeFileSync(path, `
+[agent]
+id = "a"
+version = "1"
+
+[[rules]]
+tool = "Bash"
+allow = true
+${field} = "echo*"
+`, 'utf8');
+
+      expect(() => loadPolicy(path)).toThrow(`rules[0].${field} must be an array of strings`);
+    },
+  );
+
+  it('rejects non-string elements in rule arrays', () => {
+    const path = join(tmpBase, 'invalid-pattern-element.toml');
+    writeFileSync(path, `
+[agent]
+id = "a"
+version = "1"
+
+[[rules]]
+tool = "Bash"
+allow = true
+pattern = ["echo*", 42]
+`, 'utf8');
+
+    expect(() => loadPolicy(path)).toThrow('rules[0].pattern must be an array of strings');
+  });
+
   it('parses optional authorization proof config', () => {
     const toml = `
 [agent]

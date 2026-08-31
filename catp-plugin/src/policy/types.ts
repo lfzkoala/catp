@@ -19,6 +19,7 @@ export interface CatpPolicy {
 }
 
 export interface AuditEntry {
+  commitment_version?: 1 | 2;
   ts: string;
   tool: string;
   decision: "allow" | "deny";

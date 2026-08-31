@@ -3,7 +3,7 @@ import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { verifyChain } from '../../src/audit/verifier.js';
-import { computeCommitment } from '../../src/audit/logger.js';
+import { buildEntry, computeCommitment } from '../../src/audit/logger.js';
 import type { AuditEntry } from '../../src/policy/types.js';
 
 const tmpBase = join(tmpdir(), `catp-verifier-test-${Date.now()}`);
@@ -86,6 +86,33 @@ describe('verifyChain', () => {
     const result = await verifyChain(path);
     expect(result.ok).toBe(false);
     expect(result.broken_at).toBe(1);
+  });
+
+  it('detects tampering with structured authorization data', async () => {
+    const entry = buildEntry({
+      runtime: 'test-runtime',
+      phase: 'pre',
+      toolName: 'Bash',
+      toolInput: {
+        padding: 'x'.repeat(250),
+        authorization: {
+          actionType: 'Swap',
+          protocol: `0x${'aa'.repeat(32)}`,
+          token: `0x${'bb'.repeat(32)}`,
+          value: '1',
+        },
+      },
+    }, 'allow', null);
+    const tampered = {
+      ...entry,
+      authorization: { ...entry.authorization!, value: '999' },
+    };
+    const path = writeLog('tampered-authorization.jsonl', [tampered]);
+
+    const result = await verifyChain(path);
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('commitment mismatch');
   });
 
   it('reports invalid JSON with broken_at pointing to the bad line', async () => {
