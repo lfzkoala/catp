@@ -8,6 +8,7 @@ PROOF_VERSION="authorization_groth16_v1"
 ARTIFACT="$DEFAULT_ARTIFACT"
 DEPLOYMENT_FILE=""
 AUTHORIZER=""
+EXECUTOR=""
 OUT=""
 
 usage() {
@@ -20,6 +21,7 @@ Options:
                           Defaults to catp-circuits/groth16/build/authorization_groth16_v1.json.
   --deployment <path>     Deployment metadata JSON. Reads .agentAuthorizer when present.
   --authorizer <address>  AgentAuthorizer address to include in the output.
+  --executor <address>    Address authorized to submit executeAuthorized.
   --out <path>            Write encoded call JSON to this path.
   -h, --help              Show this help.
 
@@ -111,6 +113,11 @@ while [[ $# -gt 0 ]]; do
     --authorizer)
       [[ $# -ge 2 ]] || fail "missing value for --authorizer"
       AUTHORIZER="$2"
+      shift 2
+      ;;
+    --executor)
+      [[ $# -ge 2 ]] || fail "missing value for --executor"
+      EXECUTOR="$2"
       shift 2
       ;;
     --out)
@@ -206,10 +213,12 @@ done
 if [[ -n "$AUTHORIZER" ]]; then
   is_address "$AUTHORIZER" || fail "authorizer must be an EVM address"
 fi
+is_address "$EXECUTOR" || fail "executor must be an EVM address; pass --executor"
 
 register_calldata="$(cast calldata \
-  "registerPolicy(bytes32)" \
-  "$policy_commitment")"
+  "registerPolicy(bytes32,address)" \
+  "$policy_commitment" \
+  "$EXECUTOR")"
 
 execute_calldata="$(cast calldata \
   "executeAuthorized(bytes32,bytes,uint256,bytes)" \
@@ -223,6 +232,7 @@ output="$(jq -n \
   --arg artifact "${ARTIFACT#$ROOT_DIR/}" \
   --arg deployment "${DEPLOYMENT_FILE#$ROOT_DIR/}" \
   --arg authorizer "$AUTHORIZER" \
+  --arg executor "$EXECUTOR" \
   --arg policyCommitment "$policy_commitment" \
   --arg actionData "$action_data" \
   --arg currentTimestamp "$current_timestamp" \
@@ -236,8 +246,8 @@ output="$(jq -n \
     deployment: (if $deployment == "" then null else $deployment end),
     agentAuthorizer: (if $authorizer == "" then null else $authorizer end),
     registerPolicy: {
-      signature: "registerPolicy(bytes32)",
-      args: [$policyCommitment],
+      signature: "registerPolicy(bytes32,address)",
+      args: [$policyCommitment, $executor],
       calldata: $registerCalldata
     },
     executeAuthorized: {

@@ -15,7 +15,8 @@ contract AgentAuthorizer is IAgentAuthorizer {
     uint256 public constant PROOF_MAX_AGE = 5 minutes;
 
     mapping(bytes32 => address) private _policyDelegators;
-    mapping(bytes32 => bool)    private _activePolicies;
+    mapping(bytes32 => address) private _policyExecutors;
+    mapping(bytes32 => bool) private _activePolicies;
     mapping(bytes32 => uint256) private _cumulativeSpend;
 
     constructor(address verifier_) {
@@ -23,13 +24,17 @@ contract AgentAuthorizer is IAgentAuthorizer {
         verifier = IVerifier(verifier_);
     }
 
-    function registerPolicy(bytes32 policyCommitment) external override {
+    function registerPolicy(bytes32 policyCommitment, address executor) external override {
         require(msg.sender != address(0), "AgentAuthorizer: invalid delegator");
         require(policyCommitment != bytes32(0), "AgentAuthorizer: zero commitment");
+        require(executor != address(0), "AgentAuthorizer: zero executor");
         require(!_activePolicies[policyCommitment], "AgentAuthorizer: policy already active");
+        address currentDelegator = _policyDelegators[policyCommitment];
+        require(currentDelegator == address(0) || currentDelegator == msg.sender, "AgentAuthorizer: not delegator");
         _policyDelegators[policyCommitment] = msg.sender;
+        _policyExecutors[policyCommitment] = executor;
         _activePolicies[policyCommitment] = true;
-        emit PolicyRegistered(policyCommitment, msg.sender);
+        emit PolicyRegistered(policyCommitment, msg.sender, executor);
     }
 
     function revokePolicy(bytes32 policyCommitment) external override {
@@ -46,14 +51,10 @@ contract AgentAuthorizer is IAgentAuthorizer {
         bytes calldata proof
     ) external override {
         require(_activePolicies[policyCommitment], "AgentAuthorizer: policy not active");
+        require(_policyExecutors[policyCommitment] == msg.sender, "AgentAuthorizer: not executor");
         bytes32 actionHash = keccak256(actionData);
         uint256 currentSpend = _cumulativeSpend[policyCommitment];
-        (
-            ActionData.ActionType actionType,
-            bytes32 protocol,
-            bytes32 token,
-            uint256 value
-        ) = _decodeAction(actionData);
+        (ActionData.ActionType actionType, bytes32 protocol, bytes32 token, uint256 value) = _decodeAction(actionData);
 
         require(value > 0, "AgentAuthorizer: zero value");
         require(value <= type(uint64).max, "AgentAuthorizer: value too large");
@@ -74,11 +75,15 @@ contract AgentAuthorizer is IAgentAuthorizer {
         pub[12] = bytes32(uint256(currentSpend));
         require(verifier.verify(pub, proof), "AgentAuthorizer: invalid proof");
         _cumulativeSpend[policyCommitment] += value;
-        emit AuthorizedExecution(policyCommitment, actionHash, value);
+        emit AuthorizedExecution(policyCommitment, actionHash, msg.sender, value);
     }
 
     function isPolicyActive(bytes32 policyCommitment) external view override returns (bool) {
         return _activePolicies[policyCommitment];
+    }
+
+    function getPolicyExecutor(bytes32 policyCommitment) external view override returns (address) {
+        return _policyExecutors[policyCommitment];
     }
 
     function getCumulativeSpend(bytes32 policyCommitment) external view override returns (uint256) {
@@ -86,9 +91,11 @@ contract AgentAuthorizer is IAgentAuthorizer {
     }
 
     /// @dev Decode action from ABI-encoded ActionData using full abi.decode (type-safe).
-    function _decodeAction(
-        bytes calldata actionData
-    ) internal pure returns (ActionData.ActionType actionType, bytes32 protocol, bytes32 token, uint256 value) {
+    function _decodeAction(bytes calldata actionData)
+        internal
+        pure
+        returns (ActionData.ActionType actionType, bytes32 protocol, bytes32 token, uint256 value)
+    {
         require(actionData.length == 128, "AgentAuthorizer: invalid action data");
         return abi.decode(actionData, (ActionData.ActionType, bytes32, bytes32, uint256));
     }

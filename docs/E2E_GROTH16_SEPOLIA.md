@@ -11,7 +11,7 @@ catp-policy.toml
   -> shareable proof manifest
 ```
 
-The active Sepolia deployment is recorded in:
+The previous Sepolia deployment is recorded in:
 
 ```text
 catp-contracts/deployments/sepolia-groth16.json
@@ -25,6 +25,10 @@ Groth16AuthorizationVerifier: 0xeeebbf575556cd673209525573334934a4f1c3f1
 AgentAuthorizer:              0xb5290d2c376d84c15de4fbfde64a9a5499eee23e
 chainId:                      11155111
 ```
+
+That `AgentAuthorizer` predates executor-bound policy registration and is not
+compatible with the current contract ABI. Redeploy it, update the metadata,
+and complete the smoke flow before treating these addresses as active.
 
 ## 1. Install And Build
 
@@ -109,12 +113,13 @@ node catp-plugin/dist/cli.js prove authorization \
 npm run groth16:encode-execute -- \
   --artifact authorization_groth16_v1.json \
   --deployment catp-contracts/deployments/sepolia-groth16.json \
+  --executor 0xYourExecutorAddress \
   --out execute-authorized.calldata.json
 ```
 
 This validates artifact shape and emits calldata for:
 
-- `registerPolicy(bytes32)`
+- `registerPolicy(bytes32,address)`
 - `executeAuthorized(bytes32,bytes,uint256,bytes)`
 
 It checks 13 public inputs, 128-byte ABI `actionData`, 256-byte proof bytes,
@@ -141,7 +146,8 @@ npm run groth16:execute -- \
 ```
 
 The script registers the policy if inactive, checks on-chain cumulative spend,
-executes the authorization proof, and writes receipt metadata.
+checks that the sender is the registered executor, executes the authorization
+proof, and writes receipt metadata.
 
 ## 6. Create A Proof Manifest From An Existing Artifact
 

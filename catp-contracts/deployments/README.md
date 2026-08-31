@@ -96,7 +96,7 @@ The smoke script:
 1. Refreshes the smoke proof with the persisted setup keys.
 2. Refuses to run if local verifier/key hashes differ from deployment metadata.
 3. Checks deployed verifier code size.
-4. Registers a fresh policy commitment.
+4. Registers a fresh policy commitment bound to the transaction sender as executor.
 5. Executes an authorized action with a real Groth16 proof.
 6. Reads cumulative spend.
 

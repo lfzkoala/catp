@@ -50,6 +50,9 @@ Out of scope for this document:
 - The EVM execution path binds replay prevention to contract state by requiring
   the proof's `cumulativeSpend` to match on-chain cumulative spend before
   incrementing it.
+- Each registered policy binds an explicit executor address. Only that address
+  can submit an authorization proof, and revocation does not allow another
+  delegator to take over the same commitment.
 
 ## Current Assumptions
 
@@ -73,10 +76,15 @@ Out of scope for this document:
 | Action/protocol/token binding | Reviewed | Public action fields are checked against private allowed policy fields. |
 | Timestamp semantics | Reviewed | Circuit proves policy validity window; `AgentAuthorizer` enforces freshness around execution timestamp. |
 | Cumulative spend replay binding | Reviewed | Contract checks proof spend against current state, then increments by action value. |
+| Executor binding | Reviewed | Registration binds an executor; execution rejects other callers and revoked commitments retain delegator ownership. |
 | Proof shape validation | Reviewed | Wrapper/SDK/plugin and calldata encoder require 13 inputs, 128-byte `actionData`, and 256 proof bytes before execution/manifest use. |
 | External proof references | Reviewed | Manifest `proofUrl` accepts HTTPS, IPFS, Arweave, or localhost HTTP only. |
 | Setup reproducibility | Reviewed with caveat | `npm run groth16:check` verifies key/source/deployment metadata consistency. Mainnet ceremony remains open. |
 | Sepolia deployment metadata | Reviewed | `catp-contracts/deployments/sepolia-groth16.json` records addresses, hashes, gas, blocks, and smoke txs; CLI rejects mismatched deployment proof versions. |
+
+The checked-in Sepolia `AgentAuthorizer` address predates executor binding. It
+is retained as historical deployment metadata and must be replaced and smoked
+before the executor-bound contract is announced or released.
 
 ## Findings
 

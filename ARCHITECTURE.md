@@ -296,19 +296,21 @@ State:
 
 - `activePolicies: bytes32 -> bool`
 - `policyDelegators: bytes32 -> address`
+- `policyExecutors: bytes32 -> address`
 - `cumulativeSpend: bytes32 -> uint256`
 
 External methods:
 
-- `registerPolicy(bytes32 policyCommitment)`
+- `registerPolicy(bytes32 policyCommitment, address executor)`
 - `revokePolicy(bytes32 policyCommitment)`
 - `executeAuthorized(bytes32 policyCommitment, bytes actionData, uint256 currentTimestamp, bytes proof)`
 - `isPolicyActive(bytes32 policyCommitment)`
+- `getPolicyExecutor(bytes32 policyCommitment)`
 - `getCumulativeSpend(bytes32 policyCommitment)`
 
 `executeAuthorized`:
 
-1. checks that the policy is active
+1. checks that the policy is active and the caller is its registered executor
 2. decodes `ActionData`
 3. checks value, spend, and timestamp bounds
 4. builds the 13 public inputs

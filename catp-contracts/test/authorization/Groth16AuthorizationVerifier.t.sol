@@ -34,16 +34,12 @@ contract Groth16AuthorizationVerifierTest is Test {
     function _registerAndWarp() internal {
         vm.warp(proofTimestamp);
         vm.prank(delegator);
-        authorizer.registerPolicy(policyCommitment);
+        authorizer.registerPolicy(policyCommitment, agent);
     }
 
     function _publicInputs(uint256 currentSpend) internal view returns (bytes32[] memory pub) {
-        (
-            ActionData.ActionType actionType,
-            bytes32 protocol,
-            bytes32 token,
-            uint256 value
-        ) = abi.decode(actionData, (ActionData.ActionType, bytes32, bytes32, uint256));
+        (ActionData.ActionType actionType, bytes32 protocol, bytes32 token, uint256 value) =
+            abi.decode(actionData, (ActionData.ActionType, bytes32, bytes32, uint256));
 
         pub = new bytes32[](13);
         pub[0] = policyCommitment;

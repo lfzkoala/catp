@@ -91,6 +91,7 @@ npm run groth16:prove -- \
 
 npm run groth16:encode-execute -- \
   --artifact authorization_groth16_v1.json \
+  --executor 0xYourExecutorAddress \
   --out execute-authorized.calldata.json
 ```
 

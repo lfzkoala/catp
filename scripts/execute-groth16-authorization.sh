@@ -7,6 +7,7 @@ DEFAULT_DEPLOYMENT="$ROOT_DIR/catp-contracts/deployments/sepolia-groth16.json"
 ARTIFACT="$DEFAULT_ARTIFACT"
 DEPLOYMENT_FILE="$DEFAULT_DEPLOYMENT"
 AUTHORIZER=""
+EXECUTOR=""
 OUT=""
 DRY_RUN=0
 SKIP_REGISTER=0
@@ -21,6 +22,7 @@ Options:
                           Defaults to catp-circuits/groth16/build/authorization_groth16_v1.json.
   --deployment <path>     Deployment metadata JSON. Defaults to Sepolia Groth16 metadata.
   --authorizer <address>  Override AgentAuthorizer address.
+  --executor <address>    Executor address. Defaults to CATP_PRIVATE_KEY sender for live execution.
   --out <path>            Write transaction metadata JSON to this path.
   --skip-register         Do not register the policy if it is inactive.
   --dry-run               Validate and print planned calls without RPC or broadcast.
@@ -83,6 +85,11 @@ while [[ $# -gt 0 ]]; do
       AUTHORIZER="$2"
       shift 2
       ;;
+    --executor)
+      [[ $# -ge 2 ]] || fail "missing value for --executor"
+      EXECUTOR="$2"
+      shift 2
+      ;;
     --out)
       [[ $# -ge 2 ]] || fail "missing value for --out"
       OUT="$2"
@@ -111,6 +118,19 @@ done
 require_command jq
 require_command cast
 
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  is_address "$EXECUTOR" || fail "dry-run requires --executor <address>"
+else
+  [[ -n "${CATP_RPC_URL:-}" ]] || fail "missing CATP_RPC_URL"
+  [[ -n "${CATP_PRIVATE_KEY:-}" ]] || fail "missing CATP_PRIVATE_KEY"
+  SENDER="$(cast wallet address --private-key "$CATP_PRIVATE_KEY")"
+  if [[ -z "$EXECUTOR" ]]; then
+    EXECUTOR="$SENDER"
+  elif [[ "${EXECUTOR,,}" != "${SENDER,,}" ]]; then
+    fail "executor $EXECUTOR does not match transaction sender $SENDER"
+  fi
+fi
+
 [[ -f "$ARTIFACT" ]] || fail "missing artifact: $ARTIFACT"
 if [[ -n "$DEPLOYMENT_FILE" ]]; then
   [[ -f "$DEPLOYMENT_FILE" ]] || fail "missing deployment file: $DEPLOYMENT_FILE"
@@ -129,6 +149,7 @@ fi
 if [[ -n "$AUTHORIZER" ]]; then
   encode_args+=(--authorizer "$AUTHORIZER")
 fi
+encode_args+=(--executor "$EXECUTOR")
 
 bash "$ROOT_DIR/scripts/encode-groth16-execute.sh" "${encode_args[@]}" >/dev/null
 
@@ -145,6 +166,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   jq -n \
     --arg mode "dry-run" \
     --arg authorizer "$AUTHORIZER" \
+    --arg executor "$EXECUTOR" \
     --arg policyCommitment "$POLICY_COMMITMENT" \
     --arg expectedCumulativeSpend "$EXPECTED_CUMULATIVE_SPEND" \
     --arg registerCalldata "$REGISTER_CALLDATA" \
@@ -152,6 +174,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
     '{
       mode: $mode,
       agentAuthorizer: $authorizer,
+      policyExecutor: $executor,
       policyCommitment: $policyCommitment,
       expectedCumulativeSpend: $expectedCumulativeSpend,
       calls: [
@@ -171,17 +194,9 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   exit 0
 fi
 
-if [[ -z "${CATP_RPC_URL:-}" ]]; then
-  fail "missing CATP_RPC_URL"
-fi
-
-if [[ -z "${CATP_PRIVATE_KEY:-}" ]]; then
-  fail "missing CATP_PRIVATE_KEY"
-fi
-
-SENDER="$(cast wallet address --private-key "$CATP_PRIVATE_KEY")"
 echo "AgentAuthorizer:          $AUTHORIZER"
 echo "Sender:                   $SENDER"
+echo "Policy executor:          $EXECUTOR"
 echo "PolicyCommitment:         $POLICY_COMMITMENT"
 echo "Expected cumulativeSpend: $EXPECTED_CUMULATIVE_SPEND"
 
@@ -195,6 +210,13 @@ REGISTER_TX=""
 REGISTER_BLOCK=""
 REGISTER_GAS=""
 if [[ "$ACTIVE" == "true" ]]; then
+  CHAIN_EXECUTOR="$(cast call "$AUTHORIZER" \
+    "getPolicyExecutor(bytes32)(address)" \
+    "$POLICY_COMMITMENT" \
+    --rpc-url "$CATP_RPC_URL")"
+  if [[ "${CHAIN_EXECUTOR,,}" != "${EXECUTOR,,}" ]]; then
+    fail "active policy executor $CHAIN_EXECUTOR does not match sender $EXECUTOR"
+  fi
   echo "==> Policy already active; skipping registration"
 elif [[ "$ACTIVE" == "false" ]]; then
   if [[ "$SKIP_REGISTER" -eq 1 ]]; then
@@ -202,8 +224,9 @@ elif [[ "$ACTIVE" == "false" ]]; then
   fi
   echo "==> Registering policy"
   REGISTER_JSON="$(cast send "$AUTHORIZER" \
-    "registerPolicy(bytes32)" \
+    "registerPolicy(bytes32,address)" \
     "$POLICY_COMMITMENT" \
+    "$EXECUTOR" \
     --rpc-url "$CATP_RPC_URL" \
     --private-key "$CATP_PRIVATE_KEY" \
     --json)"
@@ -249,6 +272,7 @@ FINAL_CUMULATIVE_SPEND="$(cast --to-dec "$FINAL_CUMULATIVE_SPEND")"
 RESULT="$(jq -n \
   --arg agentAuthorizer "$AUTHORIZER" \
   --arg sender "$SENDER" \
+  --arg executor "$EXECUTOR" \
   --arg policyCommitment "$POLICY_COMMITMENT" \
   --arg expectedCumulativeSpend "$EXPECTED_CUMULATIVE_SPEND" \
   --arg registerPolicyTx "$REGISTER_TX" \
@@ -261,6 +285,7 @@ RESULT="$(jq -n \
   '{
     agentAuthorizer: $agentAuthorizer,
     sender: $sender,
+    policyExecutor: $executor,
     policyCommitment: $policyCommitment,
     expectedCumulativeSpendBefore: $expectedCumulativeSpend,
     registerPolicyTx: (if $registerPolicyTx == "" then null else $registerPolicyTx end),

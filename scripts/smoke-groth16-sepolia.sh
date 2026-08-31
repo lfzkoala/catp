@@ -24,6 +24,8 @@ if [[ -z "${CATP_PRIVATE_KEY:-}" ]]; then
   exit 1
 fi
 
+EXECUTOR="$(cast wallet address --private-key "$CATP_PRIVATE_KEY")"
+
 echo "==> Refreshing Groth16 smoke proof"
 CATP_GROTH16_REQUIRE_KEYS=1 bash "$ROOT_DIR/scripts/generate-groth16-verifier.sh"
 
@@ -123,13 +125,15 @@ CURRENT_TIMESTAMP="$(jq -r '.currentTimestamp' "$SMOKE_JSON")"
 PROOF="$(jq -r '.proof' "$SMOKE_JSON")"
 
 echo "AgentAuthorizer:   $AUTHORIZER"
+echo "Policy executor:   $EXECUTOR"
 echo "PolicyCommitment:  $POLICY_COMMITMENT"
 echo "Timestamp:         $CURRENT_TIMESTAMP"
 
 echo "==> Registering policy"
 cast send "$AUTHORIZER" \
-  "registerPolicy(bytes32)" \
+  "registerPolicy(bytes32,address)" \
   "$POLICY_COMMITMENT" \
+  "$EXECUTOR" \
   --rpc-url "$CATP_RPC_URL" \
   --private-key "$CATP_PRIVATE_KEY"
 
