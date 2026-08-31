@@ -75,13 +75,16 @@ the same checks, so catching failures locally saves a round-trip.
 
 ## Commit Messages
 
-Use short, imperative, lowercase summaries that state what the change does, e.g.:
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-add receipt smoke test
-reject invalid auth action enums
-extend anchor and witness regression coverage
+feat: add Poseidon hash commitment to audit log
+fix: correct path_allowlist match semantics in engine
+test: add verifier chain-tamper tests
+docs: update installation guide
 ```
+
+Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`
 
 ## Reporting Issues
 
