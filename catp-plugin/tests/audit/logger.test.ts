@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from '@jest/globals';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -8,6 +8,7 @@ import {
   buildEntry,
   extractAuthorizationAction,
   appendAuditEntry,
+  appendChainedAuditEntry,
   getLastCommitment,
   auditDir,
 } from '../../src/audit/logger.js';
@@ -154,6 +155,52 @@ describe('appendAuditEntry + getLastCommitment', () => {
     });
 
     expect(getLastCommitment(TEST_AGENT)).toBe(c2);
+  });
+});
+
+describe('appendChainedAuditEntry', () => {
+  it('builds each entry from the latest commitment while holding the audit lock', () => {
+    const first = appendChainedAuditEntry(TEST_AGENT, (prev) =>
+      ({ auditEntry: buildEntry(makeInput('Bash'), 'allow', null, prev) }),
+    );
+    const second = appendChainedAuditEntry(TEST_AGENT, (prev) =>
+      ({ auditEntry: buildEntry(makeInput('Write'), 'allow', null, prev) }),
+    );
+
+    expect(second.auditEntry.commitment).toBe(
+      computeCommitment(
+        'Write',
+        'allow',
+        second.auditEntry.ts,
+        first.auditEntry.commitment,
+        null,
+        '{}',
+        undefined,
+        3,
+        'pre',
+      ),
+    );
+  });
+
+  it('releases the audit lock when entry construction fails', () => {
+    expect(() => appendChainedAuditEntry(TEST_AGENT, () => {
+      throw new Error('build failed');
+    })).toThrow('build failed');
+
+    expect(() => appendChainedAuditEntry(TEST_AGENT, (prev) =>
+      ({ auditEntry: buildEntry(makeInput('Bash'), 'allow', null, prev) }),
+    )).not.toThrow();
+  });
+
+  it('recovers an abandoned audit lock', () => {
+    const dir = auditDir(TEST_AGENT);
+    const lockDir = join(dir, '.actions.lock');
+    mkdirSync(lockDir, { recursive: true });
+    utimesSync(lockDir, new Date(0), new Date(0));
+
+    expect(() => appendChainedAuditEntry(TEST_AGENT, (prev) =>
+      ({ auditEntry: buildEntry(makeInput('Bash'), 'allow', null, prev) }),
+    )).not.toThrow();
   });
 });
 

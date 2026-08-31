@@ -1,5 +1,5 @@
 import { findPolicyFile, loadPolicy } from "../policy/loader.js";
-import { appendAuditEntry, getLastCommitment } from "../audit/logger.js";
+import { appendChainedAuditEntry } from "../audit/logger.js";
 import { claudeCodeAdapter } from "../adapters/claude-code.js";
 import { recordPostAction } from "../enforcement/core.js";
 import type { RuntimeAdapter } from "../runtime/types.js";
@@ -28,10 +28,8 @@ export async function runPostHook(opts: HookOptions = {}): Promise<void> {
   }
 
   // PostToolUse always records allow — the action already executed
-  const prev = getLastCommitment(policy.agent.id);
-  const result = recordPostAction(action, prev);
   try {
-    appendAuditEntry(policy.agent.id, result.auditEntry);
+    appendChainedAuditEntry(policy.agent.id, (prev) => recordPostAction(action, prev));
   } catch {
     // Audit log failure must not block the agent
   }

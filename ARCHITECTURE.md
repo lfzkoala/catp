@@ -192,6 +192,9 @@ ${CATP_HOME:-~/.catp}/audit/<agentId>/<YYYY-MM-DD>/actions.jsonl
 ```
 
 Each audit entry includes a commitment linked to the previous entry commitment.
+Runtime hook writers hold a per-agent, per-day cross-process lock while reading
+the previous commitment, constructing the next entry, and appending it. This
+prevents concurrent pre/post hook processes from creating sibling chain heads.
 
 ---
 

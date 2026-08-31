@@ -1,5 +1,5 @@
 import { findPolicyFile, loadPolicy } from "../policy/loader.js";
-import { appendAuditEntry, getLastCommitment } from "../audit/logger.js";
+import { appendChainedAuditEntry } from "../audit/logger.js";
 import { claudeCodeAdapter } from "../adapters/claude-code.js";
 import { evaluatePreAction } from "../enforcement/core.js";
 import type { RuntimeAdapter } from "../runtime/types.js";
@@ -52,9 +52,9 @@ export function evaluatePreHookInput(raw: string, opts: HookOptions = {}): PreHo
   }
 
   try {
-    const prev = getLastCommitment(policy.agent.id);
-    const result = evaluatePreAction(policy, action, prev);
-    appendAuditEntry(policy.agent.id, result.auditEntry);
+    const result = appendChainedAuditEntry(policy.agent.id, (prev) =>
+      evaluatePreAction(policy, action, prev)
+    );
 
     return {
       exitCode: result.allow ? 0 : 2,

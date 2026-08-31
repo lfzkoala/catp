@@ -1,10 +1,16 @@
 import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { lockSync } from "proper-lockfile";
 import { auditDirForDate } from "./paths.js";
 import type { AuditEntry, AuthorizationAction } from "../policy/types.js";
 import type { ToolAction } from "../runtime/types.js";
 import type { RuntimePhase } from "../runtime/types.js";
+
+const AUDIT_LOCK_STALE_MS = 5_000;
+const AUDIT_LOCK_WAIT_MS = 2_000;
+const AUDIT_LOCK_RETRY_MS = 10;
+const lockWaitBuffer = new Int32Array(new SharedArrayBuffer(4));
 
 // Phase 0: SHA-256 audit commitment.
 // Chains on fields stored in the log (tool, decision, ts, prev) so the chain
@@ -44,6 +50,10 @@ export function auditDir(agentId: string): string {
 export function getLastCommitment(agentId: string): string {
   const dir = auditDir(agentId);
   const file = join(dir, "actions.jsonl");
+  return getLastCommitmentFromFile(file);
+}
+
+function getLastCommitmentFromFile(file: string): string {
   if (!existsSync(file)) return "0";
 
   const content = readFileSync(file, "utf8").trimEnd();
@@ -59,7 +69,55 @@ export function getLastCommitment(agentId: string): string {
 export function appendAuditEntry(agentId: string, entry: AuditEntry): void {
   const dir = auditDir(agentId);
   mkdirSync(dir, { recursive: true });
-  appendFileSync(join(dir, "actions.jsonl"), JSON.stringify(entry) + "\n", "utf8");
+  const file = join(dir, "actions.jsonl");
+  withAuditLock(file, () => appendEntryToFile(file, entry));
+}
+
+export function appendChainedAuditEntry<T extends { auditEntry: AuditEntry }>(
+  agentId: string,
+  build: (prevCommitment: string) => T,
+): T {
+  const dir = auditDir(agentId);
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, "actions.jsonl");
+
+  return withAuditLock(file, () => {
+    const result = build(getLastCommitmentFromFile(file));
+    appendEntryToFile(file, result.auditEntry);
+    return result;
+  });
+}
+
+function appendEntryToFile(file: string, entry: AuditEntry): void {
+  appendFileSync(file, JSON.stringify(entry) + "\n", "utf8");
+}
+
+function withAuditLock<T>(file: string, operation: () => T): T {
+  closeSync(openSync(file, "a"));
+  const release = acquireAuditLock(file);
+  try {
+    return operation();
+  } finally {
+    release();
+  }
+}
+
+function acquireAuditLock(file: string): () => void {
+  const deadline = Date.now() + AUDIT_LOCK_WAIT_MS;
+  while (true) {
+    try {
+      return lockSync(file, {
+        lockfilePath: join(dirname(file), ".actions.lock"),
+        stale: AUDIT_LOCK_STALE_MS,
+        realpath: true,
+      });
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ELOCKED" || Date.now() >= deadline) {
+        throw err;
+      }
+      Atomics.wait(lockWaitBuffer, 0, 0, AUDIT_LOCK_RETRY_MS);
+    }
+  }
 }
 
 export function buildEntry(
