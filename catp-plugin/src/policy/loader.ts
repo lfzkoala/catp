@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "smol-toml";
+import { validateAgentId } from "../audit/paths.js";
 import type { AuthorizationConfig, CatpPolicy } from "./types.js";
 
 const POLICY_FILENAME = "catp-policy.toml";
@@ -34,6 +35,11 @@ function validate(raw: unknown, path: string): CatpPolicy {
   const agent = obj.agent as Record<string, unknown>;
   if (typeof agent.id !== "string" || !agent.id) {
     throw new Error(`${path}: agent.id must be a non-empty string`);
+  }
+  try {
+    validateAgentId(agent.id);
+  } catch (err) {
+    throw new Error(`${path}: agent.id is invalid: ${(err as Error).message}`);
   }
   if (typeof agent.version !== "string" || !agent.version) {
     throw new Error(`${path}: agent.version must be a non-empty string`);

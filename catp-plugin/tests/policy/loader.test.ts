@@ -185,6 +185,12 @@ allow = true
     expect(() => loadPolicy(path)).toThrow('agent.id');
   });
 
+  it('throws when agent.id contains path separators', () => {
+    const path = join(tmpBase, 'unsafe-id.toml');
+    writeFileSync(path, '[agent]\nid = "../outside"\nversion = "1"\n[[rules]]\ntool = "Bash"\nallow = true\n', 'utf8');
+    expect(() => loadPolicy(path)).toThrow('agent.id');
+  });
+
   it('throws when agent.version is missing', () => {
     const path = join(tmpBase, 'no-version.toml');
     writeFileSync(path, '[agent]\nid = "a"\n[[rules]]\ntool = "Bash"\nallow = true\n', 'utf8');

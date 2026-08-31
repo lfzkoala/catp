@@ -11,6 +11,7 @@ import {
   getLastCommitment,
   auditDir,
 } from '../../src/audit/logger.js';
+import { auditRoot } from '../../src/audit/paths.js';
 import type { ToolAction } from '../../src/runtime/types.js';
 
 const TEST_AGENT = `__test__${Date.now()}`;
@@ -95,6 +96,20 @@ describe('auditDir', () => {
     const today = new Date().toISOString().slice(0, 10);
     expect(dir).toBe(join(TEST_HOME, 'audit', 'my-agent', today));
   });
+
+  it.each(['../outside', 'agent/child', 'agent\\child', '.', '..'])(
+    'rejects unsafe agent id %s',
+    (agentId) => {
+      expect(() => auditRoot(agentId)).toThrow('agent id');
+    },
+  );
+
+  it.each(['agent-1', 'agent.v1', '__test__'])(
+    'accepts safe agent id %s',
+    (agentId) => {
+      expect(auditRoot(agentId)).toBe(join(TEST_HOME, 'audit', agentId));
+    },
+  );
 });
 
 describe('getLastCommitment', () => {
