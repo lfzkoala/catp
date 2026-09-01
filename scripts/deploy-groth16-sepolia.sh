@@ -30,6 +30,15 @@ Dry run:
 USAGE
 }
 
+to_decimal() {
+  local value="$1"
+  if [[ "$value" == 0x* ]]; then
+    cast to-dec "$value"
+  else
+    printf '%s\n' "$value"
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run)
@@ -69,8 +78,6 @@ echo "==> Checking Groth16 verifier sizes"
 bash "$ROOT_DIR/scripts/check-groth16-verifier-size.sh"
 GROTH16_RUNTIME_BYTES="$(jq -r '.deployedBytecode.object' "$CONTRACTS_DIR/out/Groth16Verifier.sol/Groth16Verifier.json" | awk '{ gsub(/^0x/, ""); print length($0) / 2 }')"
 WRAPPER_RUNTIME_BYTES="$(jq -r '.deployedBytecode.object' "$CONTRACTS_DIR/out/Groth16AuthorizationVerifier.sol/Groth16AuthorizationVerifier.json" | awk '{ gsub(/^0x/, ""); print length($0) / 2 }')"
-GROTH16_RUNTIME_HASH="$(cast keccak "$(jq -r '.deployedBytecode.object' "$CONTRACTS_DIR/out/Groth16Verifier.sol/Groth16Verifier.json")")"
-WRAPPER_RUNTIME_HASH="$(cast keccak "$(jq -r '.deployedBytecode.object' "$CONTRACTS_DIR/out/Groth16AuthorizationVerifier.sol/Groth16AuthorizationVerifier.json")")"
 if (( GROTH16_RUNTIME_BYTES > MAX_EVM_RUNTIME_BYTES || WRAPPER_RUNTIME_BYTES > MAX_EVM_RUNTIME_BYTES )); then
   echo "One or more Groth16 deployment targets exceed the EVM runtime size limit." >&2
   exit 1
@@ -126,8 +133,8 @@ echo "Log: $LOG_FILE"
   echo "$GROTH16_CREATE_JSON"
   GROTH16_ADDRESS="$(echo "$GROTH16_CREATE_JSON" | jq -r '.contractAddress // .contract_address // .deployedTo // .address')"
   GROTH16_TX="$(echo "$GROTH16_CREATE_JSON" | jq -r '.transactionHash // .transaction_hash // .hash')"
-  GROTH16_BLOCK="$(echo "$GROTH16_CREATE_JSON" | jq -r '.blockNumber // .block_number')"
-  GROTH16_GAS="$(echo "$GROTH16_CREATE_JSON" | jq -r '.gasUsed // .gas_used')"
+  GROTH16_BLOCK="$(to_decimal "$(echo "$GROTH16_CREATE_JSON" | jq -r '.blockNumber // .block_number')")"
+  GROTH16_GAS="$(to_decimal "$(echo "$GROTH16_CREATE_JSON" | jq -r '.gasUsed // .gas_used')")"
 
   echo "Deploying Groth16AuthorizationVerifier..."
   WRAPPER_BYTECODE="$(jq -r '.bytecode.object' out/Groth16AuthorizationVerifier.sol/Groth16AuthorizationVerifier.json)"
@@ -141,8 +148,8 @@ echo "Log: $LOG_FILE"
   echo "$WRAPPER_CREATE_JSON"
   WRAPPER_ADDRESS="$(echo "$WRAPPER_CREATE_JSON" | jq -r '.contractAddress // .contract_address // .deployedTo // .address')"
   WRAPPER_TX="$(echo "$WRAPPER_CREATE_JSON" | jq -r '.transactionHash // .transaction_hash // .hash')"
-  WRAPPER_BLOCK="$(echo "$WRAPPER_CREATE_JSON" | jq -r '.blockNumber // .block_number')"
-  WRAPPER_GAS="$(echo "$WRAPPER_CREATE_JSON" | jq -r '.gasUsed // .gas_used')"
+  WRAPPER_BLOCK="$(to_decimal "$(echo "$WRAPPER_CREATE_JSON" | jq -r '.blockNumber // .block_number')")"
+  WRAPPER_GAS="$(to_decimal "$(echo "$WRAPPER_CREATE_JSON" | jq -r '.gasUsed // .gas_used')")"
 
   echo "Deploying AgentAuthorizer..."
   AUTHORIZER_BYTECODE="$(jq -r '.bytecode.object' out/AgentAuthorizer.sol/AgentAuthorizer.json)"
@@ -156,12 +163,25 @@ echo "Log: $LOG_FILE"
   echo "$AUTHORIZER_CREATE_JSON"
   AUTHORIZER_ADDRESS="$(echo "$AUTHORIZER_CREATE_JSON" | jq -r '.contractAddress // .contract_address // .deployedTo // .address')"
   AUTHORIZER_TX="$(echo "$AUTHORIZER_CREATE_JSON" | jq -r '.transactionHash // .transaction_hash // .hash')"
-  AUTHORIZER_BLOCK="$(echo "$AUTHORIZER_CREATE_JSON" | jq -r '.blockNumber // .block_number')"
-  AUTHORIZER_GAS="$(echo "$AUTHORIZER_CREATE_JSON" | jq -r '.gasUsed // .gas_used')"
+  AUTHORIZER_BLOCK="$(to_decimal "$(echo "$AUTHORIZER_CREATE_JSON" | jq -r '.blockNumber // .block_number')")"
+  AUTHORIZER_GAS="$(to_decimal "$(echo "$AUTHORIZER_CREATE_JSON" | jq -r '.gasUsed // .gas_used')")"
+  DEPLOYMENT_GAS="$((GROTH16_GAS + WRAPPER_GAS + AUTHORIZER_GAS))"
 
   echo "Groth16Verifier deployed at:              $GROTH16_ADDRESS"
   echo "Groth16AuthorizationVerifier deployed at: $WRAPPER_ADDRESS"
   echo "AgentAuthorizer deployed at:              $AUTHORIZER_ADDRESS"
+
+  DEPLOYED_GROTH16_CODE="$(cast code --rpc-url "$CATP_RPC_URL" "$GROTH16_ADDRESS")"
+  DEPLOYED_WRAPPER_CODE="$(cast code --rpc-url "$CATP_RPC_URL" "$WRAPPER_ADDRESS")"
+  DEPLOYED_GROTH16_RUNTIME_BYTES="$(((${#DEPLOYED_GROTH16_CODE} - 2) / 2))"
+  DEPLOYED_WRAPPER_RUNTIME_BYTES="$(((${#DEPLOYED_WRAPPER_CODE} - 2) / 2))"
+  if [[ "$DEPLOYED_GROTH16_RUNTIME_BYTES" != "$GROTH16_RUNTIME_BYTES" ||
+        "$DEPLOYED_WRAPPER_RUNTIME_BYTES" != "$WRAPPER_RUNTIME_BYTES" ]]; then
+    echo "Deployed runtime size does not match the build artifact." >&2
+    exit 1
+  fi
+  GROTH16_RUNTIME_HASH="$(cast keccak "$DEPLOYED_GROTH16_CODE")"
+  WRAPPER_RUNTIME_HASH="$(cast keccak "$DEPLOYED_WRAPPER_CODE")"
 
   echo "== Metadata skeleton =="
   jq -n \
@@ -187,6 +207,7 @@ echo "Log: $LOG_FILE"
     --arg groth16Gas "$GROTH16_GAS" \
     --arg wrapperGas "$WRAPPER_GAS" \
     --arg authorizerGas "$AUTHORIZER_GAS" \
+    --arg deploymentGas "$DEPLOYMENT_GAS" \
     --arg deploymentLog "${LOG_FILE#$CONTRACTS_DIR/}" \
     '{
       chainId: 11155111,
@@ -222,7 +243,8 @@ echo "Log: $LOG_FILE"
       gasUsed: {
         groth16VerifierDeploy: $groth16Gas,
         groth16AuthorizationVerifierDeploy: $wrapperGas,
-        agentAuthorizerDeploy: $authorizerGas
+        agentAuthorizerDeploy: $authorizerGas,
+        deploymentTotal: $deploymentGas
       },
       smoke: {
         policyCommitment: "",
