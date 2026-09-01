@@ -82,9 +82,10 @@ Out of scope for this document:
 | Setup reproducibility | Reviewed with caveat | `npm run groth16:check` verifies key/source/deployment metadata consistency. Mainnet ceremony remains open. |
 | Sepolia deployment metadata | Reviewed | `catp-contracts/deployments/sepolia-groth16.json` records addresses, hashes, gas, blocks, and smoke txs; CLI rejects mismatched deployment proof versions. |
 
-The checked-in Sepolia `AgentAuthorizer` address predates executor binding. It
-is retained as historical deployment metadata and must be replaced and smoked
-before the executor-bound contract is announced or released.
+The active checked-in Sepolia deployment uses executor-bound policy
+registration and has passed registration plus real-proof execution smoke
+testing. Its addresses and transaction evidence are recorded in the deployment
+metadata.
 
 ## Findings
 

@@ -11,7 +11,7 @@ catp-policy.toml
   -> shareable proof manifest
 ```
 
-The previous Sepolia deployment is recorded in:
+The active Sepolia deployment is recorded in:
 
 ```text
 catp-contracts/deployments/sepolia-groth16.json
@@ -20,15 +20,14 @@ catp-contracts/deployments/sepolia-groth16.json
 Current addresses:
 
 ```text
-Groth16Verifier:              0xb90ab689ac39c83271a3b630844cf71d77071d60
-Groth16AuthorizationVerifier: 0xeeebbf575556cd673209525573334934a4f1c3f1
-AgentAuthorizer:              0xb5290d2c376d84c15de4fbfde64a9a5499eee23e
+Groth16Verifier:              0x99c50c1570c8b288fa400de70e5a324b002a36e6
+Groth16AuthorizationVerifier: 0x47c1900df4196c205cc1baae39c1a3aefe3a0941
+AgentAuthorizer:              0xf6d0475febc976aa6cf172de331264594adc5dae
 chainId:                      11155111
 ```
 
-That `AgentAuthorizer` predates executor-bound policy registration and is not
-compatible with the current contract ABI. Redeploy it, update the metadata,
-and complete the smoke flow before treating these addresses as active.
+This deployment uses executor-bound policy registration and passed the full
+registration and real-proof execution smoke flow recorded in the metadata.
 
 ## 1. Install And Build
 

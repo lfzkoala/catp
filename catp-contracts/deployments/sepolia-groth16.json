@@ -1,7 +1,7 @@
 {
   "chainId": 11155111,
   "network": "sepolia",
-  "status": "deployed_pending_smoke",
+  "status": "smoke_passed",
   "deployedAt": "2026-08-31T14:46:12Z",
   "deployer": "0x15c4caea87c3e76c4f7805b6abac99d9859dabe6",
   "groth16Verifier": "0x99c50c1570c8b288fa400de70e5a324b002a36e6",
@@ -36,15 +36,15 @@
     "deploymentTotal": "2460585"
   },
   "smoke": {
-    "policyCommitment": "",
-    "proofTimestamp": "",
-    "registerPolicyTx": "",
-    "executeAuthorizedTx": "",
-    "registerPolicyBlock": null,
-    "executeAuthorizedBlock": null,
-    "registerPolicyGasUsed": "",
-    "executeAuthorizedGasUsed": "",
-    "cumulativeSpendAfter": ""
+    "policyCommitment": "0x05d46ca9cd01862e90759447eaab1da2f2f5d12ff28f3986c4e0ca73b9f0853e",
+    "proofTimestamp": "1788230398",
+    "registerPolicyTx": "0xe4973e2aa0b64b6fcf8a13f3f3c89d2d2a21fb160fc9e7a581051c0be5a6c318",
+    "executeAuthorizedTx": "0x6e45f22074e8605d540d04b278482b7e508ef30f16dc44c6cf97045ec1f82d39",
+    "registerPolicyBlock": 11609828,
+    "executeAuthorizedBlock": 11609831,
+    "registerPolicyGasUsed": "91253",
+    "executeAuthorizedGasUsed": "351706",
+    "cumulativeSpendAfter": "500"
   },
   "foundryBroadcast": null,
   "deploymentLog": "deployments/logs/sepolia-groth16-20260831T144548Z.log"
