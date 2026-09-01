@@ -4,21 +4,34 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to publish (for example, v0.6.0)
+        required: true
+        type: string
 
 jobs:
   publish:
     name: Publish @catp-protocol/cli to npm
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     permissions:
       contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Install npm with trusted publishing support
+        run: npm install --global 'npm@^11.5.1'
 
       - name: Install dependencies
         run: npm install --include=dev
@@ -40,10 +53,14 @@ jobs:
         shell: bash
         run: |
           PACKAGE_VERSION="$(node -p "require('./catp-plugin/package.json').version")"
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          TAG_VERSION="${RELEASE_TAG#v}"
 
           if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
-            echo "Tag v$TAG_VERSION does not match catp-plugin/package.json version $PACKAGE_VERSION" >&2
+            echo "Tag $RELEASE_TAG does not match catp-plugin/package.json version $PACKAGE_VERSION" >&2
             exit 1
           fi
 
@@ -58,6 +75,4 @@ jobs:
       - name: Publish
         if: steps.release-version.outputs.published != 'true'
         working-directory: catp-plugin
-        run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public

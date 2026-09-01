@@ -80,14 +80,20 @@ PATH="/tmp/catp-0.6.0/install/bin:$PATH" catp verify authorization --help
 
 ## Publish
 
-Do not publish this version manually. Push the release commit to `main`, wait
-for CI, then trigger the release workflow with the matching tag:
+Do not publish this version manually. Future releases trigger the trusted
+publishing workflow by pushing the matching tag after main CI passes:
 
 ```bash
 git tag -a v0.6.0 -m "CATP CLI v0.6.0"
 git push origin v0.6.0
 ```
 
+For an existing tag whose earlier token-based publish failed, open GitHub
+Actions, select `Release`, choose `Run workflow`, and enter the existing tag
+(`v0.6.0`). The manual run loads the current workflow from `main` but checks out
+and publishes the exact tagged source.
+
 The release workflow checks that the package and tag versions match, runs the
-CLI checks, and publishes to npm with provenance. After it succeeds, verify a
+CLI checks, and publishes through npm Trusted Publishing with automatic
+provenance. It does not use a long-lived npm token. After it succeeds, verify a
 fresh registry install before marking this document released.
