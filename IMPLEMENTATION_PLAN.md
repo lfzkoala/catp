@@ -157,9 +157,37 @@ path.
 
 ## Active Milestones
 
-### P0: Authorization Proof Security Hardening
+### P0: 0.6.0 Security Convergence Release
 
-Status: complete for `0.5.0`; retained as an ongoing release guardrail.
+Status: release candidate ready for main CI and tag.
+
+Goal: publish the enforcement, audit, receipt, and executor-binding fixes made
+after `0.5.0` as one focused security release.
+
+Work:
+
+- Keep policy-enabled pre-enforcement fail-closed when runtime input, policy
+  loading, or audit persistence fails.
+- Bind audit commitments to phase and structured authorization data while
+  retaining verification support for earlier commitment versions.
+- Require an externally trusted public key for receipt verification and issue
+  authorization receipts only from pre-enforcement decisions.
+- Serialize concurrent audit-chain appends and constrain audit agent ids used in
+  filesystem paths.
+- Keep audit anchoring separate from authorization policy registration.
+- Ship executor-bound `AgentAuthorizer` contracts with current, smoke-tested
+  Sepolia deployment metadata.
+
+Exit criteria:
+
+- Full repository checks, CLI coverage, Groth16 setup checks, and receipt smoke
+  pass.
+- The packed npm CLI passes an isolated global-install smoke test.
+- Package version, release notes, Git tag, and npm version agree on `0.6.0`.
+
+### Ongoing: Authorization Proof Security Hardening
+
+Status: release guardrail.
 
 Goal: keep `authorization_groth16_v1` from accepting invalid actions or drifting
 from its documented public input schema.
