@@ -8,7 +8,11 @@ import {
 describe("runtime adapter registry", () => {
   it("resolves the supported Claude Code adapter", () => {
     expect(getRuntimeAdapter("claude-code")?.runtime).toBe("claude-code");
-    expect(supportedRuntimeAdapters()).toEqual(["claude-code"]);
+    expect(supportedRuntimeAdapters()).toEqual(["claude-code", "codex"]);
+  });
+
+  it("resolves the supported Codex adapter", () => {
+    expect(getRuntimeAdapter("codex")?.runtime).toBe("codex");
   });
 
   it("returns null for unsupported runtime adapters", () => {
@@ -16,6 +20,6 @@ describe("runtime adapter registry", () => {
   });
 
   it("formats supported runtime adapters for CLI output", () => {
-    expect(formatSupportedRuntimeAdapters()).toBe("Supported runtime adapters:\n- claude-code\n");
+    expect(formatSupportedRuntimeAdapters()).toBe("Supported runtime adapters:\n- claude-code\n- codex\n");
   });
 });
