@@ -52,13 +52,32 @@ Wire Claude Code hooks in `~/.claude/settings.json`:
 }
 ```
 
+For OpenAI Codex CLI, enable hooks in `$CODEX_HOME/config.toml`
+(`[features] hooks = true`) and wire `~/.codex/hooks.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "hooks": [{ "type": "command", "command": "catp hook pre --runtime codex" }]
+    }],
+    "PostToolUse": [{
+      "hooks": [{ "type": "command", "command": "catp hook post --runtime codex" }]
+    }]
+  }
+}
+```
+
+See [docs/INSTALL.md](docs/INSTALL.md) for the full setup, including the Codex
+`/hooks` trust step and the enforcement surface each runtime supports.
+
 Check supported runtime adapters:
 
 ```bash
 catp hook runtimes
 ```
 
-Today the only built-in adapter is `claude-code`. The enforcement core is
+Built-in adapters are `claude-code` and `codex`. The enforcement core is
 runtime-neutral; future runtimes should map their tool events into CATP
 `ToolAction` events.
 

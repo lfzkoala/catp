@@ -12,7 +12,7 @@ CATP has two installation paths:
 For npm CLI usage:
 
 - Node.js `>=20`
-- Claude Code, if you want hook-based local enforcement
+- Claude Code or OpenAI Codex CLI, if you want hook-based local enforcement
 
 For the full proof/development flow:
 
@@ -87,6 +87,47 @@ For a starter policy that also includes authorization proof fields:
 catp init --authorization
 catp validate
 ```
+
+### Wire OpenAI Codex CLI Hooks
+
+Codex hooks are behind a feature flag. Enable them in `$CODEX_HOME/config.toml`
+(default `~/.codex/config.toml`):
+
+```toml
+[features]
+hooks = true
+```
+
+Then add `~/.codex/hooks.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "hooks": [{ "type": "command", "command": "catp hook pre --runtime codex" }]
+    }],
+    "PostToolUse": [{
+      "hooks": [{ "type": "command", "command": "catp hook post --runtime codex" }]
+    }]
+  }
+}
+```
+
+Trust the hooks on first run via the `/hooks` command inside Codex. The same
+`catp init` / `catp validate` project flow applies; policy rules must use Codex
+tool names (`shell`, `exec_command`, `apply_patch`, `mcp__<server>__<tool>`).
+Codex shell tools may pass `command` as an argv array; the adapter normalizes
+it to a single string so pattern rules work the same as on Claude Code.
+
+Codex enforcement surface (upstream limitations, stated honestly):
+
+- `deny` blocking is reliable for shell/exec-style tools. File edits through
+  the internal `apply_patch` path may not fire `PreToolUse`
+  (openai/codex#27833), so file-level enforcement guarantees are currently
+  complete only on Claude Code.
+- The Codex hook runtime drops `permissionDecision: "ask"` responses, and
+  `updatedInput` rewrites are unsupported (openai/codex#18491). CATP does not
+  depend on input rewriting.
 
 Check audit logs:
 

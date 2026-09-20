@@ -138,12 +138,15 @@ path.
   code and architecture docs.
 - Claude Code `PreToolUse` / `PostToolUse` parsing is isolated in the
   `claude-code` adapter.
+- OpenAI Codex CLI `PreToolUse` / `PostToolUse` parsing is isolated in the
+  `codex` adapter, including argv-array command normalization and documented
+  upstream enforcement gaps (apply_patch coverage, dropped `ask` responses).
 - Hook stdin parsing is centralized and tested.
 - `catp hook pre/post` accept an injectable adapter internally and expose
-  `--runtime claude-code` in the CLI.
+  `--runtime claude-code` and `--runtime codex` in the CLI.
 - `catp hook runtimes` lists supported runtime adapter ids.
-- README and ARCHITECTURE describe the adapter model and current supported
-  runtime.
+- README and ARCHITECTURE describe the adapter model, supported runtimes, and
+  per-runtime enforcement surface.
 
 ### Packaging Decision For Proving
 
@@ -212,10 +215,10 @@ Exit criteria:
 
 ### Additional Runtime Adapters
 
-Claude Code is the only supported runtime adapter today. Add future runtime
-adapters only when there is a concrete payload shape and test fixture, such as
-OpenAI Agents SDK, LangGraph/LangChain, Cursor-style tool runners, MCP tool
-gateways, or local shell/tool executors.
+Claude Code and OpenAI Codex CLI are the supported runtime adapters today.
+Add future runtime adapters only when there is a concrete payload shape and
+test fixture, such as OpenAI Agents SDK, LangGraph/LangChain, Cursor-style tool
+runners, MCP tool gateways, or local shell/tool executors.
 
 ### Local Cryptographic Verification For Groth16 Manifests
 

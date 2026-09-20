@@ -44,9 +44,10 @@ In short:
 runtime adapter -> policy engine -> audit log -> witness/proof manifest -> optional verifier backend
 ```
 
-The local enforcement core is runtime-neutral. Claude Code is the first
-supported adapter: it maps `PreToolUse` and `PostToolUse` hook payloads into
-CATP's common `ToolAction` shape before policy evaluation or audit logging.
+The local enforcement core is runtime-neutral. Claude Code and OpenAI Codex CLI
+are the supported adapters: each maps `PreToolUse` and `PostToolUse` hook
+payloads into CATP's common `ToolAction` shape before policy evaluation or audit
+logging.
 When a tool call or action has structured authorization data, it can feed the
 authorization witness/manifest flow, and a verifier backend can then check the
 authorization statement when needed.
@@ -124,8 +125,8 @@ Inputs:
 
 - `catp-policy.toml`
 - CATP `ToolAction` event
-- runtime adapter output, currently from Claude Code `PreToolUse` and
-  `PostToolUse` hook events
+- runtime adapter output, currently from Claude Code and OpenAI Codex CLI
+  `PreToolUse` and `PostToolUse` hook events
 
 Outputs:
 
@@ -182,8 +183,29 @@ Current supported runtime adapters:
 | Runtime id | Adapter | Hook command |
 |------------|---------|--------------|
 | `claude-code` | `catp-plugin/src/adapters/claude-code.ts` | `catp hook pre/post --runtime claude-code` |
+| `codex` | `catp-plugin/src/adapters/codex.ts` | `catp hook pre/post --runtime codex` |
 
 Use `catp hook runtimes` to list supported runtime ids in the installed CLI.
+
+### Runtime Enforcement Surface
+
+Adapters normalize payloads, but each runtime's hook mechanism enforces a
+different surface. CATP documents these gaps instead of implying uniform
+guarantees:
+
+- Claude Code: `PreToolUse` deny/allow applies to all tool categories,
+  including file writes and web fetches.
+- Codex: hooks require `[features] hooks = true` and `/hooks` trust review.
+  Deny blocking is reliable for shell/exec-style tools; file edits through the
+  internal `apply_patch` path may not fire `PreToolUse` (openai/codex#27833).
+  The Codex hook runtime drops `permissionDecision: "ask"` responses and
+  rejects `updatedInput` rewrites (openai/codex#18491); CATP relies on neither
+  today, but any future ask-style decision must degrade to deny on Codex until
+  upstream support lands.
+- Codex shell tools may pass `tool_input.command` as an argv array; the adapter
+  joins it into a single string so pattern rules behave identically across
+  runtimes. Tool names stay runtime-native (`shell`, `exec_command`,
+  `apply_patch`, `mcp__<server>__<tool>`), so policies are written per runtime.
 
 Audit entries are written under:
 
