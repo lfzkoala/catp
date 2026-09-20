@@ -1,7 +1,8 @@
 import { claudeCodeAdapter } from "./claude-code.js";
+import { codexAdapter } from "./codex.js";
 import type { RuntimeAdapter } from "../runtime/types.js";
 
-const ADAPTERS = [claudeCodeAdapter] as const;
+const ADAPTERS = [claudeCodeAdapter, codexAdapter] as const;
 
 export function getRuntimeAdapter(runtime: string): RuntimeAdapter | null {
   return ADAPTERS.find((adapter) => adapter.runtime === runtime) ?? null;

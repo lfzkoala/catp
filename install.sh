@@ -46,6 +46,28 @@ cat <<'JSON'
 }
 JSON
 echo ""
+echo "   Or for OpenAI Codex CLI, enable hooks in \$CODEX_HOME/config.toml (default ~/.codex/config.toml):"
+echo ""
+cat <<'TOML'
+[features]
+hooks = true
+TOML
+echo ""
+echo "   and add ~/.codex/hooks.json (trust them on first run via /hooks inside Codex):"
+echo ""
+cat <<'JSON'
+{
+  "hooks": {
+    "PreToolUse": [{
+      "hooks": [{ "type": "command", "command": "catp hook pre --runtime codex" }]
+    }],
+    "PostToolUse": [{
+      "hooks": [{ "type": "command", "command": "catp hook post --runtime codex" }]
+    }]
+  }
+}
+JSON
+echo ""
 echo "2. In your project directory:"
 echo "   catp init      # create catp-policy.toml"
 echo "   catp validate  # check policy syntax"

@@ -28,6 +28,11 @@ reason = "Writes outside the project allowlist are blocked"
 tool = "WebFetch"
 allow = false
 reason = "External network calls require explicit approval"
+
+# On OpenAI Codex CLI (catp hook pre/post --runtime codex), rules must use
+# Codex tool names instead: "shell"/"exec_command" for commands (tool_input
+# command argv arrays are normalized to a single string) and "apply_patch"
+# for file edits. MCP tools keep their "mcp__<server>__<tool>" names.
 `;
 
 const AUTHORIZATION_TEMPLATE = `
@@ -54,8 +59,8 @@ export function cmdInit(opts: { authorization?: boolean } = {}): void {
   writeFileSync(dest, policyTemplate(opts), "utf8");
   const authorizationStep = opts.authorization
     ? "  3. Run: catp witness --action <action.json> --out <witness.json>\n" +
-      "  4. Add CATP hooks to ~/.claude/settings.json (see README)\n"
-    : "  3. Add CATP hooks to ~/.claude/settings.json (see README)\n";
+      "  4. Add CATP hooks to ~/.claude/settings.json, or ~/.codex/hooks.json for Codex CLI (see README)\n"
+    : "  3. Add CATP hooks to ~/.claude/settings.json, or ~/.codex/hooks.json for Codex CLI (see README)\n";
   process.stdout.write(
     "Created catp-policy.toml\n\nNext steps:\n" +
     "  1. Edit catp-policy.toml to match your agent's requirements\n" +
