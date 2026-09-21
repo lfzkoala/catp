@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "@jest/globals";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { evaluatePreHookInput } from "../../src/hook/pre.js";
+import { evaluatePreHookInput, preHookBlockOutput } from "../../src/hook/pre.js";
 
 const ROOT = join(tmpdir(), `catp-pre-hook-test-${Date.now()}`);
 const ORIGINAL_CATP_HOME = process.env.CATP_HOME;
@@ -78,5 +78,18 @@ describe("evaluatePreHookInput", () => {
     const result = evaluatePreHookInput(hookInput(), { startDir: ROOT });
 
     expect(result).toMatchObject({ exitCode: 0, policyFound: true, auditRecorded: true });
+  });
+});
+
+describe("preHookBlockOutput", () => {
+  it("writes the JSON decision to stdout and the reason to stderr", () => {
+    const block = preHookBlockOutput("destructive commands are blocked");
+
+    expect(JSON.parse(block.stdout)).toEqual({
+      decision: "block",
+      reason: "destructive commands are blocked",
+    });
+    // Codex CLI only honors the blocking reason on stderr (exit code 2).
+    expect(block.stderr).toBe("destructive commands are blocked\n");
   });
 });

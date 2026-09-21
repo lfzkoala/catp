@@ -72,14 +72,24 @@ export function evaluatePreHookInput(raw: string, opts: HookOptions = {}): PreHo
   }
 }
 
+export function preHookBlockOutput(reason: string): { stdout: string; stderr: string } {
+  return {
+    stdout: JSON.stringify({ decision: "block", reason }) + "\n",
+    // Codex CLI ignores stdout JSON when the hook exits non-zero and treats a
+    // missing stderr reason as a hook failure (fail-open); Claude Code also
+    // surfaces stderr on exit code 2. Write the reason to both streams.
+    stderr: reason + "\n",
+  };
+}
+
 export async function runPreHook(opts: HookOptions = {}): Promise<void> {
   const raw = await readStdin();
   const outcome = evaluatePreHookInput(raw, opts);
 
   if (outcome.exitCode === 2) {
-    process.stdout.write(
-      JSON.stringify({ decision: "block", reason: outcome.reason }) + "\n"
-    );
+    const block = preHookBlockOutput(outcome.reason);
+    process.stdout.write(block.stdout);
+    process.stderr.write(block.stderr);
     process.exit(2);
   }
 
