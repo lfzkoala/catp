@@ -1,7 +1,12 @@
 # CATP CLI 0.7.2 Release Checklist
 
-Status: pending release. To be published from the `v0.7.2` Git tag through npm
-Trusted Publishing.
+Status: released, superseded by `0.7.3`. Published from the `v0.7.2`
+Git tag through npm Trusted Publishing. The fresh registry install
+verification uncovered a pre-existing engine gap: command glob patterns
+(micromatch path semantics) never matched commands containing absolute paths,
+so template deny rules like `rm -rf*` were silently inert there. Fixed in
+`0.7.3` (see `docs/SECURITY_AUDIT_2026-09.md`, finding 8). Users should skip
+`0.7.2` and install `0.7.3`.
 
 Package:
 
