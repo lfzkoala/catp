@@ -1,4 +1,5 @@
 import micromatch from "micromatch";
+import { posix as posixPath } from "node:path";
 import type { CatpPolicy, Rule } from "./types.js";
 import type { ToolAction } from "../runtime/types.js";
 
@@ -35,14 +36,18 @@ function matchesRule(rule: Rule, input: ToolAction): boolean {
   }
 
   if (rule.path_allowlist || rule.path_denylist) {
-    const filePath = extractPath(input);
-    if (filePath === null) return false;
+    const rawPath = extractPath(input);
+    if (rawPath === null) return false;
+    // Lexical normalization collapses dot segments and redundant separators on
+    // both sides so "src/../secrets/x" cannot slip past an allowlist label.
+    // Symlink and runtime-CWD resolution remain host-side residual risk.
+    const filePath = normalizePathLabel(rawPath);
 
     if (rule.path_denylist && rule.path_denylist.length > 0) {
-      if (micromatch.isMatch(filePath, rule.path_denylist)) return true;
+      if (micromatch.isMatch(filePath, rule.path_denylist.map(normalizePathLabel))) return true;
     }
     if (rule.path_allowlist && rule.path_allowlist.length > 0) {
-      return !micromatch.isMatch(filePath, rule.path_allowlist);
+      return !micromatch.isMatch(filePath, rule.path_allowlist.map(normalizePathLabel));
     }
     // path condition present but file didn't match denylist and no allowlist — no match
     return false;
@@ -63,4 +68,8 @@ function extractPath(input: ToolAction): string | null {
     if (typeof v === "string") return v;
   }
   return null;
+}
+
+function normalizePathLabel(value: string): string {
+  return posixPath.normalize(value);
 }

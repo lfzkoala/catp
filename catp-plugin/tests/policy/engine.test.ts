@@ -173,3 +173,38 @@ describe('evaluate — path extraction fallback keys', () => {
     expect(r.allow).toBe(true);
   });
 });
+
+describe('evaluate — command pattern ordering semantics', () => {
+  it('allow prefix wins over a later deny for compound commands (first match wins)', () => {
+    const p = policy([
+      { tool: 'Bash', allow: true, pattern: ['echo*'] },
+      { tool: 'Bash', allow: false },
+    ]);
+    const r = evaluate(p, input('Bash', { command: 'echo hi && rm -rf ~' }));
+    expect(r.allow).toBe(true);
+  });
+
+  it('a control-operator deny rule placed first blocks compound commands', () => {
+    const p = policy([
+      { tool: 'Bash', allow: false, pattern: ['&&', ';', '|', '`', '$('], reason: 'compound commands are blocked' },
+      { tool: 'Bash', allow: true, pattern: ['echo*'] },
+      { tool: 'Bash', allow: false },
+    ]);
+    expect(evaluate(p, input('Bash', { command: 'echo hi && rm -rf ~' })).allow).toBe(false);
+    expect(evaluate(p, input('Bash', { command: 'echo hi' })).allow).toBe(true);
+  });
+});
+
+describe('evaluate — path normalization', () => {
+  it('collapses dot segments before allowlist matching', () => {
+    const p = policy([{ tool: 'Write', allow: false, path_allowlist: ['src/**'], reason: 'outside src' }]);
+    const r = evaluate(p, input('Write', { file_path: 'src/../secrets/key.pem' }));
+    expect(r.allow).toBe(false);
+  });
+
+  it('matches "./"-prefixed allowlist patterns against normalized paths', () => {
+    const p = policy([{ tool: 'Write', allow: false, path_allowlist: ['./src/**'] }]);
+    expect(evaluate(p, input('Write', { file_path: './src/foo.ts' })).allow).toBe(true);
+    expect(evaluate(p, input('Write', { file_path: 'src/foo.ts' })).allow).toBe(true);
+  });
+});

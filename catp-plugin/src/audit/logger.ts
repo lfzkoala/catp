@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { lockSync } from "proper-lockfile";
 import { auditDirForDate } from "./paths.js";
@@ -10,6 +10,10 @@ import type { RuntimePhase } from "../runtime/types.js";
 const AUDIT_LOCK_STALE_MS = 5_000;
 const AUDIT_LOCK_WAIT_MS = 2_000;
 const AUDIT_LOCK_RETRY_MS = 10;
+// Tail recovery reads only this suffix of the daily file: audit entries are
+// bounded (input summaries are capped), so the last line always fits, and
+// append cost stays constant as the daily log grows.
+const AUDIT_TAIL_READ_BYTES = 64 * 1024;
 const lockWaitBuffer = new Int32Array(new SharedArrayBuffer(4));
 
 // Phase 0: SHA-256 audit commitment.
@@ -56,14 +60,37 @@ export function getLastCommitment(agentId: string): string {
 function getLastCommitmentFromFile(file: string): string {
   if (!existsSync(file)) return "0";
 
-  const content = readFileSync(file, "utf8").trimEnd();
-  if (!content) return "0";
-  const lastLine = content.split("\n").pop() ?? "";
+  const lastLine = readLastAuditLine(file);
+  if (lastLine === null) return "0";
   const entry = JSON.parse(lastLine) as AuditEntry;
   if (typeof entry.commitment !== "string" || !/^[0-9a-f]{64}$/i.test(entry.commitment)) {
     throw new Error(`invalid audit log tail in ${file}`);
   }
   return entry.commitment;
+}
+
+function readLastAuditLine(file: string): string | null {
+  const size = statSync(file).size;
+  if (size === 0) return null;
+
+  const fd = openSync(file, "r");
+  try {
+    const chunkSize = Math.min(size, AUDIT_TAIL_READ_BYTES);
+    const buffer = Buffer.alloc(chunkSize);
+    readSync(fd, buffer, 0, chunkSize, size - chunkSize);
+    let text = buffer.toString("utf8");
+    // A valid file ends every entry with a newline, so the suffix must
+    // contain one unless the whole file is a single oversized line.
+    if (size > chunkSize && !text.includes("\n")) {
+      throw new Error(`invalid audit log tail in ${file}`);
+    }
+    text = text.trimEnd();
+    if (!text) return null;
+    const cut = text.lastIndexOf("\n");
+    return cut === -1 ? text : text.slice(cut + 1);
+  } finally {
+    closeSync(fd);
+  }
 }
 
 export function appendAuditEntry(agentId: string, entry: AuditEntry): void {

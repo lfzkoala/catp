@@ -7,6 +7,15 @@ version = "1"
 
 # Rules are evaluated top-to-bottom; first match wins.
 # Omit pattern/path fields to match any invocation of that tool.
+# Command patterns are matched against the raw command string; CATP does not
+# parse shell syntax. Keep the control-operator deny rule below ahead of any
+# Bash allow rule so allowlisted commands cannot be chained into others.
+
+[[rules]]
+tool = "Bash"
+allow = false
+pattern = ["&&", ";", "|", "\`", "$("]
+reason = "Compound shell commands are blocked; remove this rule only if you understand the bypass risk"
 
 [[rules]]
 tool = "Bash"

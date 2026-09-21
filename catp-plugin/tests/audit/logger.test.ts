@@ -156,6 +156,40 @@ describe('appendAuditEntry + getLastCommitment', () => {
 
     expect(getLastCommitment(TEST_AGENT)).toBe(c2);
   });
+
+  it('recovers the tail from large daily files without scanning them', () => {
+    const dir = auditDir(TEST_AGENT);
+    mkdirSync(dir, { recursive: true });
+    const inputSummary = 'x'.repeat(200);
+    const ts = '2026-01-01T00:00:00.000Z';
+    const lines: string[] = [];
+    let prev = '0';
+    // ~3000 bounded entries push the daily file far past the 64 KiB tail window.
+    for (let i = 0; i < 3000; i++) {
+      prev = computeCommitment('Bash', 'allow', ts, prev, null, inputSummary, undefined, 3, 'pre');
+      lines.push(JSON.stringify({
+        commitment_version: 3,
+        phase: 'pre',
+        ts,
+        tool: 'Bash',
+        decision: 'allow',
+        rule_matched: null,
+        commitment: prev,
+        input_summary: inputSummary,
+      }));
+    }
+    writeFileSync(join(dir, 'actions.jsonl'), lines.join('\n') + '\n', 'utf8');
+
+    expect(getLastCommitment(TEST_AGENT)).toBe(prev);
+  });
+
+  it('throws when the file is a single line larger than the tail window', () => {
+    const dir = auditDir(TEST_AGENT);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'actions.jsonl'), 'x'.repeat(70_000), 'utf8');
+
+    expect(() => getLastCommitment(TEST_AGENT)).toThrow('invalid audit log tail');
+  });
 });
 
 describe('appendChainedAuditEntry', () => {
