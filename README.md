@@ -20,7 +20,7 @@ required for the default CATP workflow.
 ## Install
 
 ```bash
-npm install -g @catp-protocol/cli@0.7.1
+npm install -g @catp-protocol/cli@0.7.2
 catp --version
 ```
 
