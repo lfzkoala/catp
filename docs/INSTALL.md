@@ -115,8 +115,8 @@ Then add `~/.codex/hooks.json`:
 
 Trust the hooks on first run via the `/hooks` command inside Codex. The same
 `catp init` / `catp validate` project flow applies. Codex v0.155.1 reports
-Claude-compatible tool names (`Bash` observed for shell commands); after the
-first tool call, run `catp log show` to confirm the exact tool names your Codex
+`Bash` for shell commands and `apply_patch` for file edits; after the first
+tool call, run `catp log show` to confirm the exact tool names your Codex
 version reports and write policy rules against those names.
 Codex shell tools may pass `command` as an argv array; the adapter normalizes
 it to a single string so pattern rules work the same as on Claude Code.
@@ -126,9 +126,9 @@ Codex enforcement surface (upstream limitations, stated honestly):
 - `deny` blocking is reliable for shell/exec-style tools. Codex only honors a
   block when the reason is on stderr with exit code 2; `catp hook pre` writes
   the deny reason to both stderr and stdout JSON, so no extra setup is needed.
-  File edits through the internal `apply_patch` path may not fire `PreToolUse`
-  (openai/codex#27833), so file-level enforcement guarantees are currently
-  complete only on Claude Code.
+  On v0.155.1, `apply_patch` file edits fire `PreToolUse` with the patch text
+  in `tool_input.command`, so file-level deny rules work there too (the
+  openai/codex#27833 gap is not observed on this version).
 - The Codex hook runtime drops `permissionDecision: "ask"` responses, and
   `updatedInput` rewrites are unsupported (openai/codex#18491). CATP does not
   depend on input rewriting.

@@ -139,8 +139,10 @@ path.
 - Claude Code `PreToolUse` / `PostToolUse` parsing is isolated in the
   `claude-code` adapter.
 - OpenAI Codex CLI `PreToolUse` / `PostToolUse` parsing is isolated in the
-  `codex` adapter, including argv-array command normalization and documented
-  upstream enforcement gaps (apply_patch coverage, dropped `ask` responses).
+  `codex` adapter, including argv-array command normalization. Real-device
+  smoke on v0.155.1 confirmed deny blocking (exit 2 + stderr reason), the
+  `Bash` / `apply_patch` tool names, and `PreToolUse` coverage for apply_patch
+  edits; dropped `ask` responses remain the documented upstream gap.
 - Hook stdin parsing is centralized and tested.
 - `catp hook pre/post` accept an injectable adapter internally and expose
   `--runtime claude-code` and `--runtime codex` in the CLI.

@@ -30,10 +30,10 @@ allow = false
 reason = "External network calls require explicit approval"
 
 # On OpenAI Codex CLI (catp hook pre/post --runtime codex), tool rules match
-# the names Codex reports: v0.155.1 uses Claude-compatible names ("Bash" for
-# shell commands; tool_input command argv arrays are normalized to a single
-# string). Run "catp log show" after a tool call to confirm the names your
-# runtime reports, and write rules against those.
+# the names Codex reports: v0.155.1 uses "Bash" for shell commands and
+# "apply_patch" for file edits (patch text arrives in tool_input.command;
+# argv-array commands are normalized to a single string). Run "catp log show"
+# after a tool call to confirm the names your runtime reports.
 `;
 
 const AUTHORIZATION_TEMPLATE = `

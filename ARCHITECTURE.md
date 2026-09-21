@@ -196,9 +196,11 @@ guarantees:
 - Claude Code: `PreToolUse` deny/allow applies to all tool categories,
   including file writes and web fetches.
 - Codex: hooks require `[features] hooks = true` and `/hooks` trust review.
-  Deny blocking is reliable for shell/exec-style tools; file edits through the
-  internal `apply_patch` path may not fire `PreToolUse` (openai/codex#27833).
-  The Codex hook runtime drops `permissionDecision: "ask"` responses and
+  On v0.155.1, deny blocking works for shell commands and file edits alike:
+  `apply_patch` edits fire `PreToolUse` with the patch text in
+  `tool_input.command`, so deny rules can match patch contents (the
+  openai/codex#27833 gap is not observed on this version). The Codex hook
+  runtime drops `permissionDecision: "ask"` responses and
   rejects `updatedInput` rewrites (openai/codex#18491); CATP relies on neither
   today, but any future ask-style decision must degrade to deny on Codex until
   upstream support lands.
@@ -209,10 +211,9 @@ guarantees:
   deny reason to both streams, which is also valid for Claude Code.
 - Codex shell tools may pass `tool_input.command` as an argv array; the adapter
   joins it into a single string so pattern rules behave identically across
-  runtimes. Tool names stay runtime-native, and Codex v0.155.1 reports
-  Claude-compatible names (`Bash` observed for shell commands), so policies
-  should be written against the names `catp log show` reports for the target
-  runtime.
+  runtimes. Tool names stay runtime-native: Codex v0.155.1 reports `Bash` for
+  shell commands and `apply_patch` for file edits, so policies should be
+  written against the names `catp log show` reports for the target runtime.
 
 Audit entries are written under:
 
