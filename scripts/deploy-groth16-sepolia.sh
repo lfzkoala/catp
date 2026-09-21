@@ -8,6 +8,7 @@ WRAPPER_FILE="$CONTRACTS_DIR/src/authorization/Groth16AuthorizationVerifier.sol"
 SETUP_MANIFEST="$ROOT_DIR/catp-circuits/groth16/keys/authorization_groth16_v1.manifest.json"
 DEPLOY_LOG_DIR="$CONTRACTS_DIR/deployments/logs"
 MAX_EVM_RUNTIME_BYTES=24576
+EXPECTED_CHAIN_ID=11155111
 DRY_RUN=0
 
 usage() {
@@ -37,6 +38,10 @@ to_decimal() {
   else
     printf '%s\n' "$value"
   fi
+}
+
+lowercase() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
 while [[ $# -gt 0 ]]; do
@@ -115,6 +120,14 @@ if [[ -z "${CATP_PRIVATE_KEY:-}" ]]; then
   exit 1
 fi
 
+echo "==> Verifying RPC chain id"
+RPC_CHAIN_ID="$(to_decimal "$(cast chain-id --rpc-url "$CATP_RPC_URL")")"
+if [[ "$RPC_CHAIN_ID" != "$EXPECTED_CHAIN_ID" ]]; then
+  echo "RPC chain id $RPC_CHAIN_ID does not match expected $EXPECTED_CHAIN_ID; refusing to broadcast." >&2
+  exit 1
+fi
+echo "RPC chain id: $RPC_CHAIN_ID"
+
 mkdir -p "$DEPLOY_LOG_DIR"
 LOG_FILE="$DEPLOY_LOG_DIR/sepolia-groth16-$(date -u +%Y%m%dT%H%M%SZ).log"
 
@@ -173,6 +186,7 @@ echo "Log: $LOG_FILE"
 
   DEPLOYED_GROTH16_CODE="$(cast code --rpc-url "$CATP_RPC_URL" "$GROTH16_ADDRESS")"
   DEPLOYED_WRAPPER_CODE="$(cast code --rpc-url "$CATP_RPC_URL" "$WRAPPER_ADDRESS")"
+  DEPLOYED_AUTHORIZER_CODE="$(cast code --rpc-url "$CATP_RPC_URL" "$AUTHORIZER_ADDRESS")"
   DEPLOYED_GROTH16_RUNTIME_BYTES="$(((${#DEPLOYED_GROTH16_CODE} - 2) / 2))"
   DEPLOYED_WRAPPER_RUNTIME_BYTES="$(((${#DEPLOYED_WRAPPER_CODE} - 2) / 2))"
   if [[ "$DEPLOYED_GROTH16_RUNTIME_BYTES" != "$GROTH16_RUNTIME_BYTES" ||
@@ -180,8 +194,21 @@ echo "Log: $LOG_FILE"
     echo "Deployed runtime size does not match the build artifact." >&2
     exit 1
   fi
-  GROTH16_RUNTIME_HASH="$(cast keccak "$DEPLOYED_GROTH16_CODE")"
-  WRAPPER_RUNTIME_HASH="$(cast keccak "$DEPLOYED_WRAPPER_CODE")"
+
+  # Cross-check deployed runtime bytecode against local build artifacts so a
+  # malicious RPC cannot self-certify a substituted deployment.
+  EXPECTED_GROTH16_CODE="$(jq -r '.deployedBytecode.object' out/Groth16Verifier.sol/Groth16Verifier.json)"
+  EXPECTED_WRAPPER_CODE="$(jq -r '.deployedBytecode.object' out/Groth16AuthorizationVerifier.sol/Groth16AuthorizationVerifier.json)"
+  EXPECTED_AUTHORIZER_CODE="$(jq -r '.deployedBytecode.object' out/AgentAuthorizer.sol/AgentAuthorizer.json)"
+  if [[ "$(lowercase "$DEPLOYED_GROTH16_CODE")" != "$(lowercase "$EXPECTED_GROTH16_CODE")" ||
+        "$(lowercase "$DEPLOYED_WRAPPER_CODE")" != "$(lowercase "$EXPECTED_WRAPPER_CODE")" ||
+        "$(lowercase "$DEPLOYED_AUTHORIZER_CODE")" != "$(lowercase "$EXPECTED_AUTHORIZER_CODE")" ]]; then
+    echo "Deployed runtime bytecode does not match the local build artifact." >&2
+    exit 1
+  fi
+  GROTH16_RUNTIME_HASH="$(cast keccak "$EXPECTED_GROTH16_CODE")"
+  WRAPPER_RUNTIME_HASH="$(cast keccak "$EXPECTED_WRAPPER_CODE")"
+  AUTHORIZER_RUNTIME_HASH="$(cast keccak "$EXPECTED_AUTHORIZER_CODE")"
 
   echo "== Metadata skeleton =="
   jq -n \
@@ -198,6 +225,7 @@ echo "Log: $LOG_FILE"
     --arg wrapperRuntime "$WRAPPER_RUNTIME_BYTES" \
     --arg groth16RuntimeHash "$GROTH16_RUNTIME_HASH" \
     --arg wrapperRuntimeHash "$WRAPPER_RUNTIME_HASH" \
+    --arg authorizerRuntimeHash "$AUTHORIZER_RUNTIME_HASH" \
     --arg groth16Tx "$GROTH16_TX" \
     --arg wrapperTx "$WRAPPER_TX" \
     --arg authorizerTx "$AUTHORIZER_TX" \
@@ -209,8 +237,9 @@ echo "Log: $LOG_FILE"
     --arg authorizerGas "$AUTHORIZER_GAS" \
     --arg deploymentGas "$DEPLOYMENT_GAS" \
     --arg deploymentLog "${LOG_FILE#$CONTRACTS_DIR/}" \
+    --argjson chainId "$EXPECTED_CHAIN_ID" \
     '{
-      chainId: 11155111,
+      chainId: $chainId,
       network: "sepolia",
       status: "deployed_pending_smoke",
       deployedAt: $deployedAt,
@@ -228,7 +257,8 @@ echo "Log: $LOG_FILE"
       groth16AuthorizationVerifierRuntimeBytes: $wrapperRuntime,
       deployedRuntimeCodeKeccak256: {
         groth16Verifier: $groth16RuntimeHash,
-        groth16AuthorizationVerifier: $wrapperRuntimeHash
+        groth16AuthorizationVerifier: $wrapperRuntimeHash,
+        agentAuthorizer: $authorizerRuntimeHash
       },
       blocks: {
         groth16Verifier: $groth16Block,
