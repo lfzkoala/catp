@@ -1,7 +1,12 @@
 # CATP CLI 0.7.3 Release Checklist
 
-Status: pending release. To be published from the `v0.7.3` Git tag through npm
-Trusted Publishing.
+Status: released. Published from the `v0.7.3` Git tag through npm Trusted
+Publishing. A fresh registry install was verified in an isolated temporary
+directory (tarball shasum `711eeb47…` matched the registry; version,
+runtimes, and — with the default `catp init` template — deny of `rm -rf
+/tmp/whatever`, allow of `ls -la`, deny of the compound `echo hi && rm -rf
+~`, deny of a dot-segment write outside the allowlist, and audit chain verify
+all passed).
 
 Package:
 
