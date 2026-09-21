@@ -29,10 +29,11 @@ tool = "WebFetch"
 allow = false
 reason = "External network calls require explicit approval"
 
-# On OpenAI Codex CLI (catp hook pre/post --runtime codex), rules must use
-# Codex tool names instead: "shell"/"exec_command" for commands (tool_input
-# command argv arrays are normalized to a single string) and "apply_patch"
-# for file edits. MCP tools keep their "mcp__<server>__<tool>" names.
+# On OpenAI Codex CLI (catp hook pre/post --runtime codex), tool rules match
+# the names Codex reports: v0.155.1 uses Claude-compatible names ("Bash" for
+# shell commands; tool_input command argv arrays are normalized to a single
+# string). Run "catp log show" after a tool call to confirm the names your
+# runtime reports, and write rules against those.
 `;
 
 const AUTHORIZATION_TEMPLATE = `

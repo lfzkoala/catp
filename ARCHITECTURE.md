@@ -202,10 +202,17 @@ guarantees:
   rejects `updatedInput` rewrites (openai/codex#18491); CATP relies on neither
   today, but any future ask-style decision must degrade to deny on Codex until
   upstream support lands.
+- Codex blocking protocol (observed on v0.155.1): a non-zero hook exit is only
+  honored as a block when the reason is written to stderr; the stdout JSON
+  `{"decision":"block"}` payload is ignored, and exit 2 with empty stderr is
+  treated as a hook failure (fail-open). The pre-hook therefore writes the
+  deny reason to both streams, which is also valid for Claude Code.
 - Codex shell tools may pass `tool_input.command` as an argv array; the adapter
   joins it into a single string so pattern rules behave identically across
-  runtimes. Tool names stay runtime-native (`shell`, `exec_command`,
-  `apply_patch`, `mcp__<server>__<tool>`), so policies are written per runtime.
+  runtimes. Tool names stay runtime-native, and Codex v0.155.1 reports
+  Claude-compatible names (`Bash` observed for shell commands), so policies
+  should be written against the names `catp log show` reports for the target
+  runtime.
 
 Audit entries are written under:
 
