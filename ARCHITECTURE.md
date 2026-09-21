@@ -142,6 +142,20 @@ existing audit logs.
 
 Policy rules are evaluated top-to-bottom. The first matching rule determines whether the tool call is allowed. Unmatched tools are allowed by default.
 
+Policy matching semantics (deliberately simple, and bounded accordingly):
+
+- `pattern` rules match the raw command string as a whole-string glob OR a
+  substring; CATP does not parse shell syntax. An allow prefix such as `echo*`
+  also matches compound commands like `echo hi && rm -rf ~` under first-match
+  semantics. The supported mitigation is a control-operator deny rule
+  (`&&`, `;`, `|`, backtick, `$(`) placed ahead of any command allow rule; the
+  `catp init` template and `examples/receipt-basic` ship this rule.
+- Path rules extract the first present key among `file_path`, `path`,
+  `filePath`, then normalize `.`/`..` dot segments on both the path and the
+  allowlist/denylist patterns (POSIX semantics) before micromatch. Matching
+  operates on the path string reported by the runtime, not the filesystem:
+  symlinks are not resolved, and absolute vs relative forms are not unified.
+
 ### Runtime Adapter Model
 
 Runtime adapters are deliberately thin. An adapter validates a runtime-specific

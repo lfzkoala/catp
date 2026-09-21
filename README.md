@@ -90,6 +90,23 @@ if the audit decision cannot be appended safely.
 CATP policies are TOML files. Rules are evaluated top-to-bottom; first match
 wins. Unmatched tools are allowed by default.
 
+Command patterns match the raw command string (glob or substring); CATP does
+not parse shell syntax. A prefix allow rule such as `echo*` therefore also
+matches compound commands like `echo hi && rm -rf ~`. If you allowlist shell
+commands, place a control-operator deny rule first:
+
+```toml
+[[rules]]
+tool = "Bash"
+allow = false
+pattern = ["&&", ";", "|", "`", "$("]
+reason = "Compound shell commands are blocked"
+```
+
+Path rules normalize `.`/`..` dot segments before matching, but they operate on
+the path reported by the runtime, not the filesystem, so symlinks are not
+resolved.
+
 ```toml
 [agent]
 id = "my-agent"

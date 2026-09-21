@@ -236,6 +236,20 @@ chooses a stable verifier implementation and package boundary.
 Hosted prover/verifier services are out of the current package surface. Revisit
 only with a concrete product reason, threat model, and operations plan.
 
+### Security Audit Follow-Ups (2026-09)
+
+Deferred from the 2026-09 self-audit (see `docs/SECURITY_AUDIT_2026-09.md`):
+
+- Binding `tool_use_id` into audit commitments requires commitment version 4;
+  deferred until another commitment change justifies the version bump.
+- Filesystem-level path canonicalization (symlink/realpath resolution) for path
+  rules; the engine normalizes dot segments only and matches the runtime-
+  reported path string.
+- `registerPolicy` commitment salting or delegator pre-authorization to remove
+  first-writer squatting; changes the on-chain interface and proof binding
+  (documented as an accepted protocol property in
+  `docs/AUTHORIZATION_SECURITY_NOTES.md`).
+
 ---
 
 ## Proof System Policy

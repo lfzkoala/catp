@@ -53,6 +53,9 @@ Out of scope for this document:
 - Each registered policy binds an explicit executor address. Only that address
   can submit an authorization proof, and revocation does not allow another
   delegator to take over the same commitment.
+- `registerPolicy` is first-writer-wins per commitment: whoever registers a
+  commitment first owns it permanently, even across revocation. See the
+  first-writer squatting finding below for the integrator consequences.
 
 ## Current Assumptions
 
@@ -142,6 +145,39 @@ Follow-up:
 
 - Add a verifier-backed mode once CATP exposes a stable local Groth16 verifier
   command/API for proof artifacts.
+
+### Low: registerPolicy Is First-Writer-Wins (Commitment Squatting)
+
+`AgentAuthorizer.registerPolicy` binds a policy commitment to its first
+registrant permanently. An attacker who observes a pending commitment
+(for example in the mempool or in a published proof manifest) can register it
+first. The intended delegator is then locked out of that commitment forever,
+including after the squatter revokes: re-registration reverts with
+`not delegator` for everyone but the original registrant.
+
+This is a denial-of-binding, not a fund-safety issue: the squatted entry is
+owned by the attacker, so it never authorizes actions against the intended
+delegator's assets, and the delegator's wallet only ever signs proofs for
+policies it committed to.
+
+Decision: accepted as a protocol property. Changing it (for example
+commitment salting or delegator pre-authorization) would alter the on-chain
+interface and proof binding and is deferred.
+
+Integrator guidance:
+
+- Treat policy commitments as single-use secrets until registered.
+- Register the commitment on-chain before publishing it anywhere (manifests,
+  receipts, off-chain channels).
+- If a commitment is squatted, generate a new policy with a fresh commitment
+  instead of attempting to reclaim the original.
+
+Regression/guard:
+
+- `catp-contracts/test/authorization/AgentAuthorizer.t.sol`
+  (`test_register_attackerSquatBlocksIntendedDelegator`,
+  `test_register_intendedDelegatorLockedOutAfterSquatterRevoke`,
+  `test_register_rejectsTakeoverAfterRevoke`)
 
 ## Required Regression Tests
 

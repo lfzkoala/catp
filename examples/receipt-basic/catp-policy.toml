@@ -4,6 +4,12 @@ version = "1"
 
 [[rules]]
 tool = "Bash"
+allow = false
+pattern = ["&&", ";", "|", "`", "$("]
+reason = "Compound shell commands are blocked so the echo allow-rule below cannot be chained into other commands"
+
+[[rules]]
+tool = "Bash"
 allow = true
 pattern = ["echo*"]
 reason = "Allow the receipt example command"
