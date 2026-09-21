@@ -1,7 +1,9 @@
 # CATP CLI 0.7.1 Release Checklist
 
-Status: release candidate; local checks and a real-device Codex smoke test
-passed. Publish from the `v0.7.1` Git tag after main CI is green.
+Status: released. Published from the `v0.7.1` Git tag through npm Trusted
+Publishing; a fresh registry install was verified in an isolated temporary
+directory (version, runtime adapters, codex deny path with stderr reason,
+audit chain verify).
 
 Package:
 
