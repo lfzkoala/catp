@@ -144,8 +144,12 @@ Policy rules are evaluated top-to-bottom. The first matching rule determines whe
 
 Policy matching semantics (deliberately simple, and bounded accordingly):
 
-- `pattern` rules match the raw command string as a whole-string glob OR a
-  substring; CATP does not parse shell syntax. An allow prefix such as `echo*`
+- `pattern` rules match the raw command string as a shell-style glob OR a
+  substring; CATP does not parse shell syntax. Command globs are not
+  micromatch path globs: `*` matches any run of characters including `/` and
+  newlines, so deny patterns like `rm -rf*` also match commands containing
+  absolute paths (micromatch's segment-boundary semantics silently failed
+  there; path rules keep micromatch semantics). An allow prefix such as `echo*`
   also matches compound commands like `echo hi && rm -rf ~` under first-match
   semantics. The supported mitigation is a control-operator deny rule
   (`&&`, `;`, `|`, backtick, `$(`) placed ahead of any command allow rule; the

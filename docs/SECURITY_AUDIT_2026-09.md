@@ -140,6 +140,31 @@ Filesystem-level canonicalization is deferred (IMPLEMENTATION_PLAN).
 Tests: `catp-plugin/tests/policy/engine.test.ts` (dot-segment collapse,
 `./`-prefixed pattern equivalence).
 
+### 8. Command glob patterns silently failed on absolute paths — Fixed in 0.7.3
+
+Found during the 0.7.2 registry install verification (after this audit run):
+command `pattern` globs were evaluated with `micromatch.isMatch`, which treats
+`/` as a path-segment boundary. Deny patterns shipped in the README and the
+`catp init` template (for example `rm -rf*`) therefore never matched commands
+containing absolute paths such as `rm -rf /tmp/x`; only the substring arm or
+segment-free commands matched. This weakened every glob-style command deny
+rule in default templates since their introduction.
+
+Fix: command patterns now use a dedicated shell-style glob (compiled to an
+anchored regex): `*` matches any run of characters including `/` and newlines,
+`?` matches one character, and all regex metacharacters in patterns are
+escaped. The substring arm is unchanged. Path rules keep micromatch semantics
+(segment-aware matching is correct for file paths).
+
+Behavior change: deny globs that were silently inert against absolute-path
+commands now fire (fail-safe direction); allow globs containing `*` can match
+more commands, so an allow pattern relying on the broken segment semantics
+would need review — no shipped template or example relies on it.
+
+Tests: `catp-plugin/tests/policy/engine.test.ts` (`command glob semantics`
+suite: absolute paths, embedded destructive commands, literal operators,
+multi-line commands, `?`, metacharacter escaping).
+
 ## Rejected Lead
 
 - `receipt.prephase.positive-binding`: rejected during the audit; receipt
@@ -171,7 +196,8 @@ and `registerPolicy` salting/pre-authorization.
 
 ## Verification Performed
 
-- `catp-plugin`: `npm test` — 212 tests passed (17 suites).
+- `catp-plugin`: `npm test` — 218 tests passed (17 suites) after the 0.7.3
+  command-glob fix (212 at the initial audit-fix commit).
 - `catp-contracts`: `forge test` — 33 tests passed (including 2 new
   first-writer tests).
 - `scripts/deploy-groth16-sepolia.sh`: `bash -n` + `--dry-run` passed.

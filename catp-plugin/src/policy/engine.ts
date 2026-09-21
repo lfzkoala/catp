@@ -32,7 +32,7 @@ function matchesRule(rule: Rule, input: ToolAction): boolean {
   if (rule.pattern && rule.pattern.length > 0) {
     const command = extractCommand(input);
     if (command === null) return false;
-    return rule.pattern.some((p) => micromatch.isMatch(command, p) || command.includes(p));
+    return rule.pattern.some((p) => commandGlobMatches(p, command) || command.includes(p));
   }
 
   if (rule.path_allowlist || rule.path_denylist) {
@@ -72,4 +72,24 @@ function extractPath(input: ToolAction): string | null {
 
 function normalizePathLabel(value: string): string {
   return posixPath.normalize(value);
+}
+
+// Command patterns use shell-style glob semantics: "*" matches any run of
+// characters including "/" and "?" matches any single character. micromatch is
+// deliberately not used here because it treats "/" as a path-segment boundary,
+// so glob patterns like "rm -rf*" silently fail to match commands containing
+// absolute paths ("rm -rf /tmp/x"). Path rules keep micromatch glob semantics.
+const commandGlobCache = new Map<string, RegExp>();
+
+function commandGlobMatches(pattern: string, command: string): boolean {
+  let re = commandGlobCache.get(pattern);
+  if (re === undefined) {
+    const source = pattern
+      .replace(/[.+^${}()|[\]\\*?]/g, "\\$&")
+      .replace(/\\\*/g, ".*")
+      .replace(/\\\?/g, ".");
+    re = new RegExp(`^${source}$`, "s");
+    commandGlobCache.set(pattern, re);
+  }
+  return re.test(command);
 }

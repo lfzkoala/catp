@@ -20,7 +20,7 @@ required for the default CATP workflow.
 ## Install
 
 ```bash
-npm install -g @catp-protocol/cli@0.7.2
+npm install -g @catp-protocol/cli@0.7.3
 catp --version
 ```
 
@@ -90,10 +90,11 @@ if the audit decision cannot be appended safely.
 CATP policies are TOML files. Rules are evaluated top-to-bottom; first match
 wins. Unmatched tools are allowed by default.
 
-Command patterns match the raw command string (glob or substring); CATP does
-not parse shell syntax. A prefix allow rule such as `echo*` therefore also
-matches compound commands like `echo hi && rm -rf ~`. If you allowlist shell
-commands, place a control-operator deny rule first:
+Command patterns match the raw command string as a shell-style glob (`*`
+matches any characters including `/`, `?` matches one) or as a plain substring;
+CATP does not parse shell syntax. A prefix allow rule such as `echo*` therefore
+also matches compound commands like `echo hi && rm -rf ~`. If you allowlist
+shell commands, place a control-operator deny rule first:
 
 ```toml
 [[rules]]
