@@ -77,6 +77,36 @@ contract AgentAuthorizerTest is Test {
         authorizer.registerPolicy(POLICY, attacker);
     }
 
+    // Protocol property: registerPolicy is first-writer-wins per commitment.
+    // An attacker who observes a pending commitment can squat it, blocking the
+    // intended delegator from ever binding that commitment. The squatted entry
+    // is owned by the attacker, so it never authorizes actions against the
+    // intended delegator's assets; integrators must treat commitment reuse as
+    // unsafe and register before exposing a commitment (see docs).
+    function test_register_attackerSquatBlocksIntendedDelegator() public {
+        vm.prank(attacker);
+        authorizer.registerPolicy(POLICY, attacker);
+        assertTrue(authorizer.isPolicyActive(POLICY));
+        assertEq(authorizer.getPolicyExecutor(POLICY), attacker);
+
+        vm.prank(delegator);
+        vm.expectRevert("AgentAuthorizer: policy already active");
+        authorizer.registerPolicy(POLICY, agent);
+    }
+
+    function test_register_intendedDelegatorLockedOutAfterSquatterRevoke() public {
+        vm.prank(attacker);
+        authorizer.registerPolicy(POLICY, attacker);
+        vm.prank(attacker);
+        authorizer.revokePolicy(POLICY);
+
+        // Even after the squatter revokes, the commitment stays bound to the
+        // first writer and cannot be reclaimed by anyone else.
+        vm.prank(delegator);
+        vm.expectRevert("AgentAuthorizer: not delegator");
+        authorizer.registerPolicy(POLICY, agent);
+    }
+
     // ── revokePolicy ─────────────────────────────────────────────────────────
     function test_revoke_success() public {
         vm.prank(delegator);
