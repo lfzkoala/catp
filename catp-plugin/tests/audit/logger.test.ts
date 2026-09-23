@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   computeCommitment,
+  computeCommitmentV4,
   summarizeInput,
   buildEntry,
   extractAuthorizationAction,
@@ -12,7 +13,13 @@ import {
   getLastCommitment,
   auditDir,
 } from '../../src/audit/logger.js';
+import {
+  canonicalizeToolAction,
+  computeActionCommitment,
+  computePolicyCommitment,
+} from '../../src/evidence/commitments.js';
 import { auditRoot } from '../../src/audit/paths.js';
+import type { CatpPolicy } from '../../src/policy/types.js';
 import type { ToolAction } from '../../src/runtime/types.js';
 
 const TEST_AGENT = `__test__${Date.now()}`;
@@ -32,6 +39,17 @@ const makeInput = (tool: string, toolInput: Record<string, unknown> = {}): ToolA
   phase: 'pre',
   toolName: tool,
   toolInput,
+});
+
+const TEST_POLICY: CatpPolicy = { agent: { id: 'test', version: '1' }, rules: [] };
+
+// Build the enforcement-time bindings buildEntry now requires. The action
+// commitment is the real digest over the canonical action so v4 entries are
+// internally consistent.
+const bindingsFor = (input: ToolAction, reason = 'test-reason') => ({
+  reason,
+  policyCommitment: computePolicyCommitment(TEST_POLICY),
+  actionCommitment: computeActionCommitment(canonicalizeToolAction(input)),
 });
 
 describe('computeCommitment', () => {
@@ -195,24 +213,27 @@ describe('appendAuditEntry + getLastCommitment', () => {
 describe('appendChainedAuditEntry', () => {
   it('builds each entry from the latest commitment while holding the audit lock', () => {
     const first = appendChainedAuditEntry(TEST_AGENT, (prev) =>
-      ({ auditEntry: buildEntry(makeInput('Bash'), 'allow', null, prev) }),
+      ({ auditEntry: buildEntry(makeInput('Bash'), 'allow', null, prev, bindingsFor(makeInput('Bash'))) }),
     );
     const second = appendChainedAuditEntry(TEST_AGENT, (prev) =>
-      ({ auditEntry: buildEntry(makeInput('Write'), 'allow', null, prev) }),
+      ({ auditEntry: buildEntry(makeInput('Write'), 'allow', null, prev, bindingsFor(makeInput('Write'))) }),
     );
 
+    const bindings = bindingsFor(makeInput('Write'));
     expect(second.auditEntry.commitment).toBe(
-      computeCommitment(
-        'Write',
-        'allow',
-        second.auditEntry.ts,
-        first.auditEntry.commitment,
-        null,
-        '{}',
-        undefined,
-        3,
-        'pre',
-      ),
+      computeCommitmentV4({
+        phase: 'pre',
+        tool: 'Write',
+        decision: 'allow',
+        ts: second.auditEntry.ts,
+        ruleMatched: null,
+        reason: bindings.reason,
+        inputSummary: '{}',
+        policyCommitment: bindings.policyCommitment,
+        actionCommitment: bindings.actionCommitment,
+        authorization: undefined,
+        prev: first.auditEntry.commitment,
+      }),
     );
   });
 
@@ -222,7 +243,7 @@ describe('appendChainedAuditEntry', () => {
     })).toThrow('build failed');
 
     expect(() => appendChainedAuditEntry(TEST_AGENT, (prev) =>
-      ({ auditEntry: buildEntry(makeInput('Bash'), 'allow', null, prev) }),
+      ({ auditEntry: buildEntry(makeInput('Bash'), 'allow', null, prev, bindingsFor(makeInput('Bash'))) }),
     )).not.toThrow();
   });
 
@@ -233,39 +254,60 @@ describe('appendChainedAuditEntry', () => {
     utimesSync(lockDir, new Date(0), new Date(0));
 
     expect(() => appendChainedAuditEntry(TEST_AGENT, (prev) =>
-      ({ auditEntry: buildEntry(makeInput('Bash'), 'allow', null, prev) }),
+      ({ auditEntry: buildEntry(makeInput('Bash'), 'allow', null, prev, bindingsFor(makeInput('Bash'))) }),
     )).not.toThrow();
   });
 });
 
 describe('buildEntry', () => {
-  it('returns a valid AuditEntry with correct fields', () => {
-    const entry = buildEntry(makeInput('Bash', { command: 'ls' }), 'allow', 'my-rule');
+  it('returns a valid v4 AuditEntry with correct fields', () => {
+    const input = makeInput('Bash', { command: 'ls' });
+    const entry = buildEntry(input, 'allow', 'my-rule', '0', bindingsFor(input, 'my-reason'));
+    expect(entry.commitment_version).toBe(4);
     expect(entry.tool).toBe('Bash');
     expect(entry.decision).toBe('allow');
     expect(entry.rule_matched).toBe('my-rule');
+    expect(entry.reason).toBe('my-reason');
     expect(entry.commitment).toMatch(/^[0-9a-f]{64}$/);
+    expect(entry.policy_commitment).toMatch(/^[0-9a-f]{64}$/);
+    expect(entry.action_commitment).toMatch(/^[0-9a-f]{64}$/);
     expect(entry.input_summary).toContain('ls');
     expect(new Date(entry.ts).getTime()).not.toBeNaN();
   });
 
+  it('always contains both enforcement-time bindings', () => {
+    const input = makeInput('Bash', { command: 'ls' });
+    const entry = buildEntry(input, 'allow', null, '0', bindingsFor(input));
+    expect(entry.policy_commitment).toBe(computePolicyCommitment(TEST_POLICY));
+    expect(entry.action_commitment).toBe(computeActionCommitment(canonicalizeToolAction(input)));
+  });
+
   it('accepts null for rule_matched', () => {
-    const entry = buildEntry(makeInput('Read', {}), 'allow', null);
+    const input = makeInput('Read', {});
+    const entry = buildEntry(input, 'allow', null, '0', bindingsFor(input));
     expect(entry.rule_matched).toBeNull();
   });
 
   it('chains on the provided prev commitment', () => {
     const prev = 'a'.repeat(64);
-    const entry = buildEntry(makeInput('Bash', {}), 'allow', null, prev);
-    const expected = computeCommitment('Bash', 'allow', entry.ts, prev, null, '{}', undefined, 3, 'pre');
+    const input = makeInput('Bash', {});
+    const bindings = bindingsFor(input);
+    const entry = buildEntry(input, 'allow', null, prev, bindings);
+    const expected = computeCommitmentV4({
+      phase: 'pre',
+      tool: 'Bash',
+      decision: 'allow',
+      ts: entry.ts,
+      ruleMatched: null,
+      reason: bindings.reason,
+      inputSummary: '{}',
+      policyCommitment: bindings.policyCommitment,
+      actionCommitment: bindings.actionCommitment,
+      authorization: undefined,
+      prev,
+    });
     expect(entry.commitment).toBe(expected);
-    expect(entry.commitment_version).toBe(3);
-  });
-
-  it('defaults prev to "0" when not provided', () => {
-    const entry = buildEntry(makeInput('Bash', {}), 'deny', null);
-    const expected = computeCommitment('Bash', 'deny', entry.ts, '0', null, '{}', undefined, 3, 'pre');
-    expect(entry.commitment).toBe(expected);
+    expect(entry.commitment_version).toBe(4);
   });
 
   it('attaches structured authorization action data when present', () => {
@@ -277,8 +319,24 @@ describe('buildEntry', () => {
       currentTimestamp: '150',
       cumulativeSpend: '0',
     };
-    const entry = buildEntry(makeInput('Bash', { catp_authorization: authorization }), 'allow', null);
+    const input = makeInput('Bash', { catp_authorization: authorization });
+    const entry = buildEntry(input, 'allow', null, '0', bindingsFor(input));
     expect(entry.authorization).toEqual(authorization);
+  });
+
+  it('does not let a display-summary change substitute for action evidence', () => {
+    // Two actions whose capped display summaries are identical (the difference
+    // is beyond the 200-char cap) must still have distinct action commitments.
+    // input_summary is display-only and non-authoritative.
+    const prefix = 'x'.repeat(250);
+    const a = makeInput('Write', { data: `${prefix}SAFE` });
+    const b = makeInput('Write', { data: `${prefix}DESTRUCTIVE` });
+    expect(summarizeInput(a)).toBe(summarizeInput(b));
+
+    const entryA = buildEntry(a, 'allow', null, '0', bindingsFor(a));
+    const entryB = buildEntry(b, 'allow', null, '0', bindingsFor(b));
+    expect(entryA.input_summary).toBe(entryB.input_summary);
+    expect(entryA.action_commitment).not.toBe(entryB.action_commitment);
   });
 });
 

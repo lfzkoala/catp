@@ -17,7 +17,13 @@ import {
   type AuthorizationReceipt,
 } from "../../src/commands/receipt.js";
 import { stableStringify, type AuditExport } from "../../src/commands/log.js";
+import {
+  canonicalizeToolAction,
+  computeActionCommitment,
+  computePolicyCommitment as computeEvidencePolicyCommitment,
+} from "../../src/evidence/commitments.js";
 import type { AuditEntry, CatpPolicy } from "../../src/policy/types.js";
+import type { ToolAction } from "../../src/runtime/types.js";
 
 const TEST_HOME = join(tmpdir(), `catp-receipt-command-test-${Date.now()}`);
 process.env.CATP_HOME = TEST_HOME;
@@ -78,6 +84,18 @@ function policy(): CatpPolicy {
   return {
     agent: { id: "receipt-agent", version: "1" },
     rules: [{ tool: "Bash", allow: true }],
+  };
+}
+
+// Task 2 made buildEntry emit v4 entries that require enforcement-time
+// bindings. These receipt tests exercise pre/post selection rather than the
+// binding values, so supply genuine, internally-consistent bindings derived
+// from the same action the entry is built over.
+function bindingsFor(input: ToolAction, reason = "receipt-test-reason") {
+  return {
+    reason,
+    policyCommitment: computeEvidencePolicyCommitment(policy()),
+    actionCommitment: computeActionCommitment(canonicalizeToolAction(input)),
   };
 }
 
@@ -310,12 +328,13 @@ describe("authorization receipt", () => {
 
   it("rejects signing a post-action audit export", () => {
     const { privateKeyPem } = keyPair();
-    const post = buildEntry({
+    const postInput: ToolAction = {
       runtime: "test-runtime",
       phase: "post",
       toolName: "Bash",
       toolInput: { command: "echo ok" },
-    }, "allow", null);
+    };
+    const post = buildEntry(postInput, "allow", null, "0", bindingsFor(postInput));
     const dir = join(TEST_HOME, "sign-post");
     mkdirSync(dir, { recursive: true });
     const auditExportPath = join(dir, "audit-export.json");
@@ -582,8 +601,9 @@ describe("authorization receipt", () => {
       toolName: "Bash",
       toolInput: { command: "echo ok" },
     };
-    const pre = buildEntry(action, "allow", "Bash:allow");
-    const post = buildEntry({ ...action, phase: "post" }, "allow", null, pre.commitment);
+    const pre = buildEntry(action, "allow", "Bash:allow", "0", bindingsFor(action));
+    const postAction: ToolAction = { ...action, phase: "post" };
+    const post = buildEntry(postAction, "allow", null, pre.commitment, bindingsFor(postAction));
     writeAuditEntries("receipt-agent", "2026-01-01", [
       auditExportFrom(pre, 0),
       auditExportFrom(post, 1),
@@ -619,8 +639,9 @@ describe("authorization receipt", () => {
       toolName: "Bash",
       toolInput: { command: "echo ok" },
     };
-    const pre = buildEntry(action, "allow", "Bash:allow");
-    const post = buildEntry({ ...action, phase: "post" }, "allow", null, pre.commitment);
+    const pre = buildEntry(action, "allow", "Bash:allow", "0", bindingsFor(action));
+    const postAction: ToolAction = { ...action, phase: "post" };
+    const post = buildEntry(postAction, "allow", null, pre.commitment, bindingsFor(postAction));
     writeAuditEntries("receipt-agent", "2026-01-01", [
       auditExportFrom(pre, 0),
       auditExportFrom(post, 1),

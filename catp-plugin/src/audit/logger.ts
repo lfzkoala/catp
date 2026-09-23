@@ -3,7 +3,8 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readSync, s
 import { dirname, join } from "node:path";
 import { lockSync } from "proper-lockfile";
 import { auditDirForDate } from "./paths.js";
-import type { AuditEntry, AuthorizationAction } from "../policy/types.js";
+import { sha256Hex, stableStringify } from "../evidence/canonical.js";
+import type { AuditEntry, AuditEntryV4, AuthorizationAction } from "../policy/types.js";
 import type { ToolAction } from "../runtime/types.js";
 import type { RuntimePhase } from "../runtime/types.js";
 
@@ -44,6 +45,50 @@ export function computeCommitment(
 export function summarizeInput(input: ToolAction): string {
   const raw = JSON.stringify(input.toolInput);
   return raw.length > 200 ? raw.slice(0, 200) + "…" : raw;
+}
+
+// Domain separator for version-4 audit-entry commitments. v4 is a NEW format
+// with no backward-compatibility constraint, so it uses the shared canonical
+// serializer and an explicit domain string. Legacy v1--v3 commitments above are
+// left byte-for-byte unchanged.
+const AUDIT_ENTRY_V4_DOMAIN = "catp:audit-entry:v4\n";
+
+export interface AuditEntryV4Fields {
+  phase: RuntimePhase;
+  tool: string;
+  decision: "allow" | "deny";
+  ts: string;
+  ruleMatched: string | null;
+  reason: string;
+  inputSummary: string;
+  policyCommitment: string;
+  actionCommitment: string;
+  authorization?: AuthorizationAction;
+  prev: string;
+}
+
+/**
+ * Version-4 entry commitment. Covers every security-relevant field with a
+ * domain separator: prev_commitment, phase, tool, decision, ts, rule, reason,
+ * the enforcement-time policy commitment, and the complete-action commitment.
+ * `inputSummary` is chained for display tamper-evidence only; the authoritative
+ * action binding is `actionCommitment`.
+ */
+export function computeCommitmentV4(fields: AuditEntryV4Fields): string {
+  const payload = {
+    phase: fields.phase,
+    tool: fields.tool,
+    decision: fields.decision,
+    ts: fields.ts,
+    ruleMatched: fields.ruleMatched,
+    reason: fields.reason,
+    inputSummary: fields.inputSummary,
+    policyCommitment: fields.policyCommitment,
+    actionCommitment: fields.actionCommitment,
+    authorization: fields.authorization ?? null,
+    prev: fields.prev,
+  };
+  return sha256Hex(AUDIT_ENTRY_V4_DOMAIN + stableStringify(payload));
 }
 
 export function auditDir(agentId: string): string {
@@ -147,33 +192,54 @@ function acquireAuditLock(file: string): () => void {
   }
 }
 
+export interface AuditEntryBindings {
+  reason: string;
+  policyCommitment: string;
+  actionCommitment: string;
+}
+
+/**
+ * Build a version-4 audit entry that binds the decision to the exact
+ * enforcement-time policy commitment and complete-action commitment. The caller
+ * (enforcement core) computes both commitments from the normalized policy and
+ * canonical action used for the decision; this function never recomputes them
+ * from mutable files.
+ */
 export function buildEntry(
   input: ToolAction,
   decision: "allow" | "deny",
   ruleMatched: string | null,
-  prevCommitment: string = "0"
-): AuditEntry {
+  prevCommitment: string,
+  bindings: AuditEntryBindings,
+): AuditEntryV4 {
   const ts = new Date().toISOString();
   const inputSummary = summarizeInput(input);
   const authorization = extractAuthorizationAction(input);
-  const entry: AuditEntry = {
-    commitment_version: 3,
-    phase: input.phase,
+  const phase = input.phase;
+  const commitment = computeCommitmentV4({
+    phase,
+    tool: input.toolName,
+    decision,
+    ts,
+    ruleMatched,
+    reason: bindings.reason,
+    inputSummary,
+    policyCommitment: bindings.policyCommitment,
+    actionCommitment: bindings.actionCommitment,
+    authorization,
+    prev: prevCommitment,
+  });
+  const entry: AuditEntryV4 = {
+    commitment_version: 4,
+    phase,
     ts,
     tool: input.toolName,
     decision,
     rule_matched: ruleMatched,
-    commitment: computeCommitment(
-      input.toolName,
-      decision,
-      ts,
-      prevCommitment,
-      ruleMatched,
-      inputSummary,
-      authorization,
-      3,
-      input.phase,
-    ),
+    reason: bindings.reason,
+    policy_commitment: bindings.policyCommitment,
+    action_commitment: bindings.actionCommitment,
+    commitment,
     input_summary: inputSummary,
   };
   if (authorization) {

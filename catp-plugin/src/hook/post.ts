@@ -29,7 +29,7 @@ export async function runPostHook(opts: HookOptions = {}): Promise<void> {
 
   // PostToolUse always records allow — the action already executed
   try {
-    appendChainedAuditEntry(policy.agent.id, (prev) => recordPostAction(action, prev));
+    appendChainedAuditEntry(policy.agent.id, (prev) => recordPostAction(policy, action, prev));
   } catch {
     // Audit log failure must not block the agent
   }
