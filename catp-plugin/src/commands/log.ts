@@ -1,9 +1,10 @@
 import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { auditRoot } from "../audit/paths.js";
+import { actionSidecarPath, auditRoot } from "../audit/paths.js";
 import { findPolicyFile, loadPolicy } from "../policy/loader.js";
-import { verifyChain } from "../audit/verifier.js";
+import { verifyChain, verifyEntryChain } from "../audit/verifier.js";
 import { sha256Hex, stableStringify } from "../evidence/canonical.js";
+import { computeActionCommitment, type CanonicalToolActionV1 } from "../evidence/commitments.js";
 import type { AuditEntry } from "../policy/types.js";
 
 // The canonical serializer now lives in evidence/canonical.ts and is shared with
@@ -19,6 +20,33 @@ export interface AuditExport {
   commitment: string;
   entrySha256: string;
   entry: AuditEntry;
+}
+
+// Domain separator for the self-contained version-2 audit export hash.
+const AUDIT_EXPORT_V2_DOMAIN = "catp:audit-export:v2\n";
+
+/**
+ * Self-contained portable evidence bundle. Unlike v1 (which carried only the
+ * selected entry and its display `input_summary`), v2 embeds the daily chain
+ * prefix up to the selected entry AND the complete canonical action whose digest
+ * the entry commits to. `entries` runs from index 0 through `selected_index`, so
+ * the selected entry is always `entries[entries.length - 1]`.
+ *
+ * This proves the selected entry's position within the supplied daily prefix and
+ * binds it to the exact action; it does NOT prove absence of later entries or of
+ * other undisclosed logs.
+ */
+export interface AuditExportV2Body {
+  export_version: "catp_audit_export_v2";
+  agent_id: string;
+  log_date: string;
+  selected_index: number;
+  entries: AuditEntry[];
+  action: CanonicalToolActionV1;
+}
+
+export interface AuditExportV2 extends AuditExportV2Body {
+  export_sha256: string;
 }
 
 function resolveAgentId(opts: { agent?: string }): string {
@@ -188,14 +216,14 @@ export function cmdLogExport(opts: {
 
   const agentId = resolveAgentId(opts);
   const commitment = resolveLogExportCommitment(agentId, opts);
-  const auditExport = buildAuditExport(agentId, commitment);
+  const auditExport = buildAuditExportV2(agentId, commitment);
   const json = stableStringify(auditExport, 2) + "\n";
 
   if (opts.out) {
     writeFileSync(opts.out, json, "utf8");
     process.stdout.write(`Wrote audit export to ${opts.out}\n`);
-    process.stdout.write(`commitment=${auditExport.commitment}\n`);
-    process.stdout.write(`entrySha256=${auditExport.entrySha256}\n`);
+    process.stdout.write(`commitment=${commitment}\n`);
+    process.stdout.write(`exportSha256=${auditExport.export_sha256}\n`);
     return;
   }
 
@@ -229,6 +257,66 @@ export function buildAuditExport(agentId: string, commitment: string): AuditExpo
     entrySha256: sha256Hex(stableStringify(found.entry)),
     entry: found.entry,
   };
+}
+
+/**
+ * Build the self-contained version-2 export for a commitment. Before bundling:
+ * verify the daily chain prefix offline, require the selected entry to be
+ * commitment version 4, load its content-addressed action sidecar, and require
+ * `computeActionCommitment(action) === entry.action_commitment`. Missing or
+ * mismatched evidence is rejected so a v2 bundle always carries the exact action.
+ */
+export function buildAuditExportV2(agentId: string, commitment: string): AuditExportV2 {
+  assertCommitment(commitment);
+  const found = findAuditEntry(agentId, commitment);
+  if (!found) {
+    throw new Error(`No audit entry found for commitment ${commitment}`);
+  }
+  const selected = found.entry;
+  if (selected.commitment_version !== 4) {
+    throw new Error("audit export v2 requires a commitment version 4 selected entry");
+  }
+
+  const file = join(auditRoot(agentId), found.date, "actions.jsonl");
+  const rawLines = readFileSync(file, "utf8").split("\n").filter(Boolean);
+  const parsed: AuditEntry[] = [];
+  for (let i = 0; i < rawLines.length; i++) {
+    try {
+      parsed.push(JSON.parse(rawLines[i]) as AuditEntry);
+    } catch {
+      // Fail closed with the same line-oriented diagnostic verifyChain uses,
+      // rather than leaking a raw SyntaxError.
+      throw new Error(`audit log ${file} line ${i + 1}: invalid JSON`);
+    }
+  }
+  const entries = parsed.slice(0, found.index + 1);
+  const verification = verifyEntryChain(entries);
+  if (!verification.ok) {
+    throw new Error(`audit chain verification failed at entry ${verification.broken_at}: ${verification.message}`);
+  }
+  if (entries.length !== found.index + 1) {
+    throw new Error("internal error: audit export prefix length does not match selected_index + 1");
+  }
+
+  const sidecar = actionSidecarPath(agentId, found.date, selected.action_commitment);
+  if (!existsSync(sidecar)) {
+    throw new Error(`missing action evidence sidecar for commitment ${commitment}`);
+  }
+  const action = JSON.parse(readFileSync(sidecar, "utf8")) as CanonicalToolActionV1;
+  if (computeActionCommitment(action) !== selected.action_commitment) {
+    throw new Error("action evidence does not match the audit entry action_commitment");
+  }
+
+  const body: AuditExportV2Body = {
+    export_version: "catp_audit_export_v2",
+    agent_id: agentId,
+    log_date: found.date,
+    selected_index: found.index,
+    entries,
+    action,
+  };
+  const export_sha256 = sha256Hex(AUDIT_EXPORT_V2_DOMAIN + stableStringify(body));
+  return { ...body, export_sha256 };
 }
 
 export function latestAuditEntry(

@@ -18,14 +18,32 @@ export async function verifyChain(logFile: string): Promise<VerifyResult> {
     return { ok: true, checked: 0, broken_at: null, message: "empty log" };
   }
 
-  let prev = "0";
+  const entries: AuditEntry[] = [];
   for (let i = 0; i < lines.length; i++) {
-    let entry: AuditEntry;
     try {
-      entry = JSON.parse(lines[i]) as AuditEntry;
+      entries.push(JSON.parse(lines[i]) as AuditEntry);
     } catch {
       return { ok: false, checked: i, broken_at: i, message: `line ${i + 1}: invalid JSON` };
     }
+  }
+  return verifyEntryChain(entries);
+}
+
+/**
+ * Pure chain validation over already-parsed entries. Both the on-disk
+ * `verifyChain` wrapper and offline audit-export verification delegate here, so
+ * the exact same commitment rules apply to a live daily log and to a portable
+ * export bundle. `broken_at`/`checked` are entry indices (0-based); messages use
+ * the human-facing 1-based `line N` wording shared with the file wrapper.
+ */
+export function verifyEntryChain(entries: AuditEntry[]): VerifyResult {
+  if (entries.length === 0) {
+    return { ok: true, checked: 0, broken_at: null, message: "empty log" };
+  }
+
+  let prev = "0";
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
 
     const decision = entry.decision as "allow" | "deny";
     const version = entry.commitment_version;
@@ -107,7 +125,7 @@ export async function verifyChain(logFile: string): Promise<VerifyResult> {
     prev = entry.commitment;
   }
 
-  return { ok: true, checked: lines.length, broken_at: null, message: "chain intact" };
+  return { ok: true, checked: entries.length, broken_at: null, message: "chain intact" };
 }
 
 async function readLines(file: string): Promise<string[]> {

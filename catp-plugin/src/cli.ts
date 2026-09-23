@@ -94,7 +94,7 @@ log
 
 log
   .command("export")
-  .description("Export a deterministic audit entry bundle")
+  .description("Export a self-contained audit evidence bundle (catp_audit_export_v2)")
   .option("--commitment <hex>", "audit entry commitment to export")
   .option("--latest", "export the latest audit entry")
   .option("--tool <name>", "export the latest audit entry matching a tool name")

@@ -145,6 +145,17 @@ catp log verify
 catp anchor --out catp-audit-anchor.json
 ```
 
+`catp log export` writes a self-contained `catp_audit_export_v2` bundle: the
+daily hash-chain prefix up to the selected entry plus the complete canonical
+action whose digest that entry commits to. This bundle is the portable evidence
+unit. The `input_summary` shown by `catp log show` is a capped display string
+and, on its own, does not establish exact-action binding — only the bundled
+action and the entry's `action_commitment` do. Export requires a
+commitment-version-4 selected entry and its content-addressed action sidecar; a
+missing or altered sidecar is rejected. The v2 bundle proves the selected
+entry's position within the supplied daily prefix, not the absence of later
+entries or of other undisclosed logs.
+
 The anchor command verifies each local log chain before writing a
 `catp_audit_anchor_v1` Merkle-root bundle. CATP does not currently ship a
 dedicated on-chain audit anchor contract, so this command does not broadcast.

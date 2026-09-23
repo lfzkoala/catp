@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll } from '@jest/globals';
 import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { verifyChain } from '../../src/audit/verifier.js';
+import { verifyChain, verifyEntryChain } from '../../src/audit/verifier.js';
 import { buildEntry, computeCommitment, computeCommitmentV4 } from '../../src/audit/logger.js';
 import {
   canonicalizeToolAction,
@@ -285,5 +285,38 @@ describe('computeCommitmentV4', () => {
       prev: '0',
     });
     expect(v4).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('verifyEntryChain', () => {
+  it('validates a parsed offline prefix without touching the filesystem', () => {
+    const first = makeV4Entry('Bash', 'allow');
+    const second = makeV4Entry('Read', 'allow', first.commitment);
+    const result = verifyEntryChain([first, second]);
+    expect(result.ok).toBe(true);
+    expect(result.checked).toBe(2);
+  });
+
+  it('reports an empty prefix as ok with nothing checked', () => {
+    const result = verifyEntryChain([]);
+    expect(result.ok).toBe(true);
+    expect(result.checked).toBe(0);
+  });
+
+  it('detects a tampered entry in a parsed prefix', () => {
+    const first = makeV4Entry('Bash', 'allow');
+    const second = makeV4Entry('Read', 'allow', first.commitment);
+    const result = verifyEntryChain([first, { ...second, tool: 'Write' } as AuditEntryV4]);
+    expect(result.ok).toBe(false);
+    expect(result.broken_at).toBe(1);
+    expect(result.message).toContain('commitment mismatch');
+  });
+
+  it('applies the same rules as the file wrapper for a legacy chain', async () => {
+    const first = makeEntry('Bash', 'allow', '2026-01-01T00:00:00.000Z');
+    const second = makeEntry('Read', 'allow', '2026-01-01T00:00:01.000Z', first.commitment);
+    const fromFile = await verifyChain(writeLog('entry-chain-legacy.jsonl', [first, second]));
+    const fromEntries = verifyEntryChain([first, second]);
+    expect(fromEntries).toEqual(fromFile);
   });
 });
