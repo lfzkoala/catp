@@ -131,14 +131,22 @@ Inputs:
 Outputs:
 
 - allow/deny decision before a tool call executes
+- a durable, content-addressed copy of the complete normalized action
 - audit log entry after tool execution or denial
 - SHA-256 commitment chain for audit-log integrity
+- a self-contained v2 audit export and a v2 authorization receipt that copy
+  their policy/action bindings verbatim from the enforcement-time audit entry
 
-New audit entries use commitment version `3`. The commitment covers the stored
-decision fields, input summary, previous commitment, and any structured
-authorization action, including whether the event occurred before or after tool
-execution. Versions `1` and `2` remain verifiable for compatibility with
-existing audit logs.
+New audit entries use commitment version `4`. The v4 commitment is
+domain-separated (`catp:audit-entry:v4`) and binds the enforcement-time
+`policy_commitment` (`catp:policy:v1` over the normalized policy) and the
+`action_commitment` (`catp:action:v1` over the complete normalized action),
+together with the stored decision fields, phase (`pre`/`post`), reason, input
+summary, previous commitment, and any structured authorization action. The
+`input_summary` is a truncated display field only; it never substitutes for the
+full-action `action_commitment` in any security binding. Versions `1`, `2`, and
+`3` remain verifiable for compatibility with existing audit logs, but a legacy
+entry cannot be upgraded into a v2 receipt with enforcement-time bindings.
 
 Policy rules are evaluated top-to-bottom. The first matching rule determines whether the tool call is allowed. Unmatched tools are allowed by default.
 
@@ -243,6 +251,37 @@ Each audit entry includes a commitment linked to the previous entry commitment.
 Runtime hook writers hold a per-agent, per-day cross-process lock while reading
 the previous commitment, constructing the next entry, and appending it. This
 prevents concurrent pre/post hook processes from creating sibling chain heads.
+
+### Enforcement Evidence Chain
+
+The v4 evidence chain is:
+
+```text
+normalized policy + normalized action
+  -> v4 audit entry (policy_commitment + action_commitment bound at enforcement time)
+  -> v2 self-contained audit export (entry prefix + the complete action sidecar)
+  -> v2 authorization receipt (bindings copied verbatim from the selected entry)
+```
+
+A v2 receipt never recomputes its `policy_commitment` or `action_commitment`
+from the current policy file at signing time; both are copied from the selected
+enforcement-time v4 entry. Supplying `--file` at issue/verify time only checks
+that a candidate policy hashes to the already-recorded `policy_commitment`.
+
+### Durability Boundary
+
+Before an audit entry is appended, the complete canonical action is written as a
+durable, content-addressed sidecar under the same per-agent, per-day lock, and
+the append path re-checks that `computeActionCommitment(action)` equals the
+entry's `action_commitment`. The sidecar write and the entry append are flushed
+with `fsync`, and newly created directories are persisted before the entry is
+considered recorded.
+
+The pre-hook fails closed at this boundary: if the action sidecar cannot be
+written, the audit entry cannot be appended, or any `fsync` fails, the hook
+returns exit code `2` with a block response on both stdout and stderr, records
+nothing, and does not allow the action to execute. Enforcement evidence that
+cannot be persisted is treated as a denial, never as a bypass.
 
 `catp anchor` verifies these chains and exports a `catp_audit_anchor_v1`
 Merkle-root bundle. Authorization policy registration is a separate contract

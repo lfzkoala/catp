@@ -132,6 +132,47 @@ path.
   verification path.
 - `npm run smoke:receipt` validates the default receipt path end-to-end.
 
+### Enforcement-Time Evidence And Durability
+
+Security convergence work that binds every decision to the exact policy and the
+complete action it was evaluated against, and makes that evidence durable before
+it can be relied on.
+
+- Canonical evidence primitives (`catp-plugin/src/evidence`): domain-separated
+  `catp:policy:v1` and `catp:action:v1` commitments over canonical JSON, with
+  `input_summary` kept as a display-only truncation that never participates in a
+  security binding.
+- Audit commitment version `4`: each entry binds the enforcement-time
+  `policy_commitment`, the full-action `action_commitment`, phase, and reason.
+  Versions `1`-`3` remain verifiable; legacy entries are never upgraded into
+  enforcement-bound v2 receipts.
+- Durable storage: the complete canonical action is written as a
+  content-addressed sidecar (fsync'd, newly created directories persisted)
+  before the audit entry is appended, under the same per-agent, per-day lock,
+  with the append path re-checking `action_commitment`.
+- Fail-closed pre-hook: an action-sidecar write, audit append, or fsync failure
+  returns exit code `2` with a block on both streams and records nothing, so an
+  otherwise-allowable action never slips through when its evidence cannot be
+  persisted.
+- Self-contained v2 audit export (`catp_audit_export_v2`): the entry prefix plus
+  the complete action sidecar, hash-chained and re-verifiable offline.
+- v2 authorization receipt (`catp_authorization_receipt_v2`): copies
+  `policy_commitment` and `action_commitment` verbatim from the selected
+  enforcement-time entry; `--file` only checks a candidate policy against the
+  recorded commitment and never regenerates bindings at signing time.
+
+Completion evidence (all commands green during the Task 7 verification pass):
+
+```text
+cd catp-plugin && npm run build            # exit 0
+cd catp-plugin && npm run typecheck        # exit 0
+cd catp-plugin && npm test -- --runInBand  # 316 passed
+cd catp-plugin && npm run test:coverage    # 316 passed; 91.08/82.48/99.43/91.43
+bash check.sh                              # All checks passed
+npm run groth16:check                      # setup manifest + deployment metadata ok
+npm run smoke:receipt                      # receiptSmoke=ok
+```
+
 ### Universal Agent Runtime Adapters
 
 - Runtime-neutral `ToolAction` and `RuntimeAdapter` contracts are documented in
@@ -161,6 +202,31 @@ path.
 ---
 
 ## Active Milestones
+
+### P0: 0.7.4 Enforcement-Evidence Release
+
+Status: security change complete and verified; release gate pending explicit
+authorization for push / npm publish / remote tag.
+
+Goal: publish the enforcement-time policy + full-action bindings, durable
+append, fail-closed pre-hook, v2 self-contained export, and v2 receipt as one
+immutable fixed release that the paper experiments can be pinned to.
+
+Work:
+
+- Phases 1-3 of `docs/superpowers/plans/2026-09-23-paper-security-remediation.md`
+  are implemented, tested, and committed (see Enforcement-Time Evidence And
+  Durability above).
+- Bump the package version, lockfile, and release notes to `0.7.4`, and validate
+  the packed tarball.
+
+Exit criteria:
+
+- Full repository checks, CLI coverage, Groth16 setup checks, and receipt smoke
+  pass on the release commit.
+- Package version, release notes, Git tag, and npm version agree on `0.7.4`.
+- Registry package, release commit, and tag correspondence is verified before any
+  paper experiment is rerun against the fixed release.
 
 ### P0: 0.6.0 Security Convergence Release
 
@@ -240,8 +306,9 @@ only with a concrete product reason, threat model, and operations plan.
 
 Deferred from the 2026-09 self-audit (see `docs/SECURITY_AUDIT_2026-09.md`):
 
-- Binding `tool_use_id` into audit commitments requires commitment version 4;
-  deferred until another commitment change justifies the version bump.
+- Commitment version 4 now exists and binds the enforcement-time policy and
+  full-action commitments. Binding `tool_use_id` into audit commitments remains
+  deferred until a concrete correlation requirement justifies another change.
 - Filesystem-level path canonicalization (symlink/realpath resolution) for path
   rules; the engine normalizes dot segments only and matches the runtime-
   reported path string.

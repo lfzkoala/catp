@@ -233,6 +233,16 @@ describe('verifyChain v4 bindings', () => {
     expect(result.message).toContain('commitment mismatch');
   });
 
+  it('detects tampering with the v4 reason', async () => {
+    // The reason string is one of the domain-separated inputs to
+    // computeCommitmentV4, so rewriting it must break the commitment.
+    const entry = makeV4Entry('Bash', 'allow');
+    const path = writeLog('tampered-v4-reason.jsonl', [{ ...entry, reason: 'rewritten-reason' }]);
+    const result = await verifyChain(path);
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('commitment mismatch');
+  });
+
   it('detects a v4 entry whose prev_commitment does not match its predecessor', async () => {
     const e1 = makeV4Entry('Bash', 'allow');
     // e2 is built over a different prev than e1's actual commitment.

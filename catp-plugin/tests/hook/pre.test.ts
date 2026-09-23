@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { evaluatePreHookInput, preHookBlockOutput } from "../../src/hook/pre.js";
@@ -100,6 +100,40 @@ describe("evaluatePreHookInput", () => {
 
     expect(result.exitCode).toBe(2);
     expect(result.reason).toContain("audit error");
+  });
+
+  // CLI-level fail-closed case: exercise the REAL durable storage backend
+  // (nodeAuditStorage, no injected mock) against a structurally invalid
+  // CATP_HOME, and assert the exact contract `runPreHook` enforces for the CLI:
+  // exit code 2, a block (never allow) response on both streams, and no action
+  // durably recorded. An otherwise-allowable action must NOT slip through when
+  // its evidence cannot be persisted.
+  it("fails closed at the CLI when CATP_HOME is structurally invalid", () => {
+    writePolicy(ROOT);
+    const invalidHome = join(ROOT, "cli-invalid-home");
+    writeFileSync(invalidHome, "a regular file, not a CATP_HOME directory\n", "utf8");
+    process.env.CATP_HOME = invalidHome;
+
+    const outcome = evaluatePreHookInput(hookInput(), { startDir: ROOT });
+
+    // runPreHook maps exitCode 2 to process.exit(2) plus a block on both streams.
+    expect(outcome.exitCode).toBe(2);
+    expect(outcome.auditRecorded).toBe(false);
+    expect(outcome.reason).toContain("audit error");
+
+    const block = preHookBlockOutput(outcome.reason);
+    const parsed = JSON.parse(block.stdout) as { decision: string };
+    expect(parsed.decision).toBe("block");
+    expect(parsed.decision).not.toBe("allow");
+    expect(block.stderr.trim().length).toBeGreaterThan(0);
+
+    // The fail-closed guarantee must not be a silent fallback: the structurally
+    // invalid CATP_HOME stays an unchanged regular file, so the hook never
+    // recreated it as a directory in order to record evidence.
+    expect(statSync(invalidHome).isFile()).toBe(true);
+    expect(readFileSync(invalidHome, "utf8")).toBe(
+      "a regular file, not a CATP_HOME directory\n",
+    );
   });
 
   it("allows and records a valid policy decision", () => {
