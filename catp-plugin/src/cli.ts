@@ -166,33 +166,33 @@ receipt
 
 receipt
   .command("sign")
-  .description("Sign a CATP audit export as an authorization receipt")
-  .requiredOption("--audit-export <path>", "catp_audit_export_v1 JSON from catp log export")
+  .description("Sign a self-contained v2 audit export as an enforcement-time-bound authorization receipt")
+  .requiredOption("--audit-export <path>", "catp_audit_export_v2 JSON from catp log export")
   .requiredOption("--private-key <path>", "Ed25519 private key PEM")
-  .option("-f, --file <path>", "path to catp-policy.toml to bind into the receipt")
+  .option("-f, --file <path>", "policy file to verify against the recorded enforcement-time commitment (evidence only, never the binding source)")
   .option("--out <path>", "write receipt JSON to file instead of stdout")
   .action(cmdReceiptSign);
 
 receipt
   .command("issue")
-  .description("Export an audit entry by commitment and sign it as an authorization receipt")
+  .description("Export an audit entry by commitment and sign it as an enforcement-time-bound authorization receipt")
   .option("--commitment <hex>", "audit entry commitment to issue a receipt for")
   .option("--latest", "issue a receipt for the latest audit entry")
   .option("--tool <name>", "issue a receipt for the latest audit entry matching a tool name")
   .option("--decision <allow|deny>", "filter --latest or --tool by decision")
   .requiredOption("--private-key <path>", "Ed25519 private key PEM")
   .option("--agent <id>", "agent id (default: from policy file)")
-  .option("-f, --file <path>", "path to catp-policy.toml to bind into the receipt")
-  .option("--audit-export-out <path>", "also write the generated catp_audit_export_v1 JSON")
+  .option("-f, --file <path>", "policy file to verify against the recorded enforcement-time commitment (evidence only, never the binding source)")
+  .option("--audit-export-out <path>", "also write the generated catp_audit_export_v2 JSON")
   .option("--out <path>", "write receipt JSON to file instead of stdout")
   .action(cmdReceiptIssue);
 
 receipt
   .command("verify")
-  .description("Verify a signed CATP authorization receipt")
-  .requiredOption("--receipt <path>", "catp_authorization_receipt_v1 JSON")
-  .requiredOption("--public-key <path>", "trusted Ed25519 public key PEM")
-  .option("--audit-export <path>", "also check the receipt against a catp_audit_export_v1 JSON bundle")
+  .description("Verify a signed CATP authorization receipt (v2, or legacy v1)")
+  .requiredOption("--receipt <path>", "catp_authorization_receipt_v2 JSON (legacy v1 also accepted)")
+  .requiredOption("--public-key <path>", "independently trusted Ed25519 public key PEM")
+  .option("--audit-export <path>", "also check the receipt against a catp_audit_export_v2 JSON bundle")
   .option("-f, --file <path>", "also check the receipt against a catp-policy.toml commitment")
   .option("--json", "write verification summary as JSON")
   .action(cmdReceiptVerify);

@@ -582,6 +582,41 @@ allow = true
     ).rejects.toThrow("manifest actionData does not match audit authorization action");
   });
 
+  it("rejects audit-linked manifests bound to a post-enforcement entry", async () => {
+    const manifestPath = join(tmpBase, "audit-post-phase-manifest.json");
+    const commitment = computeCommitment("Bash", "allow", "2026-01-04T00:00:00.000Z", "0", null, "{}");
+
+    appendAuditEntry("manifest-post-phase-agent", {
+      phase: "post",
+      ts: "2026-01-04T00:00:00.000Z",
+      tool: "Bash",
+      decision: "allow",
+      rule_matched: null,
+      commitment,
+      input_summary: "{}",
+      authorization: {
+        actionType: "Swap",
+        protocol: artifactProtocol,
+        token: artifactToken,
+        value: "500",
+        currentTimestamp: "150",
+        cumulativeSpend: "0",
+      },
+    });
+
+    writeFileSync(manifestPath, JSON.stringify(buildAuthorizationProofManifest(artifact, {
+      auditCommitment: commitment,
+      auditAgent: "manifest-post-phase-agent",
+    })), "utf8");
+
+    await expect(
+      cmdVerifyAuthorization({
+        manifest: manifestPath,
+        checkAudit: true,
+      }),
+    ).rejects.toThrow("post-enforcement record and cannot authorize");
+  });
+
   it("formats a useful manifest summary", () => {
     const manifest = buildAuthorizationProofManifest(artifact, {
       auditCommitment: "cd".repeat(32),

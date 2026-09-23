@@ -315,8 +315,22 @@ export function buildAuditExportV2(agentId: string, commitment: string): AuditEx
     entries,
     action,
   };
-  const export_sha256 = sha256Hex(AUDIT_EXPORT_V2_DOMAIN + stableStringify(body));
+  const export_sha256 = computeAuditExportV2Sha256(body);
   return { ...body, export_sha256 };
+}
+
+/**
+ * Canonical hash of a v2 export body (everything except `export_sha256`).
+ * Shared by the exporter and by receipt issuance/verification so the
+ * `catp:audit-export:v2` domain lives in exactly one place.
+ */
+export function computeAuditExportV2Sha256(body: AuditExportV2Body): string {
+  return sha256Hex(AUDIT_EXPORT_V2_DOMAIN + stableStringify(body));
+}
+
+/** The selected entry a v2 export points at (always the final prefix element). */
+export function selectedAuditExportV2Entry(exportBody: AuditExportV2Body): AuditEntry {
+  return exportBody.entries[exportBody.selected_index];
 }
 
 export function latestAuditEntry(

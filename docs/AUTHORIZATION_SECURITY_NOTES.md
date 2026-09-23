@@ -90,6 +90,38 @@ registration and has passed registration plus real-proof execution smoke
 testing. Its addresses and transaction evidence are recorded in the deployment
 metadata.
 
+## Authorization Receipts
+
+CATP signs two receipt versions. Only version 2 carries an enforcement-time
+policy and full-action binding.
+
+`catp_authorization_receipt_v2`:
+
+- Is issued only from a self-contained `catp_audit_export_v2` bundle whose
+  selected entry is `phase == "pre"` and commitment version 4.
+- Copies `policy_commitment` and `action_commitment` verbatim from that
+  enforcement-time audit entry. Neither value is ever re-derived from the
+  current policy file at signing time.
+- Pins the exact export via `audit_export_sha256`, and identifies the issuer by
+  `issuer_key_id` (SHA-256 of the public key's DER SubjectPublicKeyInfo).
+- Signs `"catp:receipt-signature:v2\n" || stable_json(body)` and computes
+  `receipt_sha256` over `"catp:receipt:v2\n" || stable_json(body_with_signature)`;
+  neither domain includes `receipt_sha256` itself.
+- Offline verification requires an independently supplied trusted public key,
+  recomputes `issuer_key_id` from it and requires an exact match, then checks
+  the signature, `receipt_sha256`, the export hash and offline chain, selected
+  entry equality for all three bindings, the complete-action hash, and the
+  optional policy-file hash.
+- A supplied `--file <policy>` is verification evidence only: it is hashed with
+  the same domained enforcement-time scheme and must reproduce the recorded
+  `policy_commitment`. A swapped policy is rejected; the receipt stays bound to
+  the policy in force at enforcement time.
+
+`catp_authorization_receipt_v1` remains verifiable under its historical
+semantics, but its assurance is labelled `legacy` and it never claims an
+exact-action or enforcement-time policy binding. Legacy records must not be
+upgraded into v2 receipts.
+
 ## Findings
 
 ### Medium: Dev/Testnet Groth16 Setup Is Not Mainnet-Grade
@@ -132,8 +164,10 @@ consistency between `actionData` and the public action fields. With
 `--check-audit`, it also checks that the recorded audit agent's local audit
 chain is intact, the manifest's audit commitment exists in that log, and the
 audit entry's structured authorization action matches the manifest action data,
-value, timestamp, and cumulative spend when those audit fields are present.
-Audit-linked manifests must bind both `auditCommitment` and `auditAgent`; the
+value, timestamp, and cumulative spend when those audit fields are present. A
+manifest may only bind to a PRE-enforcement entry; a `phase == "post"` record is
+rejected and can never authorize. Audit-linked manifests must bind both
+`auditCommitment` and `auditAgent`; the
 optional `--audit-agent` flag is only a guard and must match the manifest. It
 does not perform cryptographic proof verification locally.
 

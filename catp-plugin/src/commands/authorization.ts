@@ -426,6 +426,13 @@ function validateAuditEntryMatchesManifest(entry: AuditEntry, manifest: Authoriz
     throw new Error(`Audit entry ${entry.commitment} does not contain authorization action data`);
   }
 
+  // A Groth16 manifest may only bind to the PRE-enforcement decision, mirroring
+  // the receipt path; a post-action record can never authorize. Legacy entries
+  // carry no phase and remain unaffected.
+  if (entry.phase === "post") {
+    throw new Error(`Audit entry ${entry.commitment} is a post-enforcement record and cannot authorize`);
+  }
+
   const expectedActionData = encodeAuthorizationAction(entry.authorization);
   if (expectedActionData.toLowerCase() !== manifest.actionData.toLowerCase()) {
     throw new Error("manifest actionData does not match audit authorization action");
