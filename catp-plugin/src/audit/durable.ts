@@ -160,6 +160,36 @@ function uniqueTempPath(dir: string, base: string): string {
 }
 
 /**
+ * Durably create an empty file (and its parent directories) if it does not
+ * already exist: open append/create with 0o600, fsync the new file, close it,
+ * then fsync the parent directory. An existing file is left untouched. This is
+ * used to materialize the audit log so a lock manager that resolves the target
+ * realpath never bypasses the new-file durability path.
+ */
+export function durableCreateEmptyFile(path: string, fs: DurableFs = nodeFs): void {
+  const dir = dirname(path);
+  ensureDirectoryDurable(dir, fs);
+  if (fs.existsSync(path)) return;
+  const fd = fs.openSync(path, "a", FILE_MODE);
+  let closed = false;
+  try {
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    closed = true;
+  } catch (err) {
+    if (!closed) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        // preserve the original exception
+      }
+    }
+    throw err;
+  }
+  fsyncDirectory(fs, dir);
+}
+
+/**
  * Durably write content-addressed `bytes` to `path` via a same-directory temp
  * file: create parents, write the temp with 0o600, fsync it, close, atomically
  * rename onto the target, then fsync the parent directory.
@@ -221,6 +251,7 @@ export function durableWriteContentAddressed(
  */
 export interface AuditStorage {
   ensureDirectoryDurable(path: string): void;
+  createEmptyFile(path: string): void;
   appendLine(path: string, line: string): void;
   writeContentAddressed(path: string, bytes: Uint8Array): void;
 }
@@ -228,6 +259,7 @@ export interface AuditStorage {
 /** Production {@link AuditStorage} backed by the fsync durable primitives. */
 export const nodeAuditStorage: AuditStorage = {
   ensureDirectoryDurable: (path) => ensureDirectoryDurable(path),
+  createEmptyFile: (path) => durableCreateEmptyFile(path),
   appendLine: (path, line) => durableAppendLine(path, line),
   writeContentAddressed: (path, bytes) => durableWriteContentAddressed(path, bytes),
 };

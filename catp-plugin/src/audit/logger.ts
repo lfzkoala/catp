@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readSync, statSync } from "node:fs";
+import { closeSync, existsSync, openSync, readSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { lockSync } from "proper-lockfile";
-import { auditDirForDate } from "./paths.js";
+import { actionSidecarPath, auditDirForDate } from "./paths.js";
 import { sha256Hex, stableStringify } from "../evidence/canonical.js";
+import { computeActionCommitment, type CanonicalToolActionV1 } from "../evidence/commitments.js";
+import { nodeAuditStorage, type AuditStorage } from "./durable.js";
 import type { AuditEntry, AuditEntryV4, AuthorizationAction } from "../policy/types.js";
 import type { ToolAction } from "../runtime/types.js";
 import type { RuntimePhase } from "../runtime/types.js";
@@ -138,34 +140,65 @@ function readLastAuditLine(file: string): string | null {
   }
 }
 
-export function appendAuditEntry(agentId: string, entry: AuditEntry): void {
-  const dir = auditDir(agentId);
-  mkdirSync(dir, { recursive: true });
-  const file = join(dir, "actions.jsonl");
-  withAuditLock(file, () => appendEntryToFile(file, entry));
+export function appendAuditEntry(
+  agentId: string,
+  entry: AuditEntry,
+  storage: AuditStorage = nodeAuditStorage,
+): void {
+  const file = join(auditDir(agentId), "actions.jsonl");
+  withAuditLock(file, storage, () => appendEntryToFile(file, entry, storage));
 }
 
-export function appendChainedAuditEntry<T extends { auditEntry: AuditEntry }>(
+/**
+ * Append a v4 entry produced by `build`, persisting the complete canonical
+ * action as a content-addressed sidecar BEFORE the entry that references it.
+ *
+ * The sidecar write and the entry append both happen while holding the same
+ * per-log lock used to choose `prev_commitment`, so the ordering is atomic with
+ * respect to concurrent appends. A crash may leave an unreferenced sidecar, but
+ * never a committed entry whose action evidence was not flushed first. Any
+ * storage/fsync error propagates so the caller (pre-hook) can fail closed.
+ */
+export function appendChainedAuditEntry<
+  T extends { auditEntry: AuditEntryV4; action: CanonicalToolActionV1 },
+>(
   agentId: string,
   build: (prevCommitment: string) => T,
+  storage: AuditStorage = nodeAuditStorage,
 ): T {
-  const dir = auditDir(agentId);
-  mkdirSync(dir, { recursive: true });
+  // Compute the date once so the log file and its action sidecars always land
+  // in the same daily directory even across a midnight boundary.
+  const date = new Date().toISOString().slice(0, 10);
+  const dir = auditDirForDate(agentId, date);
   const file = join(dir, "actions.jsonl");
 
-  return withAuditLock(file, () => {
+  return withAuditLock(file, storage, () => {
     const result = build(getLastCommitmentFromFile(file));
-    appendEntryToFile(file, result.auditEntry);
+    const entry = result.auditEntry;
+    // Re-check the binding at the persistence boundary so a mismatched
+    // entry/action pair can never be durably recorded.
+    if (computeActionCommitment(result.action) !== entry.action_commitment) {
+      throw new Error("internal error: action evidence does not match audit entry binding");
+    }
+    const sidecar = actionSidecarPath(agentId, date, entry.action_commitment);
+    storage.writeContentAddressed(sidecar, Buffer.from(stableStringify(result.action), "utf8"));
+    appendEntryToFile(file, entry, storage);
     return result;
   });
 }
 
-function appendEntryToFile(file: string, entry: AuditEntry): void {
-  appendFileSync(file, JSON.stringify(entry) + "\n", "utf8");
+// `input_summary` is capped for operator readability and is NON-AUTHORITATIVE:
+// the security binding is the content-addressed action sidecar plus the entry's
+// action_commitment, never this display string.
+function appendEntryToFile(file: string, entry: AuditEntry, storage: AuditStorage): void {
+  storage.appendLine(file, JSON.stringify(entry));
 }
 
-function withAuditLock<T>(file: string, operation: () => T): T {
-  closeSync(openSync(file, "a"));
+function withAuditLock<T>(file: string, storage: AuditStorage, operation: () => T): T {
+  // Durably materialize the log file (fsync new file + parent) before
+  // proper-lockfile resolves its realpath, so lock setup cannot bypass the
+  // new-file durability path.
+  storage.createEmptyFile(file);
   const release = acquireAuditLock(file);
   try {
     return operation();

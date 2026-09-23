@@ -1,8 +1,13 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { evaluatePreHookInput, preHookBlockOutput } from "../../src/hook/pre.js";
+import { actionSidecarPath, auditRoot } from "../../src/audit/paths.js";
+import { computeActionCommitment } from "../../src/evidence/commitments.js";
+import { nodeAuditStorage, type AuditStorage } from "../../src/audit/durable.js";
+import { verifyChain } from "../../src/audit/verifier.js";
+import type { AuditEntryV4 } from "../../src/policy/types.js";
 
 const ROOT = join(tmpdir(), `catp-pre-hook-test-${Date.now()}`);
 const ORIGINAL_CATP_HOME = process.env.CATP_HOME;
@@ -26,6 +31,32 @@ function hookInput(): string {
     tool_name: "Bash",
     tool_input: { command: "echo ok" },
   });
+}
+
+// nodeAuditStorage with exactly one method forced to throw, so a test can
+// simulate a sidecar-fsync or log-fsync failure while the rest of the durable
+// path (including the empty-file creation the lock needs) still works.
+function failingStorage(method: keyof AuditStorage, message: string): AuditStorage {
+  return {
+    ...nodeAuditStorage,
+    [method]: () => {
+      throw new Error(message);
+    },
+  } as AuditStorage;
+}
+
+// Locate the daily audit directory from the filesystem rather than re-deriving
+// it from the current time, so these helpers cannot flake across a UTC midnight
+// boundary between the logger's date and a test's own clock read.
+function latestAuditDate(agentId: string): string {
+  const dates = readdirSync(auditRoot(agentId)).sort();
+  return dates[dates.length - 1];
+}
+
+function readLastEntry(agentId: string): AuditEntryV4 {
+  const dir = join(auditRoot(agentId), latestAuditDate(agentId));
+  const lines = readFileSync(join(dir, "actions.jsonl"), "utf8").trim().split("\n");
+  return JSON.parse(lines[lines.length - 1]) as AuditEntryV4;
 }
 
 describe("evaluatePreHookInput", () => {
@@ -78,6 +109,69 @@ describe("evaluatePreHookInput", () => {
     const result = evaluatePreHookInput(hookInput(), { startDir: ROOT });
 
     expect(result).toMatchObject({ exitCode: 0, policyFound: true, auditRecorded: true });
+  });
+
+  it("durably binds the recorded v4 entry to its action sidecar", () => {
+    writePolicy(ROOT);
+    process.env.CATP_HOME = join(ROOT, ".catp-home");
+
+    const result = evaluatePreHookInput(hookInput(), { startDir: ROOT });
+    expect(result).toMatchObject({ exitCode: 0, auditRecorded: true });
+
+    const entry = readLastEntry("pre-hook-agent");
+    expect(entry.commitment_version).toBe(4);
+    const sidecar = actionSidecarPath(
+      "pre-hook-agent",
+      latestAuditDate("pre-hook-agent"),
+      entry.action_commitment,
+    );
+    expect(existsSync(sidecar)).toBe(true);
+    // Recomputing the digest over the persisted sidecar reproduces the binding
+    // recorded in the entry: the complete action, not the display summary.
+    const stored = JSON.parse(readFileSync(sidecar, "utf8"));
+    expect(computeActionCommitment(stored)).toBe(entry.action_commitment);
+    expect(stored.tool_name).toBe("Bash");
+    expect(stored.tool_input).toEqual({ command: "echo ok" });
+  });
+
+  it("produces an audit log whose hash chain verifies", async () => {
+    writePolicy(ROOT);
+    process.env.CATP_HOME = join(ROOT, ".catp-home");
+    evaluatePreHookInput(hookInput(), { startDir: ROOT });
+
+    const dir = join(auditRoot("pre-hook-agent"), latestAuditDate("pre-hook-agent"));
+    const verification = await verifyChain(join(dir, "actions.jsonl"));
+    expect(verification.ok).toBe(true);
+  });
+
+  it("fails closed when the action sidecar cannot be persisted", () => {
+    writePolicy(ROOT);
+    process.env.CATP_HOME = join(ROOT, ".catp-home");
+
+    // The action is allowed by policy, so a durable-write failure must downgrade
+    // the outcome to a blocking internal error rather than a successful allow.
+    const result = evaluatePreHookInput(hookInput(), {
+      startDir: ROOT,
+      storage: failingStorage("writeContentAddressed", "sidecar fsync failed"),
+    });
+
+    expect(result.exitCode).toBe(2);
+    expect(result.auditRecorded).toBe(false);
+    expect(result.reason).toContain("audit error");
+  });
+
+  it("fails closed when the audit log append cannot be persisted", () => {
+    writePolicy(ROOT);
+    process.env.CATP_HOME = join(ROOT, ".catp-home");
+
+    const result = evaluatePreHookInput(hookInput(), {
+      startDir: ROOT,
+      storage: failingStorage("appendLine", "log fsync failed"),
+    });
+
+    expect(result.exitCode).toBe(2);
+    expect(result.auditRecorded).toBe(false);
+    expect(result.reason).toContain("audit error");
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from '@jest/globals';
-import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -18,7 +18,8 @@ import {
   computeActionCommitment,
   computePolicyCommitment,
 } from '../../src/evidence/commitments.js';
-import { auditRoot } from '../../src/audit/paths.js';
+import { actionSidecarPath, auditRoot } from '../../src/audit/paths.js';
+import { nodeAuditStorage, type AuditStorage } from '../../src/audit/durable.js';
 import type { CatpPolicy } from '../../src/policy/types.js';
 import type { ToolAction } from '../../src/runtime/types.js';
 
@@ -210,13 +211,52 @@ describe('appendAuditEntry + getLastCommitment', () => {
   });
 });
 
+// A build callback result carrying both the v4 entry and the canonical action
+// evidence that appendChainedAuditEntry persists as a content-addressed sidecar.
+function chainedResult(
+  input: ToolAction,
+  decision: 'allow' | 'deny',
+  prev: string,
+  reason = 'test-reason',
+) {
+  return {
+    auditEntry: buildEntry(input, decision, null, prev, bindingsFor(input, reason)),
+    action: canonicalizeToolAction(input),
+  };
+}
+
+// Locate the daily audit directory from the filesystem rather than re-deriving
+// it from the current time, so these helpers cannot flake across a UTC midnight
+// boundary between the logger's date and a test's own clock read.
+function latestAuditDate(agentId: string): string {
+  const dates = readdirSync(auditRoot(agentId)).sort();
+  return dates[dates.length - 1];
+}
+
+// The sidecar path the logger wrote for a result.
+function sidecarFor(entry: { action_commitment: string }): string {
+  return actionSidecarPath(TEST_AGENT, latestAuditDate(TEST_AGENT), entry.action_commitment);
+}
+
+// nodeAuditStorage with exactly one method forced to throw, so a test can
+// simulate a sidecar-fsync or log-fsync failure while everything else (including
+// the durable empty-file creation the lock needs) still works.
+function failingStorage(method: keyof AuditStorage, message: string): AuditStorage {
+  return {
+    ...nodeAuditStorage,
+    [method]: () => {
+      throw new Error(message);
+    },
+  } as AuditStorage;
+}
+
 describe('appendChainedAuditEntry', () => {
   it('builds each entry from the latest commitment while holding the audit lock', () => {
     const first = appendChainedAuditEntry(TEST_AGENT, (prev) =>
-      ({ auditEntry: buildEntry(makeInput('Bash'), 'allow', null, prev, bindingsFor(makeInput('Bash'))) }),
+      chainedResult(makeInput('Bash'), 'allow', prev),
     );
     const second = appendChainedAuditEntry(TEST_AGENT, (prev) =>
-      ({ auditEntry: buildEntry(makeInput('Write'), 'allow', null, prev, bindingsFor(makeInput('Write'))) }),
+      chainedResult(makeInput('Write'), 'allow', prev),
     );
 
     const bindings = bindingsFor(makeInput('Write'));
@@ -237,13 +277,43 @@ describe('appendChainedAuditEntry', () => {
     );
   });
 
+  it('persists the canonical action sidecar named by the entry action_commitment', () => {
+    const input = makeInput('Bash', { command: 'ls -la' });
+    const result = appendChainedAuditEntry(TEST_AGENT, (prev) =>
+      chainedResult(input, 'allow', prev),
+    );
+
+    const sidecar = sidecarFor(result.auditEntry);
+    expect(existsSync(sidecar)).toBe(true);
+    const stored = JSON.parse(readFileSync(sidecar, 'utf8'));
+    expect(stored).toEqual(canonicalizeToolAction(input));
+    // The sidecar content re-hashes to the commitment the entry records.
+    expect(computeActionCommitment(stored)).toBe(result.auditEntry.action_commitment);
+  });
+
+  it('gives two actions with an identical 200-char prefix distinct sidecars', () => {
+    const prefix = 'x'.repeat(250);
+    const a = makeInput('Write', { data: `${prefix}SAFE` });
+    const b = makeInput('Write', { data: `${prefix}DESTRUCTIVE` });
+    expect(summarizeInput(a)).toBe(summarizeInput(b));
+
+    const ra = appendChainedAuditEntry(TEST_AGENT, (prev) => chainedResult(a, 'allow', prev));
+    const rb = appendChainedAuditEntry(TEST_AGENT, (prev) => chainedResult(b, 'allow', prev));
+
+    expect(ra.auditEntry.action_commitment).not.toBe(rb.auditEntry.action_commitment);
+    const bodyA = JSON.parse(readFileSync(sidecarFor(ra.auditEntry), 'utf8'));
+    const bodyB = JSON.parse(readFileSync(sidecarFor(rb.auditEntry), 'utf8'));
+    expect(bodyA.tool_input.data).toBe(`${prefix}SAFE`);
+    expect(bodyB.tool_input.data).toBe(`${prefix}DESTRUCTIVE`);
+  });
+
   it('releases the audit lock when entry construction fails', () => {
     expect(() => appendChainedAuditEntry(TEST_AGENT, () => {
       throw new Error('build failed');
     })).toThrow('build failed');
 
     expect(() => appendChainedAuditEntry(TEST_AGENT, (prev) =>
-      ({ auditEntry: buildEntry(makeInput('Bash'), 'allow', null, prev, bindingsFor(makeInput('Bash'))) }),
+      chainedResult(makeInput('Bash'), 'allow', prev),
     )).not.toThrow();
   });
 
@@ -254,8 +324,46 @@ describe('appendChainedAuditEntry', () => {
     utimesSync(lockDir, new Date(0), new Date(0));
 
     expect(() => appendChainedAuditEntry(TEST_AGENT, (prev) =>
-      ({ auditEntry: buildEntry(makeInput('Bash'), 'allow', null, prev, bindingsFor(makeInput('Bash'))) }),
+      chainedResult(makeInput('Bash'), 'allow', prev),
     )).not.toThrow();
+  });
+
+  it('fails closed and commits no entry when the sidecar write fails', () => {
+    const storage = failingStorage('writeContentAddressed', 'sidecar fsync failed');
+    expect(() =>
+      appendChainedAuditEntry(TEST_AGENT, (prev) => chainedResult(makeInput('Bash'), 'allow', prev), storage),
+    ).toThrow('sidecar fsync failed');
+    // No entry was committed: the chain is still at genesis.
+    expect(getLastCommitment(TEST_AGENT)).toBe('0');
+  });
+
+  it('fails closed when the audit append fails, leaving at most an unreferenced sidecar', () => {
+    const storage = failingStorage('appendLine', 'log fsync failed');
+    let commitment = '';
+    expect(() =>
+      appendChainedAuditEntry(TEST_AGENT, (prev) => {
+        const r = chainedResult(makeInput('Bash'), 'allow', prev);
+        commitment = r.auditEntry.action_commitment;
+        return r;
+      }, storage),
+    ).toThrow('log fsync failed');
+    // The entry was never committed.
+    expect(getLastCommitment(TEST_AGENT)).toBe('0');
+    // An unreferenced sidecar may remain, which the ordering explicitly allows.
+    expect(existsSync(actionSidecarPath(TEST_AGENT, latestAuditDate(TEST_AGENT), commitment))).toBe(true);
+  });
+
+  it('refuses to persist when the action evidence does not match the entry binding', () => {
+    const entryInput = makeInput('Bash', { command: 'ls' });
+    const mismatched = makeInput('Write', { data: 'different' });
+    expect(() =>
+      appendChainedAuditEntry(TEST_AGENT, (prev) => ({
+        auditEntry: buildEntry(entryInput, 'allow', null, prev, bindingsFor(entryInput)),
+        action: canonicalizeToolAction(mismatched),
+      })),
+    ).toThrow('does not match audit entry binding');
+    // The mismatched pair is never committed.
+    expect(getLastCommitment(TEST_AGENT)).toBe('0');
   });
 });
 

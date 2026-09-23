@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   durableAppendLine,
+  durableCreateEmptyFile,
   durableWriteContentAddressed,
   ensureDirectoryDurable,
   nodeAuditStorage,
@@ -327,6 +328,37 @@ describe("durableWriteContentAddressed", () => {
   });
 });
 
+describe("durableCreateEmptyFile", () => {
+  it("creates parents, opens 0o600, fsyncs file then parent, and writes no bytes", () => {
+    const h = makeFakeFs({ existing: ["/", "/tmp"] });
+    const file = "/tmp/agent/actions.jsonl";
+
+    durableCreateEmptyFile(file, h.fs);
+
+    expect(h.ops.some((o) => o === `open:a:${MODE_FILE}:${file}`)).toBe(true);
+    expect(h.ops.some((o) => o.startsWith("write:"))).toBe(false);
+    expect(firstIndex(h.ops, `fsync-file:${file}`)).toBeLessThan(firstIndex(h.ops, `close:${file}`));
+    expect(lastIndex(h.ops, "fsync-dir:/tmp/agent")).toBeGreaterThan(firstIndex(h.ops, `close:${file}`));
+  });
+
+  it("is a no-op when the file already exists", () => {
+    const file = "/tmp/agent/actions.jsonl";
+    const h = makeFakeFs({ existing: ["/", "/tmp", "/tmp/agent", file] });
+
+    durableCreateEmptyFile(file, h.fs);
+
+    expect(h.ops.filter((o) => o.startsWith("open:") || o.startsWith("fsync-file:"))).toHaveLength(0);
+  });
+
+  it("propagates a file-fsync failure and still closes the descriptor", () => {
+    const h = makeFakeFs({ existing: ["/", "/tmp", "/tmp/agent"], failOn: "file-fsync" });
+    const file = "/tmp/agent/actions.jsonl";
+
+    expect(() => durableCreateEmptyFile(file, h.fs)).toThrow("file fsync failed");
+    expect(h.ops).toContain(`close:${file}`);
+  });
+});
+
 describe("durable primitives on a real filesystem", () => {
   it("appends exact bytes with 0o600 mode", () => {
     const dir = join(tmpBase, "real-append");
@@ -368,12 +400,25 @@ describe("durable primitives on a real filesystem", () => {
     expect(statSync(dir).isDirectory()).toBe(true);
   });
 
+  it("creates an empty 0o600 file and is idempotent", () => {
+    const dir = join(tmpBase, "real-empty");
+    const file = join(dir, "actions.jsonl");
+
+    durableCreateEmptyFile(file);
+    expect(statSync(file).size).toBe(0);
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+    // A second call leaves the existing file untouched.
+    durableCreateEmptyFile(file);
+    expect(statSync(file).size).toBe(0);
+  });
+
   it("exposes the durable operations through nodeAuditStorage", () => {
     const dir = join(tmpBase, "storage");
     const file = join(dir, "actions.jsonl");
     const ca = join(dir, "ca.json");
 
     nodeAuditStorage.ensureDirectoryDurable(dir);
+    nodeAuditStorage.createEmptyFile(file);
     nodeAuditStorage.appendLine(file, "entry");
     nodeAuditStorage.writeContentAddressed(ca, Buffer.from("v", "utf8"));
 

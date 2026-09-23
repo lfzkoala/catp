@@ -2,12 +2,18 @@ import { findPolicyFile, loadPolicy } from "../policy/loader.js";
 import { appendChainedAuditEntry } from "../audit/logger.js";
 import { claudeCodeAdapter } from "../adapters/claude-code.js";
 import { evaluatePreAction } from "../enforcement/core.js";
+import type { AuditStorage } from "../audit/durable.js";
 import type { RuntimeAdapter } from "../runtime/types.js";
 import { parseHookAction, readStdin } from "./runtime.js";
 
 export interface HookOptions {
   adapter?: RuntimeAdapter;
   startDir?: string;
+  /**
+   * Test seam for injecting audit-storage failures. CLI execution leaves this
+   * undefined so the logger always uses the fsync-backed nodeAuditStorage.
+   */
+  storage?: AuditStorage;
 }
 
 export interface PreHookOutcome {
@@ -52,8 +58,10 @@ export function evaluatePreHookInput(raw: string, opts: HookOptions = {}): PreHo
   }
 
   try {
-    const result = appendChainedAuditEntry(policy.agent.id, (prev) =>
-      evaluatePreAction(policy, action, prev)
+    const result = appendChainedAuditEntry(
+      policy.agent.id,
+      (prev) => evaluatePreAction(policy, action, prev),
+      opts.storage,
     );
 
     return {
@@ -63,6 +71,9 @@ export function evaluatePreHookInput(raw: string, opts: HookOptions = {}): PreHo
       reason: result.reason,
     };
   } catch (err) {
+    // Fail closed: if the action sidecar, audit append, or any fsync failed, the
+    // decision was not durably recorded, so it must not be returned as a
+    // successful allow/deny. Surface a concise internal error and exit 2.
     return {
       exitCode: 2,
       policyFound: true,
