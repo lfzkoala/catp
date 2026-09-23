@@ -1,10 +1,15 @@
-import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { auditRoot } from "../audit/paths.js";
 import { findPolicyFile, loadPolicy } from "../policy/loader.js";
 import { verifyChain } from "../audit/verifier.js";
+import { sha256Hex, stableStringify } from "../evidence/canonical.js";
 import type { AuditEntry } from "../policy/types.js";
+
+// The canonical serializer now lives in evidence/canonical.ts and is shared with
+// the commitment code. It is re-exported here so existing importers (receipt.ts
+// and tests) keep resolving `stableStringify` from the audit-export module.
+export { stableStringify };
 
 export interface AuditExport {
   exportVersion: "catp_audit_export_v1";
@@ -297,21 +302,4 @@ function assertCommitment(commitment: string): void {
   }
 }
 
-function sha256Hex(input: string): string {
-  return createHash("sha256").update(input).digest("hex");
-}
 
-export function stableStringify(value: unknown, spaces = 0): string {
-  return JSON.stringify(sortForJson(value), null, spaces);
-}
-
-function sortForJson(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(sortForJson);
-  }
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    return Object.fromEntries(Object.keys(record).sort().map((key) => [key, sortForJson(record[key])]));
-  }
-  return value;
-}
