@@ -1,10 +1,16 @@
 # CATP CLI 0.7.4 Release Checklist
 
-Status: **prepared, pending publish authorization.** The release commit, local
-packed tarball, and this document are ready. The release gate has NOT been
-crossed: the release commit has not been pushed, the package has not been
-published through npm Trusted Publishing, and the annotated tag `v0.7.4` has not
-been created. Those three external state changes require explicit authorization.
+Status: **released and verified.** Published from the `v0.7.4` Git tag through
+npm Trusted Publishing (Release workflow run `35846548362`, conclusion
+`success`). The registry tarball was downloaded into an isolated temporary
+directory and its version, SHA-256, sha1 (`dist.shasum`), and unpacked file
+manifest were verified against a clean local build; a fresh-install smoke test
+with an isolated `CATP_HOME` issued and verified a v2 receipt end-to-end.
+
+Release commit: `86eff07ce674aa5c180ce7f8a831bc85646ac976`. Tag `v0.7.4` points
+at the same commit (`git rev-list -n 1 v0.7.4` ==
+`86eff07ce674aa5c180ce7f8a831bc85646ac976`). Main CI on the release commit
+(run `35846285993`) and the tag Release run both concluded `success`.
 
 Package:
 
@@ -88,25 +94,53 @@ npm test -- --runInBand  # 316 passed
 npm run test:coverage    # 316 passed; 91.08/82.48/99.43/91.43
 ```
 
-## Local Packed Tarball Provenance
+## Tarball Provenance And Reconciliation
 
-Packed from the release candidate working tree into an isolated temporary
-directory (the tarball is not committed):
+The **registry tarball is authoritative** for the paper experiments. It was
+published by the Release workflow from a fresh checkout of tag `v0.7.4` and
+downloaded back for verification:
 
 ```text
-filename:        catp-protocol-cli-0.7.4.tgz
-sha256:          62f942f0136234210e30621eb5f7103cf02725269f92d854383ae11390d715b9
-npm shasum (sha1): c52321380112e7d43604669c49d6353a1ac2b4a6
-size:            70103 bytes (70.1 kB packed, 323.4 kB unpacked)
-file count:      113
-manifest sha256: e2b6b29c4e0e5ae002d787411a42cec3f413374982c5ab8632c053769a4965a5
+source:          https://registry.npmjs.org/@catp-protocol/cli/-/cli-0.7.4.tgz
+version:         0.7.4
+sha256:          b4da728f43ee9e36d2c035d756de04d3b1ea7a6f93c355ab9c4ca5728077c0d3
+sha1 (dist.shasum): 3cba3c282ba2a234e749f19db76060cb606f1ffc
+integrity (sha512): sha512-w04iZPqPz8u3fSkbXTLVZNhJlsnAuXZ+ExrVvqTv5mfQTINZZ+hQjRfq4D7PoarvSHvtIKaHw8xNAXPmCWIcaQ==
+size:            67189 bytes
+unpacked size:   310239 bytes
+file count:      101
+manifest sha256: 56f4222ba4d3c4bd3e7d1350f2d8205bfeef38ff89a215e93c11225876d0fdc4
                  (sha256 of the sorted file list below)
 ```
 
-The registry may repack the tarball, so the published tarball SHA-256 can differ
-from the local one. In that case both hashes are recorded and the unpacked file
-manifests and contents must be proven to match (compare the manifest sha256
-above against the registry tarball's sorted file list).
+The downloaded tarball's sha1 equals the registry `dist.shasum`, confirming an
+authentic, unmodified download.
+
+### Reconciliation with the local build
+
+The first local `npm pack` of the release candidate produced a 113-file tarball
+(sha256 `62f942f0136234210e30621eb5f7103cf02725269f92d854383ae11390d715b9`,
+manifest sha256 `e2b6b29c4e0e5ae002d787411a42cec3f413374982c5ab8632c053769a4965a5`).
+The 12 extra files were stale `tsc` outputs in the local `dist/` for three
+modules that no longer exist in `src/` (`adapters/registry`, `commands/event`,
+`runtime/validate`); `tsc` does not prune removed modules, and the fresh CI
+checkout correctly omitted them. After deleting those 12 stale artifacts, a clean
+local repack matches the registry exactly:
+
+```text
+clean local repack sha256:  7272ff221e4907f03c4a4823ae86fc76db2e6059ab6cd4d1e9c33474da349267
+clean local repack size:    67264 bytes
+clean local file count:     101
+clean local manifest sha256: 56f4222ba4d3c4bd3e7d1350f2d8205bfeef38ff89a215e93c11225876d0fdc4  (IDENTICAL to registry)
+```
+
+The packed tarball bytes differ from the registry's (npm repacks with its own
+tar metadata/timestamps), so the SHA-256 values legitimately differ. The unpacked
+file manifests are identical (same manifest sha256), and all 101 unpacked files
+are byte-identical between the registry tarball and the clean local build
+(`content_diffs=0`, `local_missing=0`, `package.json` identical). The 101 files
+are exactly the 25 current `src/` modules x 4 build outputs (.js, .js.map,
+.d.ts, .d.ts.map) plus `package.json`.
 
 Complete file list (sorted, `package/` prefix stripped):
 
@@ -123,10 +157,6 @@ dist/adapters/index.d.ts
 dist/adapters/index.d.ts.map
 dist/adapters/index.js
 dist/adapters/index.js.map
-dist/adapters/registry.d.ts
-dist/adapters/registry.d.ts.map
-dist/adapters/registry.js
-dist/adapters/registry.js.map
 dist/audit/durable.d.ts
 dist/audit/durable.d.ts.map
 dist/audit/durable.js
@@ -155,10 +185,6 @@ dist/commands/authorization.d.ts
 dist/commands/authorization.d.ts.map
 dist/commands/authorization.js
 dist/commands/authorization.js.map
-dist/commands/event.d.ts
-dist/commands/event.d.ts.map
-dist/commands/event.js
-dist/commands/event.js.map
 dist/commands/init.d.ts
 dist/commands/init.d.ts.map
 dist/commands/init.js
@@ -219,48 +245,53 @@ dist/runtime/types.d.ts
 dist/runtime/types.d.ts.map
 dist/runtime/types.js
 dist/runtime/types.js.map
-dist/runtime/validate.d.ts
-dist/runtime/validate.d.ts.map
-dist/runtime/validate.js
-dist/runtime/validate.js.map
 package.json
 ```
 
-## Publish (PENDING AUTHORIZATION)
+## Publish (COMPLETED)
 
-Do not publish this version manually. The release workflow publishes through npm
-Trusted Publishing (OIDC, `id-token: write`) when the matching tag is pushed.
-These steps are blocked at the release gate until explicitly authorized:
+Published through npm Trusted Publishing (OIDC, `id-token: write`), triggered by
+pushing the annotated tag. No ad-hoc local npm credential flow was used:
 
 ```bash
-# 1. push the release commit (requires authorization)
-git push origin main
-
-# 2. create and push the annotated tag after main CI passes (requires authorization)
+git push origin main                         # be99b15..86eff07
 git tag -a v0.7.4 -m "CATP CLI v0.7.4"
-git push origin v0.7.4
+git push origin v0.7.4                       # triggered Release run 35846548362
 ```
 
-The release workflow validates that the tag version equals
+The Release workflow validated that the tag version equals
 `catp-plugin/package.json` version (`0.7.4`) and that the checked-out commit
-matches the tag commit before publishing.
+matched the tag commit, then ran typecheck + tests + build and published
+`@catp-protocol/cli@0.7.4` (run conclusion `success`).
 
-## Post-Publish Verification (PENDING)
+## Post-Publish Verification (COMPLETED)
 
-To be completed only after the registry package exists, then recorded here and
-committed as `docs: record verified 0.7.4 publication`:
-
-- [ ] Query the registry for `@catp-protocol/cli@0.7.4`; download its tarball
-      into an isolated temporary directory; verify its SHA-256, npm shasum, and
-      package version. If the registry repacked the tarball, record both the
-      local and registry SHA-256 and prove the unpacked file manifests match the
-      manifest sha256 above.
-- [ ] Fresh-install smoke test with an isolated `CATP_HOME`: issue and verify a
-      v2 receipt end-to-end and retain the command transcript.
-- [ ] Verify `git rev-list -n 1 v0.7.4` equals the release commit hash.
+- [x] Registry query for `@catp-protocol/cli@0.7.4`: version `0.7.4`; tarball
+      downloaded into an isolated temporary directory; sha256
+      `b4da728f43ee9e36d2c035d756de04d3b1ea7a6f93c355ab9c4ca5728077c0d3`, sha1
+      `3cba3c282ba2a234e749f19db76060cb606f1ffc` (== `dist.shasum`), 101 files,
+      unpacked 310239 bytes. The registry repacked the tarball, so both the
+      registry and clean-local SHA-256 are recorded above and their unpacked
+      file manifests are proven identical (manifest sha256
+      `56f4222ba4d3c4bd3e7d1350f2d8205bfeef38ff89a215e93c11225876d0fdc4`) with
+      all 101 files byte-identical.
+- [x] Fresh-install smoke test with an isolated `CATP_HOME`: installed
+      `@catp-protocol/cli@0.7.4` into an isolated prefix; `catp --version`
+      reported `0.7.4`; resolved executable realpath
+      `<prefix>/lib/node_modules/@catp-protocol/cli/dist/cli.js` (sha256
+      `507662ce91e936e8fb07cb08de674462ff77b8c19228cbe634245db2bbe77b9a`);
+      `scripts/smoke-receipt.sh` driven by that binary printed
+      `receiptSmoke=ok`, issuing a `catp_authorization_receipt_v2` receipt
+      (phase `pre`, Ed25519) whose verify summary reported
+      `authorizationReceipt=valid`, `auditExport=matched`, `policy=matched`,
+      `assurance=enforcement-time-bound`.
+- [x] `git rev-list -n 1 v0.7.4` == `86eff07ce674aa5c180ce7f8a831bc85646ac976`
+      == the release commit.
 
 ## Release Gate
 
-Do not begin the paper experiment rerun (Phase 5) until the registry tarball,
-tag, release commit, and local packed tarball have an auditable relationship.
-Until publish/tag authorization is granted, this release stops here.
+Crossed. The registry tarball, tag `v0.7.4`, release commit `86eff07`, and the
+clean local packed tarball now have a complete auditable relationship (identical
+unpacked manifest sha256 and byte-identical contents; tag == commit). Phase 5
+experiment reruns may pin to `@catp-protocol/cli@0.7.4` using the registry
+tarball sha256 `b4da728f43ee9e36d2c035d756de04d3b1ea7a6f93c355ab9c4ca5728077c0d3`.
