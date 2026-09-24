@@ -307,6 +307,10 @@ the verification was post-hoc rather than a gate that had to pass before the
 immutable artifact already existed on the registry.
 
 This is recorded honestly and the history above is left unchanged. Future
-releases (starting with `0.7.5`) run the full verification on the release commit
-BEFORE tagging and publishing (verify-before-tag), so a failing check prevents
-the publish instead of being discovered afterward. See `docs/RELEASE_0.7.5.md`.
+releases (starting with `0.7.5`) run the full local verification on the exact
+release commit BEFORE creating the tag — a pre-tag release-candidate gate — so a
+failing check prevents the tag/publish instead of being discovered afterward.
+Because npm Trusted Publishing is triggered BY the tag, the registry-tarball and
+fresh-install verification are inherently post-publish; the pre-tag gate is the
+local `bash check.sh` on the release commit, not a registry check. See
+`docs/RELEASE_0.7.5.md`.

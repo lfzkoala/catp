@@ -227,8 +227,10 @@ Work:
 Exit criteria:
 
 - Full repository checks, CLI coverage, and receipt smoke pass on the release
-  commit (done locally: typecheck, build, 330 tests / 21 suites,
-  `smoke:receipt`).
+  commit `077c599` (done locally in a clean worktree checked out at that exact
+  commit: `bash check.sh` exit 0 — forge 33/33, plugin typecheck + 330 tests /
+  21 suites + coverage, sdk 26 tests; plus `build` and `smoke:receipt`). This is
+  the pre-tag release-candidate gate.
 - After publish authorization: registry tarball + fresh-install verified, and
   `git rev-list -n 1 v0.7.5` == the release commit.
 - Only once 0.7.5 is published and verified: the paper re-pins the artifact and

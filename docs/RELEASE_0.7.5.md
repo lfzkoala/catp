@@ -78,32 +78,65 @@ Run on the prepared 0.7.5 working tree:
 - [x] `npm run smoke:receipt` — `receiptSmoke=ok`; v2 receipt verify summary
       reported `authorizationReceipt=valid`, `auditExport=matched`,
       `policy=matched`, `assurance=enforcement-time-bound`.
+- [x] **Full repository check on the exact release commit** — `bash check.sh`
+      run in a clean detached worktree checked out at
+      `077c5997245f1c52961a03c9f3b3be1f8d06ba6f` (not merely the branch tip):
+      Foundry compiled with Solc 0.8.26 and `forge test` passed 33/33;
+      `catp-plugin` typecheck + `test:coverage` passed 21 suites / 330 tests;
+      `catp-sdk` `pnpm install --frozen-lockfile` + typecheck + `vitest` passed
+      26 tests; the script exited `0` with `All checks passed.` No Foundry or
+      keychain failures. This is the pre-tag release-candidate gate.
 
-Not yet run (pending publish authorization): main CI on the release commit and
-the tag-triggered Release workflow (typecheck + tests + build + publish), plus
-the registry-tarball and fresh-install verification below.
+Not yet run (inherently post-tag; pending publish authorization): the
+tag-triggered Release workflow (typecheck + tests + build + Trusted Publishing)
+and the registry-tarball + fresh-install verification below. These can only run
+after the tag exists, because pushing the tag is what triggers the publish.
 
 ## Release commit
 
-PENDING — the release commit is the commit that lands this 0.7.5 version bump
-(`catp-plugin/package.json`, root `package-lock.json`) together with these release
-notes. Its exact SHA cannot be embedded in a file inside that same commit; it is
-recorded in the release-gate report and must be transcribed here (and tagged
-`v0.7.5`) at publish time.
+`077c5997245f1c52961a03c9f3b3be1f8d06ba6f` (`077c599`) — the commit that lands
+this 0.7.5 version bump (`catp-plugin/package.json`, root `package-lock.json`)
+together with these release notes. The SHA could not be embedded inside that same
+commit, so it is transcribed here from a later documentation-only commit. The
+`v0.7.5` tag MUST point at this exact commit. The only commits after it on `main`
+are documentation-only (the #14/#15 governance records and this correction); they
+change no built source, so the npm artifact is identical whether published from
+`077c599` or the current tip — but the tag target is `077c599` so that
+`git rev-list -n 1 v0.7.5` == the release commit.
 
 ## Publish (PENDING — NOT AUTHORIZED)
 
-Per the #14 process-deviation lesson (verify before tagging), run the full check
-suite on the release commit **first**, then tag:
+Release order — the enforceable invariant. npm Trusted Publishing is *triggered
+by* pushing the tag, so registry verification can never precede the tag. The gate
+that runs before the tag is the **pre-tag release-candidate verification**: the
+full local check on the exact release commit. The sequence is:
+
+```text
+exact release commit (077c599) local full verification   <- pre-tag gate (done)
+  -> create and push tag v0.7.5 (pinned to 077c599)
+  -> tag-triggered Trusted Publishing (Release workflow: typecheck+tests+build+publish)
+  -> registry tarball + fresh-install verification          <- necessarily post-publish
+  -> Phase 6 (paper re-pin + reruns)
+```
+
+Do NOT describe this as "verify the published artifact before tagging" — that is
+impossible with tag-triggered publishing. What is verified before the tag is the
+release-candidate commit, locally.
 
 ```bash
-# 1. Full verification on the release commit (already run locally this session).
-bash check.sh                       # solidity (forge) + plugin typecheck/tests/coverage + sdk
+# 1. Pre-tag release-candidate verification on the EXACT release commit.
+#    Already run this session in a clean worktree at 077c599 (exit 0). Re-run on
+#    a clean checkout of 077c599 if the tree has since changed.
+git worktree add /tmp/catp-0.7.5-release-check 077c5997245f1c52961a03c9f3b3be1f8d06ba6f
+( cd /tmp/catp-0.7.5-release-check && bash check.sh )   # forge + plugin coverage + sdk
 
-# 2. Publish via Trusted Publishing by pushing the annotated tag.
+# 2. Push main, then create the annotated tag PINNED TO THE EXACT RELEASE COMMIT.
+#    Never `git tag -a v0.7.5` bare at the tip: that could tag a later commit.
 git push origin main
-git tag -a v0.7.5 -m "CATP CLI v0.7.5"
-git push origin v0.7.5              # triggers the Release workflow -> typecheck+tests+build+publish
+git tag -a v0.7.5 077c5997245f1c52961a03c9f3b3be1f8d06ba6f -m "CATP CLI v0.7.5"
+
+# 3. Pushing the tag triggers Trusted Publishing -> the Release workflow.
+git push origin v0.7.5
 ```
 
 The Release workflow validates that the tag version equals
@@ -122,14 +155,17 @@ tag commit, then publishes `@catp-protocol/cli@0.7.5`.
       `dist/cli.js` SHA-256; `scripts/smoke-receipt.sh` driven by that binary
       prints `receiptSmoke=ok` and a v2 receipt verify summary with
       `assurance=enforcement-time-bound`.
-- [ ] `git rev-list -n 1 v0.7.5` == the release commit recorded above.
+- [ ] `git rev-list -n 1 v0.7.5` ==
+      `077c5997245f1c52961a03c9f3b3be1f8d06ba6f` (the release commit above).
 
 ## Release Gate
 
-NOT crossed this session — no publish authorization. The registry tarball, tag
-`v0.7.5`, and release commit do not yet exist. README/INSTALL keep the install
-version at the published, verifiable `0.7.4` until `0.7.5` is published and
-verified (they are bumped in the deferred paper re-pin step).
+NOT crossed this session — no publish authorization. The release commit `077c599`
+exists and has passed the pre-tag release-candidate verification (`bash check.sh`,
+exit 0); the tag `v0.7.5` and the registry tarball do NOT yet exist and are
+created only at publish time. README/INSTALL keep the install version at the
+published, verifiable `0.7.4` until `0.7.5` is published and verified (they are
+bumped in the deferred paper re-pin step).
 
 ## Paper coordination (deferred)
 
