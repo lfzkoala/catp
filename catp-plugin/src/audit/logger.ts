@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
-import { closeSync, existsSync, openSync, readSync, statSync } from "node:fs";
+import { closeSync, existsSync, fsyncSync, ftruncateSync, openSync, readFileSync, readSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { lockSync } from "proper-lockfile";
 import { actionSidecarPath, auditDirForDate } from "./paths.js";
 import { sha256Hex, stableStringify } from "../evidence/canonical.js";
 import { computeActionCommitment, type CanonicalToolActionV1 } from "../evidence/commitments.js";
 import { nodeAuditStorage, type AuditStorage } from "./durable.js";
+import { verifyEntryChain } from "./verifier.js";
 import type { AuditEntry, AuditEntryV4, AuthorizationAction } from "../policy/types.js";
 import type { ToolAction } from "../runtime/types.js";
 import type { RuntimePhase } from "../runtime/types.js";
@@ -307,4 +308,130 @@ export function extractAuthorizationAction(input: ToolAction): AuthorizationActi
 
 function isStringOrNumber(value: unknown): value is string | number {
   return typeof value === "string" || typeof value === "number";
+}
+
+export interface AuditRepairResult {
+  file: string;
+  /** `clean` = nothing to remove; `repaired` = a torn fragment was truncated. */
+  status: "clean" | "repaired";
+  /** Number of complete, chain-verified entries retained after the repair. */
+  entries: number;
+  /** The unterminated fragment that was truncated, or null when clean. */
+  removedFragment: string | null;
+  removedBytes: number;
+}
+
+/**
+ * Explicitly repair a torn audit-log tail left by a crashed append. This is the
+ * ONLY sanctioned recovery path for a partial final line; the append path itself
+ * stays fail-closed and never self-heals silently.
+ *
+ * Lock-protected (same per-log lock appends use) and deliberately conservative:
+ * 1. The complete, newline-terminated prefix is parsed and its hash chain
+ *    verified BEFORE anything is removed. A corrupt or chain-broken COMPLETE
+ *    entry is never auto-deleted -- such a file is reported and left untouched.
+ * 2. Only a trailing fragment that CANNOT be a complete JSONL entry (it does not
+ *    parse as JSON) is truncated, back to the last verified newline boundary.
+ * 3. A trailing fragment that DOES parse as a complete JSON object is left
+ *    alone and reported: it may be a genuine entry whose newline never flushed,
+ *    so guessing would risk destroying valid evidence.
+ *
+ * Repairs the current (today's) daily log for the agent, which is the file new
+ * appends target and therefore the one a torn tail would block.
+ */
+export function repairAuditLogTail(
+  agentId: string,
+  storage: AuditStorage = nodeAuditStorage,
+): AuditRepairResult {
+  const date = new Date().toISOString().slice(0, 10);
+  const file = join(auditDirForDate(agentId, date), "actions.jsonl");
+  return withAuditLock(file, storage, () => repairTornTail(file));
+}
+
+function repairTornTail(file: string): AuditRepairResult {
+  if (!existsSync(file)) {
+    return { file, status: "clean", entries: 0, removedFragment: null, removedBytes: 0 };
+  }
+  // Read raw bytes so the truncation offset is byte-accurate even if the torn
+  // fragment ends mid-way through a multi-byte UTF-8 sequence.
+  const buf = readFileSync(file);
+  if (buf.byteLength === 0) {
+    return { file, status: "clean", entries: 0, removedFragment: null, removedBytes: 0 };
+  }
+
+  const lastNl = buf.lastIndexOf(0x0a); // '\n'
+  const keepBytes = lastNl === -1 ? 0 : lastNl + 1;
+  const prefixStr = buf.subarray(0, keepBytes).toString("utf8");
+  const tailBuf = buf.subarray(keepBytes);
+
+  // Verify the complete prefix chain before touching the file.
+  const prefixEntries = parseCompletePrefix(prefixStr, file);
+  const verification = verifyEntryChain(prefixEntries);
+  if (!verification.ok) {
+    throw new Error(
+      `refusing to repair ${file}: the complete prefix fails chain verification at entry ` +
+        `${verification.broken_at} (${verification.message}); a complete but invalid entry is ` +
+        `never auto-deleted`,
+    );
+  }
+
+  if (tailBuf.byteLength === 0) {
+    // Every entry is newline-terminated and the chain is intact: nothing torn.
+    return { file, status: "clean", entries: prefixEntries.length, removedFragment: null, removedBytes: 0 };
+  }
+
+  const tail = tailBuf.toString("utf8");
+  if (parsesAsJson(tail)) {
+    throw new Error(
+      `refusing to repair ${file}: the trailing fragment is a complete JSON object without a ` +
+        `terminating newline, so it may be a valid entry whose newline was never flushed; it will ` +
+        `not be auto-truncated (manual review required)`,
+    );
+  }
+
+  // The fragment cannot constitute a complete JSONL entry: truncate it away and
+  // flush, restoring the file to its last verified newline boundary.
+  truncateFileTo(file, keepBytes);
+  return {
+    file,
+    status: "repaired",
+    entries: prefixEntries.length,
+    removedFragment: tail,
+    removedBytes: tailBuf.byteLength,
+  };
+}
+
+function parseCompletePrefix(prefixStr: string, file: string): AuditEntry[] {
+  const lines = prefixStr.split("\n").filter((l) => l.length > 0);
+  const entries: AuditEntry[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    try {
+      entries.push(JSON.parse(lines[i]) as AuditEntry);
+    } catch {
+      throw new Error(
+        `refusing to repair ${file}: complete line ${i + 1} is not valid JSON; a corrupt ` +
+          `complete entry is never auto-deleted (manual review required)`,
+      );
+    }
+  }
+  return entries;
+}
+
+function parsesAsJson(fragment: string): boolean {
+  try {
+    JSON.parse(fragment);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function truncateFileTo(file: string, bytes: number): void {
+  const fd = openSync(file, "r+");
+  try {
+    ftruncateSync(fd, bytes);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
 }

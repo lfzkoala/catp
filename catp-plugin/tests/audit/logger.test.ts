@@ -11,6 +11,7 @@ import {
   appendAuditEntry,
   appendChainedAuditEntry,
   getLastCommitment,
+  repairAuditLogTail,
   auditDir,
 } from '../../src/audit/logger.js';
 import {
@@ -18,9 +19,10 @@ import {
   computeActionCommitment,
   computePolicyCommitment,
 } from '../../src/evidence/commitments.js';
+import { verifyEntryChain } from '../../src/audit/verifier.js';
 import { actionSidecarPath, auditRoot } from '../../src/audit/paths.js';
 import { nodeAuditStorage, type AuditStorage } from '../../src/audit/durable.js';
-import type { CatpPolicy } from '../../src/policy/types.js';
+import type { AuditEntry, CatpPolicy } from '../../src/policy/types.js';
 import type { ToolAction } from '../../src/runtime/types.js';
 
 const TEST_AGENT = `__test__${Date.now()}`;
@@ -451,5 +453,84 @@ describe('buildEntry', () => {
 describe('extractAuthorizationAction', () => {
   it('returns undefined when authorization action data is incomplete', () => {
     expect(extractAuthorizationAction(makeInput('Bash', { catp_authorization: { actionType: 'Swap' } }))).toBeUndefined();
+  });
+});
+
+// The daily log file the logger actually wrote (located from disk so it cannot
+// flake across a UTC midnight boundary).
+function auditFile(): string {
+  return join(auditRoot(TEST_AGENT), latestAuditDate(TEST_AGENT), 'actions.jsonl');
+}
+
+function readEntries(file: string): AuditEntry[] {
+  return readFileSync(file, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => JSON.parse(l) as AuditEntry);
+}
+
+describe('repairAuditLogTail', () => {
+  it('reports clean and changes nothing for a well-formed log', () => {
+    appendChainedAuditEntry(TEST_AGENT, (prev) => chainedResult(makeInput('Bash'), 'allow', prev));
+    const file = auditFile();
+    const before = readFileSync(file, 'utf8');
+
+    const result = repairAuditLogTail(TEST_AGENT);
+
+    expect(result.status).toBe('clean');
+    expect(result.entries).toBe(1);
+    expect(result.removedFragment).toBeNull();
+    expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+
+  it('truncates a torn non-JSON tail and the next append chains from the last complete entry', () => {
+    appendChainedAuditEntry(TEST_AGENT, (prev) => chainedResult(makeInput('Bash', { command: 'one' }), 'allow', prev));
+    const r2 = appendChainedAuditEntry(TEST_AGENT, (prev) => chainedResult(makeInput('Bash', { command: 'two' }), 'allow', prev));
+    const file = auditFile();
+    const good = readFileSync(file, 'utf8');
+    expect(good.endsWith('\n')).toBe(true);
+
+    // A crashed append left a partial fragment that is not valid JSON.
+    const fragment = '{"commitment_version":4,"too';
+    writeFileSync(file, good + fragment, 'utf8');
+
+    const result = repairAuditLogTail(TEST_AGENT);
+    expect(result.status).toBe('repaired');
+    expect(result.entries).toBe(2);
+    expect(result.removedFragment).toBe(fragment);
+    expect(readFileSync(file, 'utf8')).toBe(good);
+
+    // The next append connects to r2 (the last complete entry), not the fragment.
+    appendChainedAuditEntry(TEST_AGENT, (prev) => {
+      expect(prev).toBe(r2.auditEntry.commitment);
+      return chainedResult(makeInput('Bash', { command: 'three' }), 'allow', prev);
+    });
+    expect(readEntries(file)).toHaveLength(3);
+    expect(verifyEntryChain(readEntries(file)).ok).toBe(true);
+  });
+
+  it('refuses to auto-delete a complete entry whose commitment is wrong', () => {
+    const r1 = appendChainedAuditEntry(TEST_AGENT, (prev) => chainedResult(makeInput('Bash'), 'allow', prev));
+    const file = auditFile();
+    const good = readFileSync(file, 'utf8');
+    // A complete, newline-terminated entry with a tampered commitment.
+    const tampered = JSON.stringify({ ...r1.auditEntry, commitment: 'f'.repeat(64) }) + '\n';
+    writeFileSync(file, good + tampered, 'utf8');
+
+    expect(() => repairAuditLogTail(TEST_AGENT)).toThrow(/refusing to repair/i);
+    // Nothing was deleted: the complete-but-invalid entry is left for review.
+    expect(readFileSync(file, 'utf8')).toBe(good + tampered);
+  });
+
+  it('refuses to truncate a trailing fragment that parses as a complete JSON object', () => {
+    const r1 = appendChainedAuditEntry(TEST_AGENT, (prev) => chainedResult(makeInput('Bash'), 'allow', prev));
+    const file = auditFile();
+    const good = readFileSync(file, 'utf8');
+    // A crash after a full entry object was written but before its newline.
+    const dangling = JSON.stringify(r1.auditEntry);
+    writeFileSync(file, good + dangling, 'utf8');
+
+    expect(() => repairAuditLogTail(TEST_AGENT)).toThrow(/terminating newline|manual review/i);
+    expect(readFileSync(file, 'utf8')).toBe(good + dangling);
   });
 });

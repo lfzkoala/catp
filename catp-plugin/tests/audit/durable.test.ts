@@ -29,6 +29,9 @@ interface FakeOptions {
   // succeed. Used to model "rename succeeded, dir-fsync failed" followed by a
   // retry that must re-establish the barrier and pass.
   failOnce?: boolean;
+  // When true, the first writeSync lands a partial chunk and then throws EIO,
+  // modelling a torn append the durable writer must roll back.
+  tornWriteOnce?: boolean;
 }
 
 interface FakeHandle {
@@ -87,10 +90,15 @@ function makeFakeFs(opts: FakeOptions = {}): FakeHandle {
         return 0;
       }
       const p = fdPath.get(fd)!;
-      const n = opts.partialWriteOnce && writes === 1 ? Math.min(1, length) : length;
+      const torn = Boolean(opts.tornWriteOnce) && writes === 1;
+      const n = torn || (opts.partialWriteOnce && writes === 1) ? Math.min(1, length) : length;
       const chunk = Buffer.from(buffer.slice(offset, offset + n));
       files.set(p, Buffer.concat([files.get(p) ?? Buffer.alloc(0), chunk]));
       ops.push(`write:${p}:${n}`);
+      if (torn) {
+        // The kernel accepted some bytes and then reported EIO mid-write.
+        throw err("write failed (EIO)");
+      }
       return n;
     },
     fsyncSync: (fd) => {
@@ -141,6 +149,13 @@ function makeFakeFs(opts: FakeOptions = {}): FakeHandle {
       ops.push(`unlink:${p}`);
       files.delete(p);
       existing.delete(p);
+    },
+    statSync: (p) => ({ size: (files.get(p) ?? Buffer.alloc(0)).byteLength }),
+    ftruncateSync: (fd, len) => {
+      const p = fdPath.get(fd)!;
+      const cur = files.get(p) ?? Buffer.alloc(0);
+      files.set(p, Buffer.from(cur.subarray(0, Math.min(len, cur.byteLength))));
+      ops.push(`ftruncate:${p}:${len}`);
     },
   };
 
@@ -244,6 +259,59 @@ describe("durableAppendLine (operation order)", () => {
     expect(() => durableAppendLine("/tmp/agent/actions.jsonl", "hello", h.fs)).toThrow(
       "file fsync failed",
     );
+  });
+
+  it("rolls back a torn append to the original length when the write fails mid-way", () => {
+    const file = "/tmp/agent/actions.jsonl";
+    const h = makeFakeFs({
+      existing: ["/", "/tmp", "/tmp/agent", file],
+      files: [[file, Buffer.from("e1\n", "utf8")]],
+      tornWriteOnce: true,
+    });
+
+    expect(() => durableAppendLine(file, "e2", h.fs)).toThrow("write failed");
+    // The partial bytes are truncated away: the file is exactly its pre-append
+    // content, so the next append cannot inherit an unterminated tail.
+    expect(h.files.get(file)?.toString("utf8")).toBe("e1\n");
+    expect(h.ops).toContain(`ftruncate:${file}:3`);
+  });
+
+  it("rolls back after a partial write when the fsync fails, preserving both errors", () => {
+    const file = "/tmp/agent/actions.jsonl";
+    const h = makeFakeFs({
+      existing: ["/", "/tmp", "/tmp/agent", file],
+      files: [[file, Buffer.from("e1\n", "utf8")]],
+      partialWriteOnce: true,
+      failOn: "file-fsync",
+    });
+
+    let caught: Error | undefined;
+    try {
+      durableAppendLine(file, "e2", h.fs);
+    } catch (e) {
+      caught = e as Error;
+    }
+    // The primary write/fsync failure is preserved...
+    expect(caught?.message).toContain("file fsync failed");
+    // ...and the rollback's own fsync failure is surfaced, not swallowed.
+    expect(caught?.message).toContain("rollback also failed");
+    // The torn bytes were still truncated back to the pre-append length.
+    expect(h.files.get(file)?.toString("utf8")).toBe("e1\n");
+    expect(h.ops).toContain(`ftruncate:${file}:3`);
+  });
+
+  it("truncates a torn append on a brand-new file back to empty", () => {
+    const file = "/tmp/agent/actions.jsonl";
+    const h = makeFakeFs({
+      existing: ["/", "/tmp", "/tmp/agent"],
+      tornWriteOnce: true,
+    });
+
+    expect(() => durableAppendLine(file, "e1", h.fs)).toThrow("write failed");
+    // originalSize was 0, so the half-written new file is truncated to empty
+    // rather than left holding a fragment.
+    expect(h.files.get(file)?.byteLength).toBe(0);
+    expect(h.ops).toContain(`ftruncate:${file}:0`);
   });
 });
 

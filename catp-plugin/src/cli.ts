@@ -6,7 +6,7 @@ import { runPostHook } from "./hook/post.js";
 import { formatSupportedRuntimeAdapters, getRuntimeAdapter, supportedRuntimeAdapters } from "./adapters/index.js";
 import { cmdInit } from "./commands/init.js";
 import { cmdValidate } from "./commands/validate.js";
-import { cmdLogExport, cmdLogShow, cmdLogVerify } from "./commands/log.js";
+import { cmdLogExport, cmdLogRepair, cmdLogShow, cmdLogVerify } from "./commands/log.js";
 import { cmdAnchor } from "./commands/anchor.js";
 import { cmdWitness } from "./commands/witness.js";
 import { cmdProveAuthorization, cmdVerifyAuthorization } from "./commands/authorization.js";
@@ -91,6 +91,13 @@ log
   .description("Verify commitment chain integrity")
   .option("--agent <id>", "agent id (default: from policy file)")
   .action(cmdLogVerify);
+
+log
+  .command("repair")
+  .description("Repair a torn audit-log tail left by a crashed append (truncates only an unterminated fragment that cannot be a complete entry)")
+  .option("--agent <id>", "agent id (default: from policy file)")
+  .option("--json", "write the repair result as JSON")
+  .action(cmdLogRepair);
 
 log
   .command("export")

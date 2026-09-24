@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { actionSidecarPath, auditRoot } from "../audit/paths.js";
 import { findPolicyFile, loadPolicy } from "../policy/loader.js";
 import { verifyChain, verifyEntryChain } from "../audit/verifier.js";
+import { repairAuditLogTail } from "../audit/logger.js";
 import { sha256Hex, stableStringify } from "../evidence/canonical.js";
 import { computeActionCommitment, type CanonicalToolActionV1 } from "../evidence/commitments.js";
 import type { AuditEntry } from "../policy/types.js";
@@ -190,6 +191,37 @@ export async function cmdLogVerify(opts: { agent?: string }): Promise<void> {
     }
   }
   process.stdout.write(`✓ Chain intact — ${checked} entries verified across ${logFiles.length} log file(s)\n`);
+}
+
+/**
+ * `catp log repair` — explicit recovery for a torn audit-log tail left by a
+ * crashed append. Truncates only a trailing fragment that cannot be a complete
+ * JSONL entry, after verifying the complete prefix chain; refuses (exit 1)
+ * rather than deleting a complete-but-invalid entry. See repairAuditLogTail.
+ */
+export function cmdLogRepair(opts: { agent?: string; json?: boolean }): void {
+  const agentId = resolveAgentId(opts);
+  let result;
+  try {
+    result = repairAuditLogTail(agentId);
+  } catch (err) {
+    process.stderr.write(`catp: ${(err as Error).message}\n`);
+    process.exit(1);
+  }
+  if (opts.json) {
+    process.stdout.write(stableStringify(result, 2) + "\n");
+    return;
+  }
+  if (result.status === "repaired") {
+    process.stdout.write(
+      `✓ Repaired torn tail in ${result.file}: truncated ${result.removedBytes} byte(s) that could ` +
+        `not form a complete entry; ${result.entries} verified entr(ies) retained\n`,
+    );
+    return;
+  }
+  process.stdout.write(
+    `✓ No torn tail in ${result.file} — ${result.entries} verified entr(ies) intact\n`,
+  );
 }
 
 export function cmdLogExport(opts: {

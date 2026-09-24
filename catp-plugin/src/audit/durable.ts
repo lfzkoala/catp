@@ -2,10 +2,12 @@ import {
   closeSync,
   existsSync,
   fsyncSync,
+  ftruncateSync,
   mkdirSync,
   openSync,
   readFileSync,
   renameSync,
+  statSync,
   unlinkSync,
   writeSync,
 } from "node:fs";
@@ -32,6 +34,10 @@ export interface DurableFs {
   readFileSync(path: string): Buffer;
   renameSync(oldPath: string, newPath: string): void;
   unlinkSync(path: string): void;
+  /** Size of a file in bytes, used to record the pre-append rollback point. */
+  statSync(path: string): { size: number };
+  /** Truncate an open file to `len` bytes, used to roll back a torn append. */
+  ftruncateSync(fd: number, len: number): void;
 }
 
 /** Production binding of {@link DurableFs} to node:fs. */
@@ -55,6 +61,10 @@ export const nodeFs: DurableFs = {
   },
   unlinkSync: (p) => {
     unlinkSync(p);
+  },
+  statSync: (p) => statSync(p),
+  ftruncateSync: (fd, len) => {
+    ftruncateSync(fd, len);
   },
 };
 
@@ -133,15 +143,41 @@ export function ensureDirectoryDurable(path: string, fs: DurableFs = nodeFs): vo
 }
 
 /**
+ * Attach a rollback failure to the primary write/fsync error without masking
+ * it. The original error is what the caller must observe to fail closed, but a
+ * failed rollback (the file could not be restored to its pre-append length) is
+ * critical diagnostic context, so it is surfaced in the message and kept as the
+ * error `cause`.
+ */
+function annotateRollbackFailure(primary: unknown, rollbackErr: unknown): void {
+  const rollbackMsg = rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr);
+  if (primary instanceof Error) {
+    primary.message = `${primary.message} (torn-append rollback also failed: ${rollbackMsg})`;
+    (primary as Error & { cause?: unknown }).cause = rollbackErr;
+  }
+}
+
+/**
  * Durably append one line to a JSONL-style log file. Sequence: create parent
  * directories, open append/create with 0o600, write the complete UTF-8 line
  * plus exactly one newline, fsync the file, close it, and fsync the parent
  * directory when the file was newly created.
+ *
+ * Torn-append safety: the pre-append file length is recorded first (inside the
+ * caller's audit lock, so no other appender can interleave). If the write or
+ * fsync fails after some bytes may have landed, the file is truncated back to
+ * that length and flushed before the ORIGINAL error propagates, so a partial
+ * line can never be left behind to corrupt every subsequent append. A crash
+ * that prevents this handler from running is recovered explicitly by
+ * `repairAuditLogTail` (`catp log repair`), never silently by the append path.
  */
 export function durableAppendLine(path: string, line: string, fs: DurableFs = nodeFs): void {
   const dir = dirname(path);
   ensureDirectoryDurable(dir, fs);
   const existed = fs.existsSync(path);
+  // Rollback boundary: for an existing file this is its current length; for a
+  // brand-new file it is 0 (a failed create leaves an empty file, not a torn one).
+  const originalSize = existed ? fs.statSync(path).size : 0;
   const fd = fs.openSync(path, "a", FILE_MODE);
   let closed = false;
   try {
@@ -150,10 +186,16 @@ export function durableAppendLine(path: string, line: string, fs: DurableFs = no
     fs.closeSync(fd);
     closed = true;
   } catch (err) {
-    // Close the descriptor without letting a secondary close error (POSIX can
-    // report a pending EIO on close after a failed fsync) mask the original
-    // write/fsync failure the caller must observe to fail closed.
+    // Roll back the torn append, then close without letting a secondary close
+    // error (POSIX can report a pending EIO on close after a failed fsync) mask
+    // the original write/fsync failure the caller must observe to fail closed.
     if (!closed) {
+      try {
+        fs.ftruncateSync(fd, originalSize);
+        fs.fsyncSync(fd);
+      } catch (rollbackErr) {
+        annotateRollbackFailure(err, rollbackErr);
+      }
       try {
         fs.closeSync(fd);
       } catch {
