@@ -1,13 +1,14 @@
 # CATP CLI 0.7.5 Release Checklist
 
-Status: **prepared — publish PENDING (not authorized this session).** All code,
-test, and documentation fixes are complete and committed, and the full local
-verification suite passes on the prepared tree. This release stopped at the
-release gate: no `npm publish`, no `git push`, and no remote tag were performed.
-The steps below are the exact actions to run once publish authorization is
-granted.
+Status: **PUBLISHED and verified (2026-09-24).** Publish authorization was
+granted and the release gate was crossed: `main` was pushed (fast-forward), the
+annotated tag `v0.7.5` was pinned to the exact release commit `077c599` and
+pushed, and the tag-triggered Release workflow published `@catp-protocol/cli@0.7.5`
+to npm via Trusted Publishing. The registry tarball and a fresh-install smoke
+test were verified afterward (see Post-Publish Verification below). All code,
+test, and documentation fixes are complete and committed.
 
-Package (prepared, not yet published):
+Package (published; npm `dist-tags.latest` = `0.7.5`):
 
 ```text
 @catp-protocol/cli@0.7.5
@@ -98,13 +99,19 @@ after the tag exists, because pushing the tag is what triggers the publish.
 this 0.7.5 version bump (`catp-plugin/package.json`, root `package-lock.json`)
 together with these release notes. The SHA could not be embedded inside that same
 commit, so it is transcribed here from a later documentation-only commit. The
-`v0.7.5` tag MUST point at this exact commit. The only commits after it on `main`
-are documentation-only (the #14/#15 governance records and this correction); they
-change no built source, so the npm artifact is identical whether published from
-`077c599` or the current tip — but the tag target is `077c599` so that
-`git rev-list -n 1 v0.7.5` == the release commit.
+`v0.7.5` tag MUST point at this exact commit — and does: the tag was created and
+pushed at `077c599`, and `git rev-list -n 1 v0.7.5` ==
+`077c5997245f1c52961a03c9f3b3be1f8d06ba6f` is confirmed on the remote. The only
+commits after it on `main` are documentation-only (the #14/#15 governance records
+and this post-publish record); they change no built source, so the published npm
+artifact is exactly the `077c599` build.
 
-## Publish (PENDING — NOT AUTHORIZED)
+## Publish (DONE — executed 2026-09-24)
+
+The commands below were executed: `main` fast-forwarded `5986265..02d1d61`, the
+annotated tag `v0.7.5` was created at `077c599` and pushed
+(`* [new tag] v0.7.5 -> v0.7.5`), and the tag-triggered Release workflow
+published `@catp-protocol/cli@0.7.5` (npm `dist-tags.latest` = `0.7.5`).
 
 Release order — the enforceable invariant. npm Trusted Publishing is *triggered
 by* pushing the tag, so registry verification can never precede the tag. The gate
@@ -143,39 +150,49 @@ The Release workflow validates that the tag version equals
 `catp-plugin/package.json` (`0.7.5`) and that the checked-out commit matches the
 tag commit, then publishes `@catp-protocol/cli@0.7.5`.
 
-## Post-Publish Verification (PENDING)
+## Post-Publish Verification (DONE — 2026-09-24)
 
-- [ ] Registry query for `@catp-protocol/cli@0.7.5`: download the tarball into an
-      isolated temporary directory; verify version, SHA-256, sha1
-      (`dist.shasum`), and the unpacked file manifest against a clean local
-      build; record the registry and clean-local tarball SHA-256.
-- [ ] Fresh-install smoke test with an isolated `CATP_HOME`: install
-      `@catp-protocol/cli@0.7.5` into an isolated prefix; `catp --version`
-      reports `0.7.5`; record the resolved executable realpath and its
-      `dist/cli.js` SHA-256; `scripts/smoke-receipt.sh` driven by that binary
-      prints `receiptSmoke=ok` and a v2 receipt verify summary with
+- [x] Registry tarball verified. `npm pack @catp-protocol/cli@0.7.5` downloaded
+      `catp-protocol-cli-0.7.5.tgz` into an isolated temp dir:
+      - `dist.tarball` = `https://registry.npmjs.org/@catp-protocol/cli/-/cli-0.7.5.tgz`
+      - SHA-1 = `51d277302289a8f5570ddf8c6d9e2e917a166912` == `dist.shasum` (match)
+      - SHA-512 = `sha512-8o/pzb8GdGfqhz6+puoVEz65IMgjBSzAEFm5DR1OwAR4gEicl2yXYBI3aIinTA4BagV7cOT1vJA1JXR/fVltWQ==` == `dist.integrity` (match)
+      - tarball SHA-256 = `b6d3f5e4f9ad7a7154ebfaeb900fe2dbb141d22b07ee1dea9ec9632da2466790`
+      - `dist.unpackedSize` = 330140, `dist.fileCount` = 101, `dist-tags.latest` = `0.7.5`
+- [x] Fresh-install smoke verified. `npm install -g @catp-protocol/cli@0.7.5` into
+      an isolated prefix; `catp --version` = `0.7.5`; installed `dist/cli.js`
+      SHA-256 = `6fc34688e8e54c0a824ade6c5b5b7aade6271399d209171cfa885ecd1c754c56`,
+      byte-identical to the clean local build from `077c599`. Driven by that
+      registry binary with an isolated `CATP_HOME`, `scripts/smoke-receipt.sh`
+      printed `receiptSmoke=ok` (exit 0) and the v2 receipt verify summary was
+      `authorizationReceipt=valid`, `auditExport=matched`, `policy=matched`,
       `assurance=enforcement-time-bound`.
-- [ ] `git rev-list -n 1 v0.7.5` ==
-      `077c5997245f1c52961a03c9f3b3be1f8d06ba6f` (the release commit above).
+- [x] `git rev-list -n 1 v0.7.5` ==
+      `077c5997245f1c52961a03c9f3b3be1f8d06ba6f` (the release commit above) —
+      confirmed on the remote via `git ls-remote --tags origin 'v0.7.5^{}'`.
 
 ## Release Gate
 
-NOT crossed this session — no publish authorization. The release commit `077c599`
-exists and has passed the pre-tag release-candidate verification (`bash check.sh`,
-exit 0); the tag `v0.7.5` and the registry tarball do NOT yet exist and are
-created only at publish time. README/INSTALL keep the install version at the
-published, verifiable `0.7.4` until `0.7.5` is published and verified (they are
-bumped in the deferred paper re-pin step).
+CROSSED — `0.7.5` is published and verified. The release commit `077c599` passed
+the pre-tag release-candidate verification (`bash check.sh`, exit 0), the tag
+`v0.7.5` was pushed at that commit, and the Release workflow published
+`@catp-protocol/cli@0.7.5` (npm `dist-tags.latest` = `0.7.5`). The registry
+tarball and fresh-install smoke test were verified afterward (above).
+README/INSTALL still keep the install example at `0.7.4` for now; they are bumped
+to `0.7.5` in the deferred paper re-pin step (Phase 6), which is now unblocked
+because `0.7.5` is published and verified.
 
 ## Paper coordination (deferred)
 
 Because CATP behavior changed (#1/#10/#3), the paper's pinned `0.7.4` artifact
 no longer matches current code. The companion `catp_paper` harness fixes
 (#5 artifact gate, #11 RQ1b scorer, #6 RQ2, #7 RQ3, #8 RQ4) are already
-committed, but their measured data is still `0.7.4`. After `0.7.5` is published
-and verified from the registry, the deferred step re-pins the artifact
-(`common.sh` `PINNED_VERSION`/`PINNED_COMMIT`/`PINNED_CLI_SHA256`, lockfile,
-manifest, tarball/cli hashes), reruns RQ1-RQ4 + the Groth16 case study, and
-regenerates `raw`/`processed`/tables/text. Until then the paper is in a
-"scripts corrected + data still 0.7.4" intermediate state and is **not**
-submission-ready.
+committed, but their measured data is still `0.7.4`. `0.7.5` is now published and
+verified from the registry, so Phase 6 is unblocked: re-pin the artifact
+(`common.sh` `PINNED_VERSION` = `0.7.5`, `PINNED_COMMIT` =
+`077c5997245f1c52961a03c9f3b3be1f8d06ba6f`, `PINNED_CLI_SHA256` =
+`6fc34688e8e54c0a824ade6c5b5b7aade6271399d209171cfa885ecd1c754c56`, plus
+lockfile, manifest, tarball/cli hashes), rerun RQ1-RQ4 + the Groth16 case study,
+and regenerate `raw`/`processed`/tables/text. Phase 6 is a separate step and is
+still deferred; until it runs, the paper remains in a "scripts corrected + data
+still 0.7.4" intermediate state and is **not** submission-ready.

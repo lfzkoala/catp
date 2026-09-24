@@ -205,9 +205,11 @@ npm run smoke:receipt                      # receiptSmoke=ok
 
 ### P0: 0.7.5 Security-Remediation Release
 
-Status: fixes complete and locally verified; release gate PENDING explicit
-authorization for push / npm publish / remote tag (see
-`docs/RELEASE_0.7.5.md`).
+Status: **released and verified (2026-09-24).** Published from the `v0.7.5` Git
+tag (`077c5997245f1c52961a03c9f3b3be1f8d06ba6f`) through npm Trusted Publishing;
+`@catp-protocol/cli@0.7.5` is on the registry with `dist-tags.latest` = `0.7.5`,
+and the registry tarball plus a fresh-install receipt smoke test were verified
+afterward (see `docs/RELEASE_0.7.5.md`).
 
 Goal: publish the confirmed security-review fixes that CHANGE runtime behavior
 (#1 idempotent durable-write retries re-establish the fsync barrier, #10
@@ -232,9 +234,15 @@ Exit criteria:
   21 suites + coverage, sdk 26 tests; plus `build` and `smoke:receipt`). This is
   the pre-tag release-candidate gate.
 - After publish authorization: registry tarball + fresh-install verified, and
-  `git rev-list -n 1 v0.7.5` == the release commit.
+  `git rev-list -n 1 v0.7.5` == the release commit. **DONE (2026-09-24):**
+  remote tag `v0.7.5^{}` == `077c599`; tarball SHA-256
+  `b6d3f5e4f9ad7a7154ebfaeb900fe2dbb141d22b07ee1dea9ec9632da2466790`; installed
+  `dist/cli.js` SHA-256
+  `6fc34688e8e54c0a824ade6c5b5b7aade6271399d209171cfa885ecd1c754c56`; fresh-install
+  `catp --version` = `0.7.5`; `scripts/smoke-receipt.sh` driven by the registry
+  binary printed `receiptSmoke=ok` (exit 0).
 - Only once 0.7.5 is published and verified: the paper re-pins the artifact and
-  reruns RQ1-RQ4 + Groth16 (deferred step).
+  reruns RQ1-RQ4 + Groth16 (deferred Phase 6 step, now unblocked).
 
 ### P0: 0.7.4 Enforcement-Evidence Release
 
