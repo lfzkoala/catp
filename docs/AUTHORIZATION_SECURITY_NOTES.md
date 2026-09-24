@@ -112,6 +112,15 @@ policy and full-action binding.
   the signature, `receipt_sha256`, the export hash and offline chain, selected
   entry equality for all three bindings, the complete-action hash, and the
   optional policy-file hash.
+- The `catp_audit_export_v2` bundle is **mandatory** to verify a v2 receipt:
+  `catp receipt verify` refuses (non-zero exit, no summary) a v2 receipt
+  presented without `--audit-export`. A signature-only check over the
+  self-asserted commitments is NOT sufficient and never yields
+  `assurance=enforcement-time-bound`; only after the trusted-key/signature,
+  the export bundle (export hash, offline chain prefix, selected v4 entry,
+  action commitment, complete canonical action), and any `--file` policy
+  evidence all verify is that assurance reported. `auditExport` is therefore
+  always `matched` in a v2 verification summary.
 - A supplied `--file <policy>` is verification evidence only: it is hashed with
   the same domained enforcement-time scheme and must reproduce the recorded
   `policy_commitment`. A swapped policy is rejected; the receipt stays bound to

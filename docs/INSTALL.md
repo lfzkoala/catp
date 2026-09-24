@@ -26,7 +26,7 @@ For the full proof/development flow:
 Use this path if you want CATP local enforcement and audit-log tooling.
 
 ```bash
-npm install -g @catp-protocol/cli@0.7.3
+npm install -g @catp-protocol/cli@0.7.4
 catp --version
 ```
 
@@ -187,6 +187,14 @@ catp receipt verify \
 receipt. CATP does not treat the public key embedded in a receipt as a trust
 anchor.
 
+`--audit-export` is **mandatory** when verifying a `catp_authorization_receipt_v2`
+receipt: without the `catp_audit_export_v2` bundle, `catp receipt verify` exits
+non-zero instead of reporting `assurance=enforcement-time-bound`, because a
+signature alone cannot establish that the receipt binds to a real chained audit
+entry and its complete action. `receipt issue --audit-export-out <path>` (above)
+writes that bundle. Legacy `catp_authorization_receipt_v1` receipts keep their
+historical optional-export semantics and are labelled `assurance=legacy`.
+
 Use `--tool <name>` instead of `--latest` when you want the newest audit entry
 from a specific tool. Add `--decision allow|deny` with `--latest` or `--tool`
 when you want the newest matching allow/deny entry.
@@ -217,7 +225,7 @@ This confirms the installed CLI is available and the local policy/audit surface
 works without a repository checkout. `CATP_HOME` keeps the smoke test isolated
 from any existing audit logs under `~/.catp`.
 
-The `0.7.3` npm smoke test should verify:
+The `0.7.4` npm smoke test should verify:
 
 ```text
 catp --version

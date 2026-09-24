@@ -187,11 +187,22 @@ from a specific tool, and
 `--decision allow|deny` with `--latest` or `--tool` when you want a matching
 allow/deny entry.
 
-Receipts use `catp_authorization_receipt_v1` and Ed25519 signatures. The signed
-payload binds the audit export hash, audit commitment, entry hash, agent id,
-tool, decision, timestamp, policy commitment, and signer public key.
-Verification requires a separately obtained trusted public key; the key embedded
-in a receipt is signed data, not a trust anchor.
+Receipts use `catp_authorization_receipt_v2` and Ed25519 signatures. The signed
+body copies the enforcement-time bindings verbatim from the selected
+pre-enforcement v4 audit entry — the audit commitment, the policy commitment,
+and the action commitment (a digest over the complete canonical action, not the
+display summary) — together with the audit-export bundle hash, agent id, tool,
+decision, phase, matched rule, reason, timestamp, and the issuer key id (a
+digest of the signer's public key). Verification requires a separately obtained
+trusted public key (the issuer key id must match it; a key embedded in a receipt
+is signed data, not a trust anchor) **and** the `catp_audit_export_v2` bundle via
+`--audit-export`, which is mandatory for v2: without it `receipt verify` exits
+non-zero rather than report `assurance=enforcement-time-bound`. Only after the
+signature, the export bundle (export hash, chain prefix, selected entry, and
+complete action), and any `--file` policy evidence all verify does a v2 receipt
+report enforcement-time-bound assurance. Legacy `catp_authorization_receipt_v1`
+receipts are still accepted, keep their historical optional-export semantics,
+and are labelled `assurance=legacy`.
 
 For a minimal fixture, see [examples/receipt-basic](examples/receipt-basic).
 
