@@ -295,3 +295,18 @@ clean local packed tarball now have a complete auditable relationship (identical
 unpacked manifest sha256 and byte-identical contents; tag == commit). Phase 5
 experiment reruns may pin to `@catp-protocol/cli@0.7.4` using the registry
 tarball sha256 `b4da728f43ee9e36d2c035d756de04d3b1ea7a6f93c355ab9c4ca5728077c0d3`.
+
+## Process Deviation (recorded, not rewritten)
+
+The sequence above was tag-before-verification. The annotated tag `v0.7.4` was
+created and pushed first; pushing it triggered the Release workflow that ran
+typecheck + tests + build and published to npm. The registry-tarball download,
+SHA-256/sha1/manifest comparison, and the fresh-install smoke test were then
+performed AFTER publication. The release succeeded and every check passed, but
+the verification was post-hoc rather than a gate that had to pass before the
+immutable artifact already existed on the registry.
+
+This is recorded honestly and the history above is left unchanged. Future
+releases (starting with `0.7.5`) run the full verification on the release commit
+BEFORE tagging and publishing (verify-before-tag), so a failing check prevents
+the publish instead of being discovered afterward. See `docs/RELEASE_0.7.5.md`.

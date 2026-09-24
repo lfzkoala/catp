@@ -203,30 +203,63 @@ npm run smoke:receipt                      # receiptSmoke=ok
 
 ## Active Milestones
 
+### P0: 0.7.5 Security-Remediation Release
+
+Status: fixes complete and locally verified; release gate PENDING explicit
+authorization for push / npm publish / remote tag (see
+`docs/RELEASE_0.7.5.md`).
+
+Goal: publish the confirmed security-review fixes that CHANGE runtime behavior
+(#1 idempotent durable-write retries re-establish the fsync barrier, #10
+torn-append rollback + explicit `log repair`, #3 v2 receipt verify requires
+`--audit-export`) as the next immutable release, because the published 0.7.4
+artifact no longer matches current code and the paper must re-pin.
+
+Work:
+
+- #1/#10/#3 behavior fixes plus #4 (CLI child-process fail-closed test) and #9
+  (docs corrections) are implemented, tested, and committed.
+- The companion `catp_paper` harness fixes (#5 artifact gate, #11 RQ1b scorer,
+  #6 RQ2, #7 RQ3, #8 RQ4) are committed in that repository (script-only; no
+  experiment data regenerated).
+- Package version, lockfile, and `docs/RELEASE_0.7.5.md` are bumped to `0.7.5`.
+
+Exit criteria:
+
+- Full repository checks, CLI coverage, and receipt smoke pass on the release
+  commit (done locally: typecheck, build, 330 tests / 21 suites,
+  `smoke:receipt`).
+- After publish authorization: registry tarball + fresh-install verified, and
+  `git rev-list -n 1 v0.7.5` == the release commit.
+- Only once 0.7.5 is published and verified: the paper re-pins the artifact and
+  reruns RQ1-RQ4 + Groth16 (deferred step).
+
 ### P0: 0.7.4 Enforcement-Evidence Release
 
-Status: security change complete and verified; release gate pending explicit
-authorization for push / npm publish / remote tag.
+Status: **released and verified.** Published from the `v0.7.4` Git tag
+(`86eff07ce674aa5c180ce7f8a831bc85646ac976`) through npm Trusted Publishing;
+the registry tarball and a fresh-install smoke test were verified afterward (see
+`docs/RELEASE_0.7.4.md`).
 
 Goal: publish the enforcement-time policy + full-action bindings, durable
 append, fail-closed pre-hook, v2 self-contained export, and v2 receipt as one
-immutable fixed release that the paper experiments can be pinned to.
+immutable fixed release that the paper experiments are pinned to.
 
 Work:
 
 - Phases 1-3 of `docs/superpowers/plans/2026-09-23-paper-security-remediation.md`
-  are implemented, tested, and committed (see Enforcement-Time Evidence And
+  were implemented, tested, and committed (see Enforcement-Time Evidence And
   Durability above).
-- Bump the package version, lockfile, and release notes to `0.7.4`, and validate
-  the packed tarball.
+- Package version, lockfile, and release notes were bumped to `0.7.4`, and the
+  packed tarball was validated.
 
-Exit criteria:
+Exit criteria (met):
 
 - Full repository checks, CLI coverage, Groth16 setup checks, and receipt smoke
-  pass on the release commit.
+  passed on the release commit.
 - Package version, release notes, Git tag, and npm version agree on `0.7.4`.
-- Registry package, release commit, and tag correspondence is verified before any
-  paper experiment is rerun against the fixed release.
+- Registry package, release commit, and tag correspondence were verified; the
+  paper is pinned to `@catp-protocol/cli@0.7.4`.
 
 ### P0: 0.6.0 Security Convergence Release
 
