@@ -199,7 +199,7 @@ receipt
   .description("Verify a signed CATP authorization receipt (v2, or legacy v1)")
   .requiredOption("--receipt <path>", "catp_authorization_receipt_v2 JSON (legacy v1 also accepted)")
   .requiredOption("--public-key <path>", "independently trusted Ed25519 public key PEM")
-  .option("--audit-export <path>", "also check the receipt against a catp_audit_export_v2 JSON bundle")
+  .option("--audit-export <path>", "catp_audit_export_v2 JSON bundle; REQUIRED for v2 receipts (enforcement-time-bound assurance), optional for legacy v1")
   .option("-f, --file <path>", "also check the receipt against a catp-policy.toml commitment")
   .option("--json", "write verification summary as JSON")
   .action(cmdReceiptVerify);

@@ -250,16 +250,25 @@ export function cmdReceiptVerify(opts: { receipt?: string; publicKey?: string; a
   const receipt = readAuthorizationReceiptAny(opts.receipt);
 
   if (isReceiptV2(receipt)) {
-    verifyAuthorizationReceiptV2(receipt, publicKeyPem);
-    if (opts.auditExport) {
-      verifyReceiptAuditExportV2(receipt, readAuditExportV2(opts.auditExport));
+    // A v2 receipt claims an enforcement-time binding, so verifying one
+    // WITHOUT its audit export would reduce that claim to a signature check
+    // over self-asserted commitments. Refuse outright (non-zero exit, no
+    // summary on either output mode) instead of reporting a weaker result.
+    if (!opts.auditExport) {
+      throw new Error(
+        "catp_authorization_receipt_v2 verification requires --audit-export <path> (the catp_audit_export_v2 bundle from receipt issue/sign or catp log export); signature-only verification cannot establish enforcement-time-bound assurance",
+      );
     }
+    // Full verification order: trusted-key/signature first, then the export
+    // bundle (export hash, chain prefix, selected v4 entry, action commitment,
+    // complete canonical action), then the optional policy-file evidence.
+    verifyAuthorizationReceiptV2(receipt, publicKeyPem);
+    verifyReceiptAuditExportV2(receipt, readAuditExportV2(opts.auditExport));
     if (opts.file) {
       verifyReceiptPolicyV2(receipt, loadPolicy(opts.file));
     }
     emitVerificationSummary(
       receiptVerificationSummaryV2(receipt, {
-        auditExportMatched: Boolean(opts.auditExport),
         policyMatched: Boolean(opts.file),
       }),
       opts,
@@ -615,15 +624,18 @@ function receiptVerificationSummary(
   };
 }
 
+// Reached only after cmdReceiptVerify has enforced the mandatory export
+// check and the full v2 verification order, so the enforcement-time-bound
+// assurance and the matched export are invariants here, not options.
 function receiptVerificationSummaryV2(
   receipt: AuthorizationReceiptV2,
-  opts: { auditExportMatched: boolean; policyMatched: boolean }
+  opts: { policyMatched: boolean }
 ): ReceiptVerificationSummary {
   return {
     authorizationReceipt: "valid",
     receiptVersion: "catp_authorization_receipt_v2",
     assurance: "enforcement-time-bound",
-    auditExport: opts.auditExportMatched ? "matched" : null,
+    auditExport: "matched",
     policy: opts.policyMatched ? "matched" : null,
     auditCommitment: receipt.audit_commitment,
     auditExportHash: receipt.audit_export_sha256,

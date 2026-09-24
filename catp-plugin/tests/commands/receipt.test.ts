@@ -555,13 +555,15 @@ describe("authorization receipt", () => {
       cmdReceiptIssue({ agent: "receipt-agent", commitment: entry.commitment, privateKey: privateKeyPath, file: pathB }),
     ).rejects.toThrow("does not match the enforcement-time policy_commitment");
 
-    // Offline verification accepts --file A and rejects --file B.
+    // Offline verification accepts --file A and rejects --file B. A v2 receipt
+    // always requires its export, so the swapped-policy check runs with the
+    // genuine export attached and must fail on the policy commitment.
     expect(() =>
       captureSync(() => cmdReceiptVerify({ receipt: receiptPath, publicKey: publicKeyPath, auditExport: auditExportPath, file: pathA })),
     ).not.toThrow();
-    expect(() => cmdReceiptVerify({ receipt: receiptPath, publicKey: publicKeyPath, file: pathB })).toThrow(
-      "policy_commitment does not match",
-    );
+    expect(() =>
+      cmdReceiptVerify({ receipt: receiptPath, publicKey: publicKeyPath, auditExport: auditExportPath, file: pathB }),
+    ).toThrow("policy_commitment does not match");
   });
 
   it("binds distinct receipts for actions that share a 200-character displayed prefix", () => {
@@ -818,10 +820,10 @@ describe("authorization receipt", () => {
     expect(summary.auditCommitment).toBe(entry.commitment);
   });
 
-  it("writes a v2 text verification summary", async () => {
+  it("refuses v2 CLI verification without --audit-export", async () => {
     const { privateKeyPem, publicKeyPem } = keyPair();
     const entry = seedV4("receipt-agent", "Bash", { command: "ls" });
-    const dir = join(TEST_HOME, "verify-v2-text");
+    const dir = join(TEST_HOME, "verify-v2-no-export");
     mkdirSync(dir, { recursive: true });
     const privateKeyPath = join(dir, "private.pem");
     const publicKeyPath = join(dir, "public.pem");
@@ -830,11 +832,67 @@ describe("authorization receipt", () => {
     writeFileSync(publicKeyPath, publicKeyPem, "utf8");
 
     await capture(() => cmdReceiptIssue({ agent: "receipt-agent", commitment: entry.commitment, privateKey: privateKeyPath, out: receiptPath }));
-    const { output } = captureSync(() => cmdReceiptVerify({ receipt: receiptPath, publicKey: publicKeyPath }));
+
+    // A signature-only v2 check must NEVER report enforcement-time-bound:
+    // without the export bundle there is no evidence the receipt binds to a
+    // real chained audit entry or its complete action, so verification is
+    // refused outright instead of emitting any summary.
+    const attempt = () => captureSync(() => cmdReceiptVerify({ receipt: receiptPath, publicKey: publicKeyPath }));
+    expect(attempt).toThrow("requires --audit-export");
+    let output = "";
+    try {
+      output = captureSync(() => cmdReceiptVerify({ receipt: receiptPath, publicKey: publicKeyPath })).output;
+    } catch {
+      // expected: the refusal happens before any summary is written
+    }
+    expect(output).not.toContain("assurance=enforcement-time-bound");
+    expect(output).toBe("");
+    // --json must fail the same way, not emit a machine-readable assurance.
+    expect(() => cmdReceiptVerify({ receipt: receiptPath, publicKey: publicKeyPath, json: true })).toThrow(
+      "requires --audit-export",
+    );
+  });
+
+  it("writes a v2 text verification summary identical to the JSON summary", async () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const entry = seedV4("receipt-agent", "Bash", { command: "ls" });
+    const dir = join(TEST_HOME, "verify-v2-text");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    const publicKeyPath = join(dir, "public.pem");
+    const receiptPath = join(dir, "receipt.json");
+    const auditExportPath = join(dir, "audit-export.json");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+    writeFileSync(publicKeyPath, publicKeyPem, "utf8");
+
+    await capture(() =>
+      cmdReceiptIssue({
+        agent: "receipt-agent",
+        commitment: entry.commitment,
+        privateKey: privateKeyPath,
+        out: receiptPath,
+        auditExportOut: auditExportPath,
+      }),
+    );
+    const { output } = captureSync(() =>
+      cmdReceiptVerify({ receipt: receiptPath, publicKey: publicKeyPath, auditExport: auditExportPath }),
+    );
 
     expect(output).toContain("authorizationReceipt=valid");
+    expect(output).toContain("receiptVersion=catp_authorization_receipt_v2");
     expect(output).toContain("assurance=enforcement-time-bound");
+    expect(output).toContain("auditExport=matched");
     expect(output).toContain(`actionCommitment=${entry.action_commitment}`);
+
+    // The JSON summary must agree field-for-field with the text output.
+    const { output: jsonOutput } = captureSync(() =>
+      cmdReceiptVerify({ receipt: receiptPath, publicKey: publicKeyPath, auditExport: auditExportPath, json: true }),
+    );
+    const summary = JSON.parse(jsonOutput) as Record<string, unknown>;
+    expect(summary.assurance).toBe("enforcement-time-bound");
+    expect(summary.auditExport).toBe("matched");
+    expect(summary.actionCommitment).toBe(entry.action_commitment);
+    expect(output).toContain(`auditCommitment=${String(summary.auditCommitment)}`);
   });
 
   it("rejects CLI verification of a v2 receipt with an untrusted key", async () => {
@@ -846,14 +904,23 @@ describe("authorization receipt", () => {
     const privateKeyPath = join(dir, "private.pem");
     const attackerKeyPath = join(dir, "attacker.pem");
     const receiptPath = join(dir, "receipt.json");
+    const auditExportPath = join(dir, "audit-export.json");
     writeFileSync(privateKeyPath, signer.privateKeyPem, "utf8");
     writeFileSync(attackerKeyPath, attacker.publicKeyPem, "utf8");
 
-    await capture(() => cmdReceiptIssue({ agent: "receipt-agent", commitment: entry.commitment, privateKey: privateKeyPath, out: receiptPath }));
-
-    expect(() => cmdReceiptVerify({ receipt: receiptPath, publicKey: attackerKeyPath })).toThrow(
-      "issuer_key_id does not match the trusted public key",
+    await capture(() =>
+      cmdReceiptIssue({
+        agent: "receipt-agent",
+        commitment: entry.commitment,
+        privateKey: privateKeyPath,
+        out: receiptPath,
+        auditExportOut: auditExportPath,
+      }),
     );
+
+    expect(() =>
+      cmdReceiptVerify({ receipt: receiptPath, publicKey: attackerKeyPath, auditExport: auditExportPath }),
+    ).toThrow("issuer_key_id does not match the trusted public key");
   });
 
   it("rejects CLI verification against a modified selected entry", async () => {
@@ -923,6 +990,36 @@ describe("authorization receipt", () => {
     expect(() => cmdReceiptVerify({ receipt: receiptPath, publicKey: publicKeyPath, auditExport: tamperedExportPath })).toThrow(
       "action does not match the selected entry action_commitment",
     );
+  });
+
+  it("rejects CLI verification against a different entry's genuine export", async () => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const entry = seedV4("receipt-agent", "Bash", { command: "ls" });
+    const other = seedV4("receipt-agent", "Bash", { command: "rm -rf /" });
+    const dir = join(TEST_HOME, "verify-v2-swapped-export");
+    mkdirSync(dir, { recursive: true });
+    const privateKeyPath = join(dir, "private.pem");
+    const publicKeyPath = join(dir, "public.pem");
+    const receiptPath = join(dir, "receipt.json");
+    const otherExportPath = join(dir, "other-export.json");
+    writeFileSync(privateKeyPath, privateKeyPem, "utf8");
+    writeFileSync(publicKeyPath, publicKeyPem, "utf8");
+
+    await capture(() =>
+      cmdReceiptIssue({
+        agent: "receipt-agent",
+        commitment: entry.commitment,
+        privateKey: privateKeyPath,
+        out: receiptPath,
+      }),
+    );
+    // A genuine, internally consistent export for a DIFFERENT entry must not
+    // substitute for the receipt's own bundle.
+    writeFileSync(otherExportPath, stableStringify(buildAuditExportV2("receipt-agent", other.commitment), 2) + "\n", "utf8");
+
+    expect(() =>
+      cmdReceiptVerify({ receipt: receiptPath, publicKey: publicKeyPath, auditExport: otherExportPath }),
+    ).toThrow("audit_export_sha256 does not match");
   });
 
   it("exposes a stable issuer key id for a public key", () => {
