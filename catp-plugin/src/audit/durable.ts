@@ -88,6 +88,21 @@ function fsyncDirectory(fs: DurableFs, dir: string): void {
 }
 
 /**
+ * fsync an existing regular file so its data and inode metadata are durable.
+ * Opened read-only with FILE_MODE; fsync does not require write access. This is
+ * the file half of the barrier the idempotent paths below re-run so a retry
+ * after a partial failure cannot report durability it never established.
+ */
+function fsyncExistingFile(fs: DurableFs, path: string): void {
+  const fd = fs.openSync(path, "r", FILE_MODE);
+  try {
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/**
  * Create `path` (and any missing ancestors) and make the new directory entries
  * durable. Missing components are collected before creation, created with
  * 0o700, then fsynced from the deepest component upward followed by the
@@ -162,14 +177,24 @@ function uniqueTempPath(dir: string, base: string): string {
 /**
  * Durably create an empty file (and its parent directories) if it does not
  * already exist: open append/create with 0o600, fsync the new file, close it,
- * then fsync the parent directory. An existing file is left untouched. This is
- * used to materialize the audit log so a lock manager that resolves the target
- * realpath never bypasses the new-file durability path.
+ * then fsync the parent directory. When the file already exists the barrier is
+ * re-established (fsync the existing file + its parent directory) WITHOUT
+ * writing any bytes, so a prior attempt that created the file and then failed
+ * the parent-dir fsync cannot leave a non-durable entry behind on retry. This
+ * is used to materialize the audit log so a lock manager that resolves the
+ * target realpath never bypasses the new-file durability path.
  */
 export function durableCreateEmptyFile(path: string, fs: DurableFs = nodeFs): void {
   const dir = dirname(path);
   ensureDirectoryDurable(dir, fs);
-  if (fs.existsSync(path)) return;
+  if (fs.existsSync(path)) {
+    // Idempotent path: re-run the barrier rather than returning blindly. A
+    // previous call may have created the file and thrown at the dir fsync, so
+    // success here must still imply the file's existence is durable.
+    fsyncExistingFile(fs, path);
+    fsyncDirectory(fs, dir);
+    return;
+  }
   const fd = fs.openSync(path, "a", FILE_MODE);
   let closed = false;
   try {
@@ -194,10 +219,12 @@ export function durableCreateEmptyFile(path: string, fs: DurableFs = nodeFs): vo
  * file: create parents, write the temp with 0o600, fsync it, close, atomically
  * rename onto the target, then fsync the parent directory.
  *
- * If the target already exists its bytes are compared: identical bytes are an
- * idempotent success, differing bytes are reported as corruption. Descriptors
- * are closed and the temp file removed on any failure while preserving the
- * original exception.
+ * If the target already exists its bytes are compared: identical bytes
+ * re-establish the durability barrier (fsync the existing file, then its parent
+ * directory) and succeed WITHOUT rewriting, so a retry after "rename succeeded,
+ * parent-dir fsync failed" cannot skip the barrier; differing bytes are reported
+ * as corruption. Descriptors are closed and the temp file removed on any
+ * failure while preserving the original exception.
  */
 export function durableWriteContentAddressed(
   path: string,
@@ -209,8 +236,18 @@ export function durableWriteContentAddressed(
 
   if (fs.existsSync(path)) {
     const existing = fs.readFileSync(path);
-    if (Buffer.compare(Buffer.from(bytes), existing) === 0) return;
-    throw new Error(`content-addressed file already exists with different bytes: ${path}`);
+    if (Buffer.compare(Buffer.from(bytes), existing) !== 0) {
+      throw new Error(`content-addressed file already exists with different bytes: ${path}`);
+    }
+    // Identical bytes are NOT an automatic success. A prior attempt may have
+    // renamed the temp file into place and then failed the parent-dir fsync, so
+    // neither the file's data nor its directory entry can be assumed durable.
+    // Re-run the full barrier and fail closed if either flush fails; only then
+    // report idempotent success. This is the exact window that let a retry
+    // append an audit entry whose action sidecar was never made durable.
+    fsyncExistingFile(fs, path);
+    fsyncDirectory(fs, dir);
+    return;
   }
 
   const temp = uniqueTempPath(dir, basename(path));

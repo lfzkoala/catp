@@ -25,6 +25,10 @@ interface FakeOptions {
   zeroProgress?: boolean;
   closeThrows?: boolean;
   failOn?: FailPoint;
+  // When true, only the FIRST occurrence of `failOn` throws; later occurrences
+  // succeed. Used to model "rename succeeded, dir-fsync failed" followed by a
+  // retry that must re-establish the barrier and pass.
+  failOnce?: boolean;
 }
 
 interface FakeHandle {
@@ -36,21 +40,30 @@ interface FakeHandle {
 }
 
 // A narrow in-memory filesystem that records the exact operation sequence and
-// can inject a failure at a chosen durability point. Directories are opened
-// with flag "r" (the only durable.ts use of "r"), so file vs directory fsync
-// can be distinguished by the flag captured at open time.
+// can inject a failure at a chosen durability point. File vs directory fsync is
+// distinguished by the MODE captured at open time: durable.ts opens directories
+// read-only with DIR_MODE (0o700) and regular files with FILE_MODE (0o600),
+// including the read-only fsync of an existing file on the idempotent paths.
 function makeFakeFs(opts: FakeOptions = {}): FakeHandle {
   const existing = new Set<string>(opts.existing ?? ["/"]);
   const files = new Map<string, Buffer>(opts.files ?? []);
   const ops: string[] = [];
   const fdPath = new Map<number, string>();
   const fdFlags = new Map<number, string>();
+  const fdMode = new Map<number, number>();
   let nextFd = 10;
   let writes = 0;
   let fileFsync = 0;
   let dirFsync = 0;
+  let hasFailed = false;
 
   const err = (msg: string): Error => Object.assign(new Error(msg), { code: "EIO" });
+  const shouldFail = (point: FailPoint): boolean => {
+    if (opts.failOn !== point) return false;
+    if (opts.failOnce && hasFailed) return false;
+    hasFailed = true;
+    return true;
+  };
 
   const fs: DurableFs = {
     existsSync: (p) => existing.has(p),
@@ -62,6 +75,7 @@ function makeFakeFs(opts: FakeOptions = {}): FakeHandle {
       const fd = nextFd++;
       fdPath.set(fd, p);
       fdFlags.set(fd, flags);
+      fdMode.set(fd, mode);
       ops.push(`open:${flags}:${mode}:${p}`);
       if (flags === "a" || flags === "w") existing.add(p);
       return fd;
@@ -81,17 +95,17 @@ function makeFakeFs(opts: FakeOptions = {}): FakeHandle {
     },
     fsyncSync: (fd) => {
       const p = fdPath.get(fd)!;
-      const isDir = fdFlags.get(fd) === "r";
+      const isDir = fdMode.get(fd) === MODE_DIR;
       if (isDir) {
         dirFsync++;
-        if (opts.failOn === "dir-fsync") {
+        if (shouldFail("dir-fsync")) {
           ops.push(`fsync-dir-fail:${p}`);
           throw err("dir fsync failed");
         }
         ops.push(`fsync-dir:${p}`);
       } else {
         fileFsync++;
-        if (opts.failOn === "file-fsync") {
+        if (shouldFail("file-fsync")) {
           ops.push(`fsync-file-fail:${p}`);
           throw err("file fsync failed");
         }
@@ -102,6 +116,7 @@ function makeFakeFs(opts: FakeOptions = {}): FakeHandle {
       ops.push(`close:${fdPath.get(fd)}`);
       fdPath.delete(fd);
       fdFlags.delete(fd);
+      fdMode.delete(fd);
       if (opts.closeThrows) throw err("close failed");
     },
     readFileSync: (p) => {
@@ -111,7 +126,7 @@ function makeFakeFs(opts: FakeOptions = {}): FakeHandle {
       return b;
     },
     renameSync: (o, n) => {
-      if (opts.failOn === "rename") {
+      if (shouldFail("rename")) {
         ops.push(`rename-fail:${o}->${n}`);
         throw err("rename failed");
       }
@@ -283,7 +298,7 @@ describe("durableWriteContentAddressed", () => {
     expect(h.ops.some((o) => o.startsWith(`open:w:${MODE_FILE}:/tmp/store/.`))).toBe(true);
   });
 
-  it("returns success without rewriting when identical bytes already exist", () => {
+  it("re-establishes the durability barrier when identical bytes already exist", () => {
     const target = "/tmp/store/aa.json";
     const bytes = Buffer.from("same", "utf8");
     const h = makeFakeFs({
@@ -292,8 +307,61 @@ describe("durableWriteContentAddressed", () => {
     });
 
     expect(() => durableWriteContentAddressed(target, bytes, h.fs)).not.toThrow();
+    // The idempotent path must NOT rewrite or re-rename the identical file...
     expect(h.ops.some((o) => o.startsWith("rename:"))).toBe(false);
     expect(h.ops.some((o) => o.startsWith("write:"))).toBe(false);
+    // ...but it MUST re-run the full barrier. A prior attempt could have renamed
+    // the file into place and then failed the parent-dir fsync, so neither the
+    // file nor its directory entry can be assumed durable on an identical retry.
+    expect(h.ops).toContain(`fsync-file:${target}`);
+    expect(h.ops).toContain("fsync-dir:/tmp/store");
+    // The file fsync precedes the parent-dir fsync (same order as a fresh write).
+    expect(firstIndex(h.ops, `fsync-file:${target}`)).toBeLessThan(
+      firstIndex(h.ops, "fsync-dir:/tmp/store"),
+    );
+  });
+
+  it("re-runs the barrier on retry after rename succeeded but the dir fsync failed", () => {
+    const target = "/tmp/store/aa.json";
+    const bytes = Buffer.from('{"schema":"catp_tool_action_v1"}', "utf8");
+    // The store dir already exists so the ONLY dir-fsync in the first attempt is
+    // the post-rename parent flush -- exactly the "rename ok, dir fsync failed"
+    // window. failOnce lets the retry's barrier complete.
+    const h = makeFakeFs({
+      existing: ["/", "/tmp", "/tmp/store"],
+      failOn: "dir-fsync",
+      failOnce: true,
+    });
+
+    // First attempt fails closed at the parent-dir fsync.
+    expect(() => durableWriteContentAddressed(target, bytes, h.fs)).toThrow("dir fsync failed");
+    // The rename already landed, so the target exists with the exact bytes.
+    expect(h.files.get(target)?.equals(bytes)).toBe(true);
+    const opsAfterFirst = h.ops.length;
+
+    // The identical retry must NOT short-circuit: it actually re-runs the file
+    // and parent-dir fsync (the barrier the first attempt failed to finish)
+    // before it is allowed to report success.
+    expect(() => durableWriteContentAddressed(target, bytes, h.fs)).not.toThrow();
+    const retryOps = h.ops.slice(opsAfterFirst);
+    expect(retryOps).toContain(`fsync-file:${target}`);
+    expect(retryOps).toContain("fsync-dir:/tmp/store");
+    expect(retryOps.some((o) => o.startsWith("write:"))).toBe(false);
+    expect(retryOps.some((o) => o.startsWith("rename:"))).toBe(false);
+  });
+
+  it("fails closed when the idempotent barrier itself cannot be flushed", () => {
+    const target = "/tmp/store/aa.json";
+    const bytes = Buffer.from("same", "utf8");
+    // dir-fsync fails every time: even the identical-bytes path must throw
+    // rather than report a durability it never established.
+    const h = makeFakeFs({
+      existing: ["/", "/tmp", "/tmp/store", target],
+      files: [[target, Buffer.from(bytes)]],
+      failOn: "dir-fsync",
+    });
+
+    expect(() => durableWriteContentAddressed(target, bytes, h.fs)).toThrow("dir fsync failed");
   });
 
   it("reports corruption when the existing target has different bytes", () => {
@@ -341,13 +409,39 @@ describe("durableCreateEmptyFile", () => {
     expect(lastIndex(h.ops, "fsync-dir:/tmp/agent")).toBeGreaterThan(firstIndex(h.ops, `close:${file}`));
   });
 
-  it("is a no-op when the file already exists", () => {
+  it("re-establishes the durability barrier when the file already exists", () => {
     const file = "/tmp/agent/actions.jsonl";
     const h = makeFakeFs({ existing: ["/", "/tmp", "/tmp/agent", file] });
 
     durableCreateEmptyFile(file, h.fs);
 
-    expect(h.ops.filter((o) => o.startsWith("open:") || o.startsWith("fsync-file:"))).toHaveLength(0);
+    // No bytes are written to an existing file...
+    expect(h.ops.some((o) => o.startsWith("write:"))).toBe(false);
+    // ...but the file and its parent directory are re-flushed so a prior attempt
+    // that created the file and then failed the dir fsync cannot leave a
+    // non-durable entry behind on the next call.
+    expect(h.ops).toContain(`fsync-file:${file}`);
+    expect(h.ops).toContain("fsync-dir:/tmp/agent");
+  });
+
+  it("re-runs the barrier on retry after the new-file dir fsync failed", () => {
+    const file = "/tmp/agent/actions.jsonl";
+    // Parent dir pre-exists, so the only dir-fsync in the first attempt is the
+    // post-create parent flush; failOnce lets the retry complete it.
+    const h = makeFakeFs({
+      existing: ["/", "/tmp", "/tmp/agent"],
+      failOn: "dir-fsync",
+      failOnce: true,
+    });
+
+    expect(() => durableCreateEmptyFile(file, h.fs)).toThrow("dir fsync failed");
+    expect(h.existing.has(file)).toBe(true);
+    const opsAfterFirst = h.ops.length;
+
+    expect(() => durableCreateEmptyFile(file, h.fs)).not.toThrow();
+    const retryOps = h.ops.slice(opsAfterFirst);
+    expect(retryOps).toContain(`fsync-file:${file}`);
+    expect(retryOps).toContain("fsync-dir:/tmp/agent");
   });
 
   it("propagates a file-fsync failure and still closes the descriptor", () => {
