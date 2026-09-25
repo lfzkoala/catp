@@ -178,21 +178,23 @@ the pre-tag release-candidate verification (`bash check.sh`, exit 0), the tag
 `v0.7.5` was pushed at that commit, and the Release workflow published
 `@catp-protocol/cli@0.7.5` (npm `dist-tags.latest` = `0.7.5`). The registry
 tarball and fresh-install smoke test were verified afterward (above).
-README/INSTALL still keep the install example at `0.7.4` for now; they are bumped
-to `0.7.5` in the deferred paper re-pin step (Phase 6), which is now unblocked
-because `0.7.5` is published and verified.
+README/INSTALL now keep the install example at the published `0.7.5` (bumped in
+commit `e7bfe66`), and the deferred paper re-pin step (Phase 6) is complete.
 
-## Paper coordination (deferred)
+## Paper coordination (Phase 6 — complete)
 
 Because CATP behavior changed (#1/#10/#3), the paper's pinned `0.7.4` artifact
-no longer matches current code. The companion `catp_paper` harness fixes
-(#5 artifact gate, #11 RQ1b scorer, #6 RQ2, #7 RQ3, #8 RQ4) are already
-committed, but their measured data is still `0.7.4`. `0.7.5` is now published and
-verified from the registry, so Phase 6 is unblocked: re-pin the artifact
+no longer matched current code. The companion `catp_paper` harness fixes
+(#5 artifact gate, #11 RQ1b scorer, #6 RQ2, #7 RQ3, #8 RQ4) were committed
+first; Phase 6 then re-pinned the artifact to the published `0.7.5`
 (`common.sh` `PINNED_VERSION` = `0.7.5`, `PINNED_COMMIT` =
 `077c5997245f1c52961a03c9f3b3be1f8d06ba6f`, `PINNED_CLI_SHA256` =
 `6fc34688e8e54c0a824ade6c5b5b7aade6271399d209171cfa885ecd1c754c56`, plus
-lockfile, manifest, tarball/cli hashes), rerun RQ1-RQ4 + the Groth16 case study,
-and regenerate `raw`/`processed`/tables/text. Phase 6 is a separate step and is
-still deferred; until it runs, the paper remains in a "scripts corrected + data
-still 0.7.4" intermediate state and is **not** submission-ready.
+lockfile, manifest, tarball/cli hashes), reran RQ1-RQ4 + the Groth16 case study
+from the sealed `0.7.5` artifact, and regenerated `raw`/`processed`/tables/text.
+A later review-remediation pass removed a host per-user temp root from the RQ1b
+evidence (behind a new pre-seal anonymity gate) and bounded the RQ2/RQ3/RQ4
+claims to what the sealed measurements establish. Phase 6 is complete and the
+paper artifact is re-sealed and submission-ready; see `IMPLEMENTATION_PLAN.md`
+(the 0.7.5 milestone) and `catp_paper/artifact/README.md` for the authoritative
+seal record.

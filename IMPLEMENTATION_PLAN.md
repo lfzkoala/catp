@@ -241,8 +241,15 @@ Exit criteria:
   `6fc34688e8e54c0a824ade6c5b5b7aade6271399d209171cfa885ecd1c754c56`; fresh-install
   `catp --version` = `0.7.5`; `scripts/smoke-receipt.sh` driven by the registry
   binary printed `receiptSmoke=ok` (exit 0).
-- Only once 0.7.5 is published and verified: the paper re-pins the artifact and
-  reruns RQ1-RQ4 + Groth16 (deferred Phase 6 step, now unblocked).
+- **DONE (2026-09-25):** the paper re-pinned the artifact to
+  `@catp-protocol/cli@0.7.5` and reran RQ1a/RQ1b/RQ2/RQ3/RQ4 + Groth16 from the
+  sealed, self-contained inputs (deferred Phase 6 step complete). The
+  `catp_paper` reproducibility package is re-sealed at content-freeze commit
+  `ea6981f2742238c70abb29ab77f54b718f0e0b26` / sealing commit
+  `3b5f163d699fcfd5313c92e5d4a3868bcb1c8b70`, deterministic archive SHA-256
+  `45d8a9bc5da1e38b777197c069cfcabc30d1ad317d362c6e91017fcdd309ca54` (237 tracked
+  files), behind a pre-seal anonymity gate that rejects any host per-user temp
+  root; see `catp_paper/artifact/README.md` for the authoritative seal record.
 
 ### P0: 0.7.4 Enforcement-Evidence Release
 
@@ -253,7 +260,8 @@ the registry tarball and a fresh-install smoke test were verified afterward (see
 
 Goal: publish the enforcement-time policy + full-action bindings, durable
 append, fail-closed pre-hook, v2 self-contained export, and v2 receipt as one
-immutable fixed release that the paper experiments are pinned to.
+immutable fixed release. (Superseded as the paper's pin: the experiments are now
+pinned to `0.7.5` -- see the 0.7.5 Security-Remediation Release milestone above.)
 
 Work:
 
@@ -268,8 +276,10 @@ Exit criteria (met):
 - Full repository checks, CLI coverage, Groth16 setup checks, and receipt smoke
   passed on the release commit.
 - Package version, release notes, Git tag, and npm version agree on `0.7.4`.
-- Registry package, release commit, and tag correspondence were verified; the
-  paper is pinned to `@catp-protocol/cli@0.7.4`.
+- Registry package, release commit, and tag correspondence were verified. The
+  paper was pinned to `@catp-protocol/cli@0.7.4` at this release; that pin is now
+  **superseded** by `@catp-protocol/cli@0.7.5` (see the 0.7.5 milestone above), so
+  maintainers should not treat 0.7.4 as the current paper artifact.
 
 ### P0: 0.6.0 Security Convergence Release
 
