@@ -577,6 +577,16 @@ export function verifyReceiptAuditExportV2(receipt: AuthorizationReceiptV2, audi
   if (computeActionCommitment(auditExport.action) !== receipt.action_commitment) {
     throw new Error("receipt action_commitment does not match the bundled complete action");
   }
+  // A valid signature authenticates the issuer's body, but does not make its
+  // copied decision fields consistent with the independently checked entry.
+  for (const field of ["tool", "decision", "phase", "rule_matched", "reason"] as const) {
+    if (receipt[field] !== selected[field]) {
+      throw new Error(`receipt ${field} does not match the selected audit entry`);
+    }
+  }
+  if (receipt.timestamp !== selected.ts) {
+    throw new Error("receipt timestamp does not match the selected audit entry");
+  }
 }
 
 /**

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
-import { createHash, generateKeyPairSync } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -393,6 +393,30 @@ describe("authorization receipt", () => {
       "issuer_key_id does not match the trusted public key",
     );
     expect(() => verifyAuthorizationReceiptV2(receipt, signer.publicKeyPem)).not.toThrow();
+  });
+
+  it.each([
+    ["decision", "deny"],
+    ["tool", "Write"],
+    ["reason", "different explanation"],
+    ["rule_matched", "different-rule"],
+    ["timestamp", "2000-01-01T00:00:00.000Z"],
+  ])("rejects a validly signed receipt with inconsistent %s", (field, value) => {
+    const { privateKeyPem, publicKeyPem } = keyPair();
+    const entry = seedV4("receipt-agent", "Bash", { command: "ls" });
+    const exported = buildAuditExportV2("receipt-agent", entry.commitment);
+    const original = signAuthorizationReceiptV2(exported, privateKeyPem);
+    expect(original[field as keyof AuthorizationReceiptV2]).not.toBe(value);
+    expect(() => verifyReceiptAuditExportV2(original, exported)).not.toThrow();
+    const { signature: originalSignature, receipt_sha256: originalHash, ...body } = original;
+    const changedBody = { ...body, [field as string]: value };
+    const signature = sign(null, Buffer.from("catp:receipt-signature:v2\n" + stableStringify(changedBody)), privateKeyPem).toString("base64");
+    const receipt_sha256 = createHash("sha256").update("catp:receipt:v2\n" + stableStringify({ ...changedBody, signature })).digest("hex");
+    const receipt = { ...changedBody, signature, receipt_sha256 } as AuthorizationReceiptV2;
+    // The signature is valid: the missing check is consistency with the entry,
+    // not resistance to forgery by an adversary without the signing key.
+    expect(() => verifyAuthorizationReceiptV2(receipt, publicKeyPem)).not.toThrow();
+    expect(() => verifyReceiptAuditExportV2(receipt, exported)).toThrow(`receipt ${field} does not match`);
   });
 
   it("rejects a tampered v2 receipt body", () => {
