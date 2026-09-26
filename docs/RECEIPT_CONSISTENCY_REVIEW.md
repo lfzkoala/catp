@@ -27,7 +27,7 @@ consistency fix; this is not an external security audit.
 
 ## Unreleased boundary
 
-Package version and release tags have not changed. This source repair is not
-published 0.7.5 and must not be substituted into the paper's pinned artifact.
+The local package is now candidate 0.7.6; release tags have not changed. This
+source repair is unpublished and must not replace the paper's pinned 0.7.5 artifact.
 A new authorized release, registry identity verification and affected paper
 remeasurement are required. No publish, push or tag movement was performed.

@@ -203,7 +203,7 @@ npm run smoke:receipt                      # receiptSmoke=ok
 
 ## Active Milestones
 
-### P0: Receipt/Entry Consistency Follow-Up (Unreleased)
+### P0: 0.7.6 Receipt/Entry Consistency Release Candidate (Unpublished)
 
 The 2026-09-26 paper mechanism review found that published 0.7.5 accepts
 validly signed receipts whose copied decision, tool, reason, matched rule, or
@@ -212,7 +212,9 @@ to create inconsistent evidence; it is not an unprivileged signature forgery.
 Local verification now compares these fields, with five regression cases.
 See `docs/RECEIPT_CONSISTENCY_REVIEW.md` for evidence and validation.
 
-Release gate: obtain publication authorization, assign a new immutable release
+The local package and lockfile now identify candidate 0.7.6. See
+`docs/RELEASE_0.7.6.md` for its exact-commit validation and release boundary.
+Release gate: obtain publication authorization, publish the new immutable release
 identity, verify the registry artifact, and rerun affected paper verification
 experiments before claiming the complete receipt contract. Do not move v0.7.5
 or present this local repair as the published 0.7.5 artifact. The paper is
